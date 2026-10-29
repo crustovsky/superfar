@@ -27,6 +27,7 @@ public:
 Q_SIGNALS:
     void locationChanged(const core::Location& dir);
     void statusChanged(const QString& text);
+    void loaded();
 
 private:
     void onBatch(quint64 generation, std::vector<core::Entry> entries);

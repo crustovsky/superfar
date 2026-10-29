@@ -5,6 +5,8 @@
 #include <QDateTime>
 #include <QLocale>
 
+#include <malloc.h>
+
 ListModel::ListModel(QObject* parent)
     : QAbstractTableModel(parent)
     , meta_(new core::MetadataQuery(this))
@@ -16,14 +18,17 @@ void ListModel::reset(const core::Location& dir)
 {
     beginResetModel();
     dir_ = dir;
-    entries_.clear();
-    rows_.clear();
+    std::vector<core::Entry>().swap(entries_);  // clear() would keep capacity
+    std::vector<quint32>().swap(rows_);
     rowOfName_.clear();
     metaCache_.clear();
     metaPending_.clear();
     ++metaGeneration_;
     meta_->cancelAll();
     endResetModel();
+    // Hand freed pages back so memory after leaving a big folder reflects
+    // what is still held, not what glibc keeps around.
+    malloc_trim(0);
 }
 
 void ListModel::append(std::vector<core::Entry> batch)

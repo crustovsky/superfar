@@ -8,6 +8,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QSplitter>
+#include <QTimer>
 
 MainWindow::MainWindow(const core::Location& start, QWidget* parent)
     : QMainWindow(parent)
@@ -44,6 +45,27 @@ MainWindow::MainWindow(const core::Location& start, QWidget* parent)
 
     pane_->activeTab()->navigate(start);
     pane_->setFocus();
+
+    // Bench aid: SUPERFAR_BENCH_THEN=<folder> navigates there once the
+    // first folder has loaded, so memory after leaving a big folder can
+    // be measured.
+    if (const QByteArray then = qgetenv("SUPERFAR_BENCH_THEN"); !then.isEmpty()) {
+        connect(pane_->activeTab(), &Tab::loaded, this, [this, then] {
+            disconnect(pane_->activeTab(), &Tab::loaded, this, nullptr);
+            QTimer::singleShot(1000, this, [this, then] {
+                pane_->activeTab()->navigate(core::Location::fromCommandLine(then));
+            });
+        });
+    }
+
+    // Dev aid: SUPERFAR_GRAB=<file.png> renders the window to a file and
+    // quits, so the look can be checked without a screenshot tool.
+    if (const QByteArray grabPath = qgetenv("SUPERFAR_GRAB"); !grabPath.isEmpty()) {
+        QTimer::singleShot(1500, this, [this, grabPath] {
+            grab().save(QString::fromLocal8Bit(grabPath));
+            qApp->quit();
+        });
+    }
 }
 
 void MainWindow::paintEvent(QPaintEvent* event)

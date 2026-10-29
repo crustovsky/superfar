@@ -81,6 +81,7 @@ void Tab::onFinished(quint64 generation)
     placeCursor();
     updateStatus();
     bench::mark("loaded");
+    Q_EMIT loaded();
 }
 
 void Tab::onFailed(quint64 generation, const QString& message)

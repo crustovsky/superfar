@@ -220,15 +220,31 @@ src/app/
 ## Performance budget
 
 `tools/bench.sh` opens a 100,000-entry folder and a 2,000-entry folder in
-superfar and Thunar, cold and warm cache. It reports time to first rows,
-startup to first frame, and memory as PSS split into a same-toolkit
-baseline (an empty Qt Widgets window) plus the delta the app adds.
-Gates, with numbers set after milestone 1 measures the skeleton: first
-rows no slower than Thunar on the same folder; memory delta for the 100k
-folder under a fixed bound and back to baseline after navigating away;
-startup to first frame under a measured bound. Thunar's memory is reported
-alongside, never used as a gate: it is a different toolkit. A milestone is
-not done while it misses a gate.
+superfar and Thunar, warm cache by default and cold with `--cold`. It
+reports time to first frame (window mapped, measured from outside with
+hyprctl), superfar's own marks (first rows, loaded), and memory as PSS
+after the app settles, split into the empty Qt window baseline plus what
+the app adds. Thunar is a different toolkit: shown for reference, never
+a gate.
+
+Gates, warm cache, against the milestone 1 skeleton measured 2026-10-29:
+
+| measure                        | gate     | skeleton |
+|--------------------------------|----------|----------|
+| first frame, empty window      | < 80 ms  | 30 ms    |
+| first rows, 100k folder        | < 100 ms | 37 ms    |
+| loaded, 100k folder            | < 1 s    | 0.6 s    |
+| PSS, empty window              | < 30 MB  | 24 MB    |
+| PSS added by the 100k folder   | < 60 MB  | 47 MB    |
+| PSS kept after leaving it      | < 15 MB  | 5 to 13 MB |
+
+Reference on the same machine: Thunar 4.20 maps its window in about
+340 ms and the bench read about 400 MB PSS on either folder.
+
+The 100k folder costs about 360 bytes per entry today (name, display
+string, collation key, row index, name hash). That is the number to
+shrink, not the gate to loosen. A milestone is not done while it misses
+a gate.
 
 ## Milestones
 
