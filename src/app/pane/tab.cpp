@@ -181,6 +181,9 @@ bool Tab::execute(keymap::Command command)
     case Command::GoUp:
         goUp();
         return true;
+    case Command::Activate:
+        activate(cur);
+        return true;
     case Command::Reload:
         reload();
         return true;

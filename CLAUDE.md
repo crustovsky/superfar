@@ -97,6 +97,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Selection is marks, separate from the cursor
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
+- Backspace and Left go up; Right and Enter open the cursor folder
 - Ctrl+L edits the path (accepts remote URIs); Ctrl+G go to folder, fuzzy
   over history by frecency; Ctrl+H toggles hidden files
 - Ctrl+Space focuses the command line, which runs in the active tab's

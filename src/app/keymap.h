@@ -40,6 +40,7 @@ enum class Command {
     MarkAll,
     InvertMarks,
     GoUp,
+    Activate,  // enter the cursor folder
     Preview,
 };
 

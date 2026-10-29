@@ -39,6 +39,8 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_A), Command::MarkAll},
         {QKeySequence(Qt::Key_Asterisk), Command::InvertMarks},
         {QKeySequence(Qt::Key_Backspace), Command::GoUp},
+        {QKeySequence(Qt::Key_Left), Command::GoUp},
+        {QKeySequence(Qt::Key_Right), Command::Activate},
         {QKeySequence(Qt::CTRL | Qt::Key_Q), Command::Preview},
     };
     return t;
@@ -102,6 +104,7 @@ QString label(Command command)
     case Command::MarkAll: return QStringLiteral("Select all");
     case Command::InvertMarks: return QStringLiteral("Invert");
     case Command::GoUp: return QStringLiteral("Up");
+    case Command::Activate: return QStringLiteral("Enter");
     case Command::Preview: return QStringLiteral("Preview");
     case Command::None: return {};
     }

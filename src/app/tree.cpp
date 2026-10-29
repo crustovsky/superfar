@@ -299,6 +299,7 @@ void Tree::keyPressEvent(QKeyEvent* event)
     case Command::MarkAll:
     case Command::InvertMarks:
     case Command::GoUp:
+    case Command::Activate:
         QTreeView::keyPressEvent(event);  // the tree's own keys
         return;
     default:
