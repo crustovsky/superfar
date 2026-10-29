@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     const QStringList args = parser.positionalArguments();
     core::Location start = args.isEmpty() ? core::Location::home()
                                           : core::Location::fromCommandLine(QFile::encodeName(args.first()));
-    MainWindow window(start);
+    MainWindow window(start, core::Location::home());
     window.show();
     return app.exec();
 }

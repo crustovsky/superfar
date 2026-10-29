@@ -1,6 +1,9 @@
-// The file list of one tab: a flat tree view over ListModel with the keys
-// a pane needs. Cursor is the current index; marks come in milestone 2.
+// The file list of one tab: a flat tree view over ListModel. The cursor
+// is the current index; marks live in the model; keys go through the
+// keymap and come out as commands.
 #pragma once
+
+#include "keymap.h"
 
 #include <QTreeView>
 
@@ -12,13 +15,23 @@ public:
     // Fixed widths for the numeric columns from font metrics (rule 12).
     void sizeColumns();
 
+    void setActivePane(bool active);
+    // Only the first tab of the first pane reports bench marks.
+    void setBenchReporter(bool on) { benchReporter_ = on; }
+    bool activePane() const { return active_; }
+
 Q_SIGNALS:
-    void goUpRequested();
+    void commandRequested(keymap::Command command);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
 
 private:
+    QRect rowRect(const QModelIndex& index) const;
+
+    bool active_ = false;
     bool paintedRows_ = false;
+    bool benchReporter_ = false;
 };

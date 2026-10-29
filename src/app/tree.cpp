@@ -4,6 +4,7 @@
 #include "core/sort.h"
 
 #include <QHeaderView>
+#include <QKeyEvent>
 
 struct TreeModel::Node {
     enum State { Unloaded, Loading, Loaded };
@@ -183,6 +184,7 @@ Tree::Tree(QWidget* parent)
     setSelectionMode(SingleSelection);
     setEditTriggers(NoEditTriggers);
     setExpandsOnDoubleClick(true);
+    setTabKeyNavigation(true);  // so Tab reaches keyPressEvent
     header()->setStretchLastSection(false);
     header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -196,6 +198,25 @@ Tree::Tree(QWidget* parent)
                 if (!guard_ && current.isValid())
                     Q_EMIT folderChosen(model_->locationAt(current));
             });
+}
+
+void Tree::keyPressEvent(QKeyEvent* event)
+{
+    using keymap::Command;
+    const Command cmd = keymap::lookup(event);
+    switch (cmd) {
+    case Command::None:
+    case Command::Mark:
+    case Command::MarkToggle:
+    case Command::MarkAll:
+    case Command::InvertMarks:
+    case Command::GoUp:
+        QTreeView::keyPressEvent(event);  // the tree's own keys
+        return;
+    default:
+        event->accept();
+        Q_EMIT commandRequested(cmd);
+    }
 }
 
 void Tree::reveal(const core::Location& dir)

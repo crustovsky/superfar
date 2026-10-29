@@ -3,6 +3,9 @@ qt_add_executable(superfar
   bench.cpp
   mainwindow.cpp
   tree.cpp
+  keymap.cpp
+  funcbar.cpp
+  pane/delegate.cpp
   pane/pane.cpp
   pane/tab.cpp
   pane/listview.cpp

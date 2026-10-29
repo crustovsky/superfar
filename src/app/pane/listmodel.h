@@ -31,6 +31,18 @@ public:
     void setShowHidden(bool on);
     bool showHidden() const { return showHidden_; }
 
+    // Marks (the selection) live here, separate from the cursor. They are
+    // per entry, so hiding rows keeps them; a load clears them and the
+    // tab restores them by name.
+    bool isMarked(int row) const { return marked_[rows_[row]] != 0; }
+    void setMarked(int row, bool on);
+    void toggleMarked(int row) { setMarked(row, !isMarked(row)); }
+    void markAll(bool on);
+    void invertMarks();
+    int markedCount() const { return markedCount_; }
+    QSet<QByteArray> markedNames() const;
+    void applyMarks(const QSet<QByteArray>& names);
+
     int rowOf(const QByteArray& name) const;
     const core::Entry& entryAt(int row) const { return entries_[rows_[row]]; }
     int totalCount() const { return static_cast<int>(entries_.size()); }
@@ -41,8 +53,12 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
+Q_SIGNALS:
+    void marksChanged();
+
 private:
     void rebuildRows();
+    void rowsRepaint();
     const core::Metadata* metadata(const core::Entry& entry) const;
     QIcon icon(const core::Entry& entry) const;
     QIcon themeIcon(const QStringList& names) const;
@@ -51,6 +67,8 @@ private:
     core::Location dir_;
     std::vector<core::Entry> entries_;
     std::vector<quint32> rows_;  // visible entries, in display order
+    std::vector<quint8> marked_;  // per entry
+    int markedCount_ = 0;
     QHash<QByteArray, int> rowOfName_;
     bool showHidden_ = false;
 

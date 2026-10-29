@@ -20,6 +20,8 @@ void ListModel::reset(const core::Location& dir)
     dir_ = dir;
     std::vector<core::Entry>().swap(entries_);  // clear() would keep capacity
     std::vector<quint32>().swap(rows_);
+    std::vector<quint8>().swap(marked_);
+    markedCount_ = 0;
     rowOfName_.clear();
     metaCache_.clear();
     metaPending_.clear();
@@ -44,6 +46,7 @@ void ListModel::append(std::vector<core::Entry> batch)
             added.push_back(base + i);
     entries_.insert(entries_.end(), std::make_move_iterator(batch.begin()),
                     std::make_move_iterator(batch.end()));
+    marked_.resize(entries_.size(), 0);
     if (added.empty())
         return;
 
@@ -60,8 +63,67 @@ void ListModel::finishLoad()
 {
     beginResetModel();
     core::sortByName(entries_);
+    marked_.assign(entries_.size(), 0);  // sorted entries: marks are restored by name
+    markedCount_ = 0;
     rebuildRows();
     endResetModel();
+    Q_EMIT marksChanged();
+}
+
+void ListModel::setMarked(int row, bool on)
+{
+    quint8& m = marked_[rows_[row]];
+    if ((m != 0) == on)
+        return;
+    m = on ? 1 : 0;
+    markedCount_ += on ? 1 : -1;
+    Q_EMIT dataChanged(index(row, 0), index(row, ColumnCount - 1));
+    Q_EMIT marksChanged();
+}
+
+void ListModel::markAll(bool on)
+{
+    for (quint32 idx : rows_)
+        marked_[idx] = on ? 1 : 0;
+    markedCount_ = on ? static_cast<int>(rows_.size()) : 0;
+    rowsRepaint();
+}
+
+void ListModel::invertMarks()
+{
+    markedCount_ = 0;
+    for (quint32 idx : rows_) {
+        marked_[idx] = marked_[idx] ? 0 : 1;
+        markedCount_ += marked_[idx];
+    }
+    rowsRepaint();
+}
+
+QSet<QByteArray> ListModel::markedNames() const
+{
+    QSet<QByteArray> names;
+    for (quint32 i = 0; i < entries_.size(); ++i)
+        if (marked_[i])
+            names.insert(entries_[i].name);
+    return names;
+}
+
+void ListModel::applyMarks(const QSet<QByteArray>& names)
+{
+    markedCount_ = 0;
+    for (quint32 i = 0; i < entries_.size(); ++i) {
+        marked_[i] = names.contains(entries_[i].name) ? 1 : 0;
+        if (marked_[i] && (showHidden_ || !entries_[i].hidden))
+            ++markedCount_;
+    }
+    rowsRepaint();
+}
+
+void ListModel::rowsRepaint()
+{
+    if (!rows_.empty())
+        Q_EMIT dataChanged(index(0, 0), index(rowCount() - 1, ColumnCount - 1));
+    Q_EMIT marksChanged();
 }
 
 void ListModel::setShowHidden(bool on)

@@ -2,9 +2,11 @@
 # Opens a 100,000-entry folder and a 2,000-entry folder in superfar and
 # Thunar and reports time to first frame (window mapped, measured from
 # outside with hyprctl), superfar's own marks (first rows, loaded), and
-# memory as PSS after the app settles. Memory is reported as the empty
-# Qt window baseline plus what the app adds; Thunar is a different
-# toolkit and is shown for reference only.
+# memory after the app settles: PSS for the whole footprint and anonymous
+# memory for what the app itself allocates. PSS shares library pages
+# with every other process mapping them, so it drifts with whatever else
+# is running; the anonymous figure is the one to gate on. Thunar is a
+# different toolkit and is shown for reference only.
 #
 #   tools/bench.sh [--cold] [--no-thunar]
 #
@@ -64,13 +66,17 @@ pss_mb() {
     awk '/^Pss:/{printf "%.1f", $2 / 1024}' "/proc/$1/smaps_rollup"
 }
 
+anon_mb() {
+    awk '/^Anonymous:/{printf "%.1f", $2 / 1024}' "/proc/$1/smaps_rollup"
+}
+
 mark() {
     # mark <log> <name>: ms of the first matching bench line, or -
     awk -v n="$2" '$1 == "bench" && $2 == n {print $3; exit}' "$1" | grep . || echo "-"
 }
 
 row() {
-    printf "%-9s %-9s %10s %10s %8s %9s %9s\n" "$@"
+    printf "%-9s %-9s %10s %10s %8s %8s %8s %9s\n" "$@"
 }
 
 run_superfar() {
@@ -85,10 +91,11 @@ run_superfar() {
     local frame
     frame=$(wait_window superfar "$start")
     sleep "$SETTLE"
-    local pss
+    local pss anon
     pss=$(pss_mb "$pid")
+    anon=$(anon_mb "$pid")
     kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true
-    row superfar "$label" "$frame" "$(mark "$log" first-rows)" "$(mark "$log" loaded)" "$pss" "-"
+    row superfar "$label" "$frame" "$(mark "$log" first-rows)" "$(mark "$log" loaded)" "$pss" "$anon" "-"
     rm -f "$log"
 }
 
@@ -103,17 +110,18 @@ run_superfar_then() {
     local pid=$!
     wait_window superfar "$start" >/dev/null
     sleep $(( SETTLE + 3 ))
-    local pss
+    local pss anon
     pss=$(pss_mb "$pid")
+    anon=$(anon_mb "$pid")
     kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true
-    row superfar "big>small" "-" "-" "-" "$pss" "-"
+    row superfar "big>small" "-" "-" "-" "$pss" "$anon" "-"
     rm -f "$log"
 }
 
 run_thunar() {
     local label=$1 folder=$2
     if pgrep -x thunar >/dev/null; then
-        row thunar "$label" "-" "-" "-" "-" "running, skipped"
+        row thunar "$label" "-" "-" "-" "-" "-" "running, skipped"
         return
     fi
     (( COLD )) && drop_caches
@@ -124,16 +132,17 @@ run_thunar() {
     local frame
     frame=$(wait_window thunar "$start")
     sleep "$SETTLE"
-    local pss
+    local pss anon
     pss=$(pss_mb "$pid")
+    anon=$(anon_mb "$pid")
     kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null || true
-    row thunar "$label" "$frame" "-" "-" "$pss" "-"
+    row thunar "$label" "$frame" "-" "-" "$pss" "$anon" "-"
 }
 
 prepare
 echo "cache: $([[ $COLD == 1 ]] && echo cold || echo warm), settle ${SETTLE}s"
-row app folder frame_ms rows_ms loaded_ms pss_mb note
-row --- ------ -------- ------- --------- ------ ----
+row app folder frame_ms rows_ms loaded_ms pss_mb anon_mb note
+row --- ------ -------- ------- --------- ------ ------- ----
 run_superfar baseline --baseline
 run_superfar small "$DATA/small"
 run_superfar big "$DATA/big"

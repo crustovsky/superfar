@@ -1,13 +1,17 @@
-// A pane: path bar, the tabs, status line. Milestone 1 holds one tab; the
-// tab strip arrives in milestone 2 but the pane / tab split is here now.
+// A pane: tab strip, path bar, the tabs, status line. The active pane
+// draws an accent border and a highlighted path bar, both from palette
+// roles.
 #pragma once
 
 #include "core/location.h"
+#include "keymap.h"
 
 #include <QWidget>
 
 class QLabel;
 class QStackedWidget;
+class QTabBar;
+class QTimer;
 class Tab;
 
 class Pane : public QWidget {
@@ -16,12 +20,37 @@ public:
     explicit Pane(QWidget* parent = nullptr);
 
     Tab* activeTab() const;
+    int tabCount() const;
+    Tab* newTab(const core::Location& dir);
+
+    void setActive(bool active);
+    bool isActive() const { return active_; }
+
+    // Runs a pane-scoped command, else hands it to the active tab.
+    bool execute(keymap::Command command);
+    // Shows text in the status line for a moment.
+    void showMessage(const QString& text);
 
 Q_SIGNALS:
-    void locationChanged(const core::Location& dir);
+    void locationChanged(const core::Location& dir);  // of the active tab
+    void commandRequested(keymap::Command command);
+
+protected:
+    void paintEvent(QPaintEvent* event) override;
 
 private:
+    bool hasFocusInside() const;
+    void closeTab(int index);
+    void onCurrentTab(int index);
+    void showStatus(const QString& items, const QString& space);
+    static QString title(const core::Location& dir);
+
+    QTabBar* tabBar_;
     QLabel* path_;
-    QStackedWidget* tabs_;
+    QStackedWidget* stack_;
     QLabel* status_;
+    QLabel* space_;
+    QTimer* messageTimer_;
+    QString statusText_;
+    bool active_ = false;
 };

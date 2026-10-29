@@ -222,24 +222,29 @@ src/app/
 `tools/bench.sh` opens a 100,000-entry folder and a 2,000-entry folder in
 superfar and Thunar, warm cache by default and cold with `--cold`. It
 reports time to first frame (window mapped, measured from outside with
-hyprctl), superfar's own marks (first rows, loaded), and memory as PSS
-after the app settles, split into the empty Qt window baseline plus what
-the app adds. Thunar is a different toolkit: shown for reference, never
-a gate.
+hyprctl), superfar's own marks (first rows, loaded), and memory after the
+app settles: PSS for the whole footprint and anonymous memory for what
+the app itself allocates. PSS shares library pages with every process
+that maps them, so it drifts with whatever else is running; gates are on
+anonymous memory. Thunar is a different toolkit: shown for reference,
+never a gate.
 
-Gates, warm cache, against the milestone 1 skeleton measured 2026-10-29:
+Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 
-| measure                        | gate     | skeleton |
-|--------------------------------|----------|----------|
-| first frame, empty window      | < 80 ms  | 30 ms    |
-| first rows, 100k folder        | < 100 ms | 37 ms    |
-| loaded, 100k folder            | < 1 s    | 0.6 s    |
-| PSS, empty window              | < 30 MB  | 24 MB    |
-| PSS added by the 100k folder   | < 60 MB  | 47 MB    |
-| PSS kept after leaving it      | < 15 MB  | 5 to 13 MB |
+| measure                            | gate     | measured |
+|------------------------------------|----------|----------|
+| first frame, empty window          | < 80 ms  | 30 ms    |
+| first rows, 100k folder            | < 100 ms | 40 ms    |
+| loaded, 100k folder                | < 1 s    | 0.5 s    |
+| anonymous memory, empty window     | < 8 MB   | 4.4 MB   |
+| anonymous memory, 2k folder open   | < 16 MB  | 12 MB    |
+| anonymous memory, 100k folder open | < 60 MB  | 48 MB    |
+| anonymous memory after leaving it  | < 24 MB  | 17 MB    |
 
-Reference on the same machine: Thunar 4.20 maps its window in about
-340 ms and the bench read about 400 MB PSS on either folder.
+Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
+folder open, depending on what else shares Qt's pages. Reference on the
+same machine: Thunar 4.20 maps its window in about 340 ms and the bench
+read about 400 MB PSS on either folder.
 
 The 100k folder costs about 360 bytes per entry today (name, display
 string, collation key, row index, name hash). That is the number to

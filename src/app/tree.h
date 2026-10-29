@@ -5,6 +5,7 @@
 
 #include "core/entry.h"
 #include "core/location.h"
+#include "keymap.h"
 
 #include <QAbstractItemModel>
 #include <QIcon>
@@ -58,6 +59,10 @@ public:
 
 Q_SIGNALS:
     void folderChosen(const core::Location& dir);
+    void commandRequested(keymap::Command command);
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void continueReveal();

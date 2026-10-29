@@ -5,6 +5,7 @@ qt_add_library(superfar_core STATIC
   sort.cpp
   listing.cpp
   metadata.cpp
+  space.cpp
 )
 target_include_directories(superfar_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(superfar_core
