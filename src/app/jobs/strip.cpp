@@ -64,7 +64,12 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
 
     connect(pause_, &QToolButton::toggled, job_, &core::Job::setPaused);
     connect(abort, &QToolButton::clicked, job_, &core::Job::abort);
-    connect(details_, &QToolButton::toggled, panel_, &QWidget::setVisible);
+    connect(details_, &QToolButton::toggled, this, [this](bool on) {
+        panel_->setVisible(on);
+        // Only an open panel takes extra height from the bar area.
+        setSizePolicy(QSizePolicy::Preferred, on ? QSizePolicy::Expanding : QSizePolicy::Fixed);
+    });
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     connect(job_, &core::Job::progress, this, &JobRow::onProgress);
 
     auto* timer = new QTimer(this);

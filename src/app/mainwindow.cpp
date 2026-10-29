@@ -45,12 +45,21 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     split->setStretchFactor(1, 1);
     split->setSizes({220, 880});
 
+    // The bar area sits under the panes behind a draggable handle; extra
+    // height goes to a job's graph or a log list.
+    auto* vsplit = new QSplitter(Qt::Vertical, this);
+    vsplit->addWidget(split);
+    vsplit->addWidget(strip_);
+    vsplit->setStretchFactor(0, 1);
+    vsplit->setStretchFactor(1, 0);
+    vsplit->setCollapsible(0, false);
+    vsplit->setCollapsible(1, false);
+
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(split, 1);
-    layout->addWidget(strip_);
+    layout->addWidget(vsplit, 1);
     layout->addWidget(funcbar_);
     setCentralWidget(central);
 

@@ -15,7 +15,7 @@ ThroughputGraph::ThroughputGraph(QWidget* parent)
     : QWidget(parent)
 {
     setMinimumHeight(56);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 void ThroughputGraph::setHistory(const std::vector<double>* history, bool bytesUnit)

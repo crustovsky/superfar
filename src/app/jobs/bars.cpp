@@ -21,10 +21,11 @@ QPushButton* button(const QString& text, QWidget* parent)
     return b;
 }
 
-void frame(QFrame* f)
+void frame(QFrame* f, bool grows = false)
 {
     f->setFrameShape(QFrame::StyledPanel);
     f->setFocusPolicy(Qt::StrongFocus);
+    f->setSizePolicy(QSizePolicy::Preferred, grows ? QSizePolicy::Expanding : QSizePolicy::Fixed);
 }
 
 QString when(qint64 secs)
@@ -159,7 +160,7 @@ void ErrorBar::keyPressEvent(QKeyEvent* event)
 LogBar::LogBar(const QString& title, const std::vector<core::LogEntry>& log, QWidget* parent)
     : QFrame(parent)
 {
-    frame(this);
+    frame(this, true);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
@@ -178,8 +179,8 @@ LogBar::LogBar(const QString& title, const std::vector<core::LogEntry>& log, QWi
         list->addItem(e.message.isEmpty() ? QStringLiteral("%1: %2").arg(kind, e.path)
                                           : QStringLiteral("%1: %2 (%3)").arg(kind, e.path, e.message));
     }
-    list->setMaximumHeight(list->sizeHintForRow(0) * 6 + 8);
-    layout->addWidget(list);
+    list->setMinimumHeight(list->sizeHintForRow(0) * 3 + 8);
+    layout->addWidget(list, 1);
     connect(close, &QPushButton::clicked, this, &LogBar::closed);
     setFocusProxy(close);
 }
