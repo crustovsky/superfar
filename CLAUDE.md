@@ -281,8 +281,11 @@ changes, ignore extension, live old / new preview with per-row checkboxes,
 clash detection, presets, batch undo); folder sync (compare the two tabs
 by name, size, mtime, optional hash; results list with per-row actions,
 copy-left, copy-right, delete orphans; built on the walker and the job
-engine); properties and permissions panel; thumbnails; inline folder
-expanders; archives as folders (GVfs archive:// first).
+engine); multi-folder create, Opus style (F7 grows into a multi-line
+field: one folder per line, and a/b/c creates the whole path, every
+folder made in one go with the cursor on the first); properties and
+permissions panel; thumbnails; inline folder expanders; archives as
+folders (GVfs archive:// first).
 
 ## Non-goals
 
