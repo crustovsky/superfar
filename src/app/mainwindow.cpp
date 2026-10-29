@@ -1,12 +1,20 @@
 #include "mainwindow.h"
 
 #include "bench.h"
+#include "core/fileops.h"
+#include "core/jobs/remove.h"
+#include "core/jobs/transfer.h"
 #include "funcbar.h"
+#include "jobs/bars.h"
+#include "jobs/strip.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
 #include "tree.h"
 
 #include <QApplication>
+#include <QFile>
+#include <QKeyEvent>
+#include <QPointer>
 #include <QSplitter>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -19,6 +27,7 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     , right_(new Pane(this))
     , active_(left_)
     , funcbar_(new FuncBar(this))
+    , strip_(new JobStrip(this))
 {
     setWindowTitle(QStringLiteral("superfar"));
     resize(1100, 700);
@@ -41,6 +50,7 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(split, 1);
+    layout->addWidget(strip_);
     layout->addWidget(funcbar_);
     setCentralWidget(central);
 
@@ -51,6 +61,7 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
         });
         connect(pane, &Pane::commandRequested, this, &MainWindow::execute);
     }
+    connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
     connect(tree_, &Tree::commandRequested, this, &MainWindow::execute);
@@ -64,8 +75,13 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
             setActivePane(right_);
     });
 
-    left_->newTab(left);
-    right_->newTab(right);
+    auto watchTab = [this](Tab* tab) {
+        connect(tab, &Tab::folderChanged, this, [this, tab] { tree_->refresh(tab->location()); });
+    };
+    watchTab(left_->newTab(left));
+    watchTab(right_->newTab(right));
+    for (Pane* pane : {left_, right_})
+        connect(pane, &Pane::tabOpened, this, watchTab);
     left_->setActive(true);
     left_->activeTab()->setFocus();
 
@@ -82,10 +98,38 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
         });
     }
 
+    // Dev aid: SUPERFAR_DEV_KEYS="Ctrl+A;F5;Return" posts those keys to the
+    // focused widget, one every 400 ms, once the first folder has loaded.
+    if (const QByteArray keys = qgetenv("SUPERFAR_DEV_KEYS"); !keys.isEmpty()) {
+        Tab* tab = left_->activeTab();
+        connect(tab, &Tab::loaded, this, [keys] {
+            static bool fired = false;
+            if (fired)
+                return;
+            fired = true;
+            const QStringList parts = QString::fromLatin1(keys).split(QLatin1Char(';'), Qt::SkipEmptyParts);
+            for (int i = 0; i < parts.size(); ++i) {
+                QTimer::singleShot(400 * (i + 1), qApp, [part = parts[i]] {
+                    QWidget* target = QApplication::focusWidget();
+                    if (!target)
+                        return;
+                    const QKeySequence seq(part);
+                    const QKeyCombination combo = seq[0];
+                    const QString text = combo.keyboardModifiers() == Qt::NoModifier && combo.key() < 0x100
+                        ? QString(QChar(static_cast<int>(combo.key()))) : QString();
+                    QApplication::postEvent(target, new QKeyEvent(QEvent::KeyPress, combo.key(), combo.keyboardModifiers(), text));
+                    QApplication::postEvent(target, new QKeyEvent(QEvent::KeyRelease, combo.key(), combo.keyboardModifiers(), text));
+                });
+            }
+        });
+    }
+
     // Dev aid: SUPERFAR_GRAB=<file.png> renders the window to a file and
     // quits, so the look can be checked without a screenshot tool.
     if (const QByteArray grabPath = qgetenv("SUPERFAR_GRAB"); !grabPath.isEmpty()) {
-        QTimer::singleShot(1500, this, [this, grabPath] {
+        const int delay = qEnvironmentVariableIntValue("SUPERFAR_GRAB_MS") > 0
+            ? qEnvironmentVariableIntValue("SUPERFAR_GRAB_MS") : 1500;
+        QTimer::singleShot(delay, this, [this, grabPath] {
             grab().save(QString::fromLocal8Bit(grabPath));
             qApp->quit();
         });
@@ -140,11 +184,105 @@ void MainWindow::execute(keymap::Command command)
     case Command::HideRight:
         togglePane(right_);
         return;
+    case Command::Copy:
+        startTransfer(false);
+        return;
+    case Command::Move:
+        startTransfer(true);
+        return;
+    case Command::Mkdir:
+        promptMkdir();
+        return;
+    case Command::Trash:
+        confirmRemove(false);
+        return;
+    case Command::DeletePermanent:
+        confirmRemove(true);
+        return;
     default:
         break;
     }
     if (!active_->execute(command))
         active_->showMessage(tr("Not yet: %1").arg(keymap::label(command)));
+}
+
+void MainWindow::startTransfer(bool move)
+{
+    Tab* tab = active_->activeTab();
+    const auto sources = tab->selectedLocations();
+    if (sources.empty())
+        return;
+    const core::Location dest = otherPane()->activeTab()->location();
+    const QString verb = move ? tr("Move") : tr("Copy");
+    PromptBar* bar = strip_->prompt(tr("%1 %2 to").arg(verb, tab->selectionText()), verb, dest.displayPath());
+    connect(bar, &PromptBar::accepted, this, [this, tab, sources, move](const QString& text) {
+        const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
+        if (!target.isValid())
+            return;
+        runJob(new core::TransferJob(sources, target, move), tab, target);
+    });
+}
+
+void MainWindow::promptMkdir()
+{
+    Tab* tab = active_->activeTab();
+    PromptBar* bar = strip_->prompt(tr("New folder"), tr("Create"), QString());
+    connect(bar, &PromptBar::accepted, this, [this, tab](const QString& text) {
+        const QByteArray name = QFile::encodeName(text.trimmed());
+        if (name.isEmpty())
+            return;
+        const core::Location dir = tab->location();
+        QPointer<Tab> guard(tab);
+        core::makeDirectory(dir.child(name), [this, guard, dir, name](const QString& error) {
+            if (!error.isEmpty()) {
+                active_->showMessage(error);
+                return;
+            }
+            if (guard && guard->location() == dir)
+                guard->reloadWithCursor(name);
+            tree_->refresh(dir);
+        });
+    });
+}
+
+void MainWindow::confirmRemove(bool permanent)
+{
+    Tab* tab = active_->activeTab();
+    const auto sources = tab->selectedLocations();
+    if (sources.empty())
+        return;
+    const QString what = tab->selectionText();
+    PromptBar* bar = strip_->prompt(permanent ? tr("Delete %1 permanently?").arg(what)
+                                              : tr("Move %1 to the trash?").arg(what),
+                                    permanent ? tr("Delete") : tr("Trash"), std::nullopt);
+    connect(bar, &PromptBar::accepted, this, [this, tab, sources, permanent] {
+        runJob(new core::RemoveJob(sources, permanent), tab, tab->location());
+    });
+}
+
+void MainWindow::runJob(core::Job* job, Tab* sourceTab, const core::Location& destination)
+{
+    QPointer<Tab> source(sourceTab);
+    const core::Location sourceDir = sourceTab->location();
+    connect(job, &core::Job::finished, this, [this, source, sourceDir, destination] {
+        if (source && source->location() == sourceDir)
+            source->clearMarks();
+        refreshAt(sourceDir);
+        refreshAt(destination);
+        tree_->refresh(sourceDir);
+        tree_->refresh(destination);
+    });
+    strip_->addJob(job);
+}
+
+void MainWindow::refreshAt(const core::Location& dir)
+{
+    // Monitored tabs catch up on their own; the rest (remote backends
+    // without monitors) reload explicitly.
+    for (Pane* pane : {left_, right_})
+        for (Tab* tab : pane->tabs())
+            if (tab->location() == dir && !tab->monitoring())
+                tab->reload();
 }
 
 void MainWindow::paintEvent(QPaintEvent* event)

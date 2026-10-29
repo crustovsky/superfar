@@ -18,7 +18,8 @@ int main(int argc, char** argv)
     parser.setApplicationDescription(QStringLiteral("Dual-pane file manager"));
     parser.addHelpOption();
     parser.addVersionOption();
-    parser.addPositionalArgument(QStringLiteral("folder"), QStringLiteral("Folder to open"));
+    parser.addPositionalArgument(QStringLiteral("left"), QStringLiteral("Folder for the left pane"));
+    parser.addPositionalArgument(QStringLiteral("right"), QStringLiteral("Folder for the right pane"), QStringLiteral("[right]"));
     QCommandLineOption baseline(QStringLiteral("baseline"),
                                 QStringLiteral("Open an empty window, for tools/bench.sh"));
     parser.addOption(baseline);
@@ -33,9 +34,11 @@ int main(int argc, char** argv)
     }
 
     const QStringList args = parser.positionalArguments();
-    core::Location start = args.isEmpty() ? core::Location::home()
-                                          : core::Location::fromCommandLine(QFile::encodeName(args.first()));
-    MainWindow window(start, core::Location::home());
+    auto at = [&](int i) {
+        return args.size() > i ? core::Location::fromCommandLine(QFile::encodeName(args[i]))
+                               : core::Location::home();
+    };
+    MainWindow window(at(0), at(1));
     window.show();
     return app.exec();
 }

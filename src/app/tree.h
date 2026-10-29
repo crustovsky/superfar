@@ -19,6 +19,8 @@ public:
     explicit TreeModel(QObject* parent = nullptr);
     ~TreeModel() override;
 
+    struct Node;
+
     QModelIndex rootIndex() const;
     core::Location locationAt(const QModelIndex& index) const;
     bool isLoaded(const QModelIndex& index) const;
@@ -26,6 +28,11 @@ public:
     QModelIndex childNamed(const QModelIndex& parent, const QByteArray& name) const;
     // Starts loading the folder's children unless already loaded or loading.
     void load(const QModelIndex& index);
+    // Index of a location reached through loaded nodes only, else invalid.
+    QModelIndex indexFor(const core::Location& dir) const;
+    // Re-lists a loaded folder and merges: gone folders leave, new ones
+    // slot in sorted, the rest keep their expansion.
+    void refresh(const QModelIndex& index);
 
     QModelIndex index(int row, int column, const QModelIndex& parent = {}) const override;
     QModelIndex parent(const QModelIndex& child) const override;
@@ -40,10 +47,11 @@ Q_SIGNALS:
     void loaded(const QModelIndex& index);
 
 private:
-    struct Node;
     Node* nodeAt(const QModelIndex& index) const;
     QModelIndex indexOf(Node* node) const;
     void onLoaded(Node* node, std::vector<core::Entry> dirs);
+    void onRefreshed(Node* node, std::vector<core::Entry> dirs);
+    void listDirs(Node* node, void (TreeModel::*done)(Node*, std::vector<core::Entry>));
 
     std::unique_ptr<Node> root_;  // invisible; its children are the roots
     QIcon folderIcon_;
@@ -56,6 +64,8 @@ public:
 
     // Expands down to dir and puts the cursor on it, loading on the way.
     void reveal(const core::Location& dir);
+    // Re-lists dir if the tree shows it.
+    void refresh(const core::Location& dir);
 
 Q_SIGNALS:
     void folderChosen(const core::Location& dir);

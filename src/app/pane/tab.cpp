@@ -5,12 +5,14 @@
 #include "pane/listview.h"
 
 #include <QLocale>
+#include <QScrollBar>
 #include <QVBoxLayout>
 
 Tab::Tab(QWidget* parent)
     : QWidget(parent)
     , listing_(new core::Listing(this))
     , space_(new core::SpaceQuery(this))
+    , monitor_(new core::Monitor(this))
     , model_(new ListModel(this))
     , view_(new ListView(this))
 {
@@ -34,6 +36,7 @@ Tab::Tab(QWidget* parent)
     connect(listing_, &core::Listing::finished, this, &Tab::onFinished);
     connect(listing_, &core::Listing::failed, this, &Tab::onFailed);
     connect(space_, &core::SpaceQuery::result, this, &Tab::onSpace);
+    connect(monitor_, &core::Monitor::changed, this, &Tab::onMonitor);
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
     connect(view_, &QAbstractItemView::activated, this, &Tab::activate);
     connect(view_, &ListView::commandRequested, this, &Tab::commandRequested);
@@ -49,7 +52,65 @@ void Tab::reload()
 {
     pendingMarks_ = model_->markedNames();
     cursorName_ = currentName();
+    scrollValue_ = view_->verticalScrollBar()->value();
     load(location_);
+}
+
+void Tab::reloadWithCursor(const QByteArray& name)
+{
+    pendingMarks_ = model_->markedNames();
+    cursorName_ = name;
+    load(location_);
+}
+
+std::vector<core::Location> Tab::selectedLocations() const
+{
+    std::vector<core::Location> out;
+    if (model_->markedCount() > 0) {
+        for (const QByteArray& name : model_->markedNames())
+            out.push_back(location_.child(name));
+    } else if (const QByteArray name = currentName(); !name.isEmpty()) {
+        out.push_back(location_.child(name));
+    }
+    return out;
+}
+
+QString Tab::selectionText() const
+{
+    const int marked = model_->markedCount();
+    if (marked > 0)
+        return tr("%n items", nullptr, marked);
+    const QModelIndex idx = view_->currentIndex();
+    return idx.isValid() ? model_->entryAt(idx.row()).display : QString();
+}
+
+void Tab::clearMarks()
+{
+    model_->markAll(false);
+}
+
+bool Tab::monitoring() const
+{
+    return monitor_->active();
+}
+
+void Tab::setCurrent(bool current)
+{
+    current_ = current;
+    if (current && dirty_) {
+        dirty_ = false;
+        reload();
+    }
+}
+
+void Tab::onMonitor()
+{
+    if (!current_) {
+        dirty_ = true;
+        return;
+    }
+    Q_EMIT folderChanged();
+    reload();
 }
 
 void Tab::load(const core::Location& dir)
@@ -57,6 +118,7 @@ void Tab::load(const core::Location& dir)
     if (!dir.isValid())
         return;
     ++generation_;
+    monitor_->stop();
     location_ = dir;
     spaceText_.clear();
     model_->reset(dir);
@@ -151,6 +213,7 @@ void Tab::onFinished(quint64 generation)
     placeCursor();
     updateStatus();
     space_->request(location_, generation_);
+    monitor_->watch(location_);
     if (benchReporter_)
         bench::mark("loaded");
     Q_EMIT loaded();
@@ -197,8 +260,14 @@ void Tab::placeCursor()
         row = 0;
     const QModelIndex idx = model_->index(row, 0);
     view_->setCurrentIndex(idx);
-    view_->scrollTo(idx, restoring ? QAbstractItemView::PositionAtCenter
-                                   : QAbstractItemView::PositionAtTop);
+    if (scrollValue_ >= 0) {
+        view_->verticalScrollBar()->setValue(scrollValue_);
+        scrollValue_ = -1;
+        view_->scrollTo(idx, QAbstractItemView::EnsureVisible);
+    } else {
+        view_->scrollTo(idx, restoring ? QAbstractItemView::PositionAtCenter
+                                       : QAbstractItemView::PositionAtTop);
+    }
     cursorName_.clear();
 }
 

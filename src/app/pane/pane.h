@@ -5,6 +5,7 @@
 
 #include "core/location.h"
 #include "keymap.h"
+#include "pane/tab.h"
 
 #include <QWidget>
 
@@ -12,7 +13,6 @@ class QLabel;
 class QStackedWidget;
 class QTabBar;
 class QTimer;
-class Tab;
 
 class Pane : public QWidget {
     Q_OBJECT
@@ -21,6 +21,7 @@ public:
 
     Tab* activeTab() const;
     int tabCount() const;
+    QList<Tab*> tabs() const;
     Tab* newTab(const core::Location& dir);
 
     void setActive(bool active);
@@ -34,6 +35,7 @@ public:
 Q_SIGNALS:
     void locationChanged(const core::Location& dir);  // of the active tab
     void commandRequested(keymap::Command command);
+    void tabOpened(Tab* tab);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -52,5 +54,6 @@ private:
     QLabel* space_;
     QTimer* messageTimer_;
     QString statusText_;
+    Tab* current_ = nullptr;
     bool active_ = false;
 };

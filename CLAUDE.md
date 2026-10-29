@@ -20,8 +20,8 @@ These are the product. When in doubt, they win.
    hide the left / right pane.
 2. **Tabs per pane.** A tab owns its folder, history, sort, filter,
    selection and cursor. Tabs are restored on start.
-3. **The active pane is unmistakable.** Each pane has its own tab strip,
-   path bar and status line. The active pane gets an accent border and
+3. **The active pane is unmistakable.** Each pane has its own path bar,
+   tab strip (at the bottom, Opus style) and status line. The active pane gets an accent border and
    highlighted path bar; the inactive pane shows its cursor as an outline
    only. Never one shared path bar.
 4. **Folder tree on the left.** One tree for the window that follows the
@@ -108,9 +108,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 ```
 +--------+---------------------------+---------------------------+
+|        | path bar (left)           | path bar (right)          |
+|  tree  | list                      | list (or preview slot)    |
 |        | tabs (left)               | tabs (right)              |
-|  tree  | path bar (left)           | path bar (right)          |
-|        | list                      | list (or preview slot)    |
 |        | status: items, selection  | status: items, free space |
 +--------+---------------------------+---------------------------+
 | job strip (only while a job runs; conflicts and confirms here)  |
@@ -208,8 +208,9 @@ src/app/
 12. **Columns are sized from font metrics.** Size, count and date get a
     fixed width from their widest possible string; Name takes the rest.
     Never resize-to-contents on a virtualized view.
-13. **Inactive tabs do nothing.** Monitors paused, walks cancelled; a tab
-    reloads on activation if its monitor saw changes while paused.
+13. **Inactive tabs do nothing.** A change seen by an inactive tab's
+    monitor only marks it dirty; walks are cancelled; a dirty tab reloads
+    when it becomes current.
 14. **Tree and pane never ping-pong.** Programmatic selection in either
     direction sets a guard; only user actions navigate.
 15. **Symlinks.** Enter follows; copy and move copy the link, not the

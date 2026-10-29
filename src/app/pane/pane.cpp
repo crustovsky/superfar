@@ -13,12 +13,30 @@
 
 namespace {
 constexpr int kBorder = 2;
-}
+
+// A label that elides from the left so the end of a path stays visible
+// and never forces its pane wider.
+class PathLabel : public QLabel {
+public:
+    using QLabel::QLabel;
+    QSize minimumSizeHint() const override { return {0, QLabel::minimumSizeHint().height()}; }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter p(this);
+        const QRect r = contentsRect();
+        p.setPen(palette().color(foregroundRole()));
+        p.drawText(r, Qt::AlignLeft | Qt::AlignVCenter,
+                   fontMetrics().elidedText(text(), Qt::ElideLeft, r.width()));
+    }
+};
+} // namespace
 
 Pane::Pane(QWidget* parent)
     : QWidget(parent)
     , tabBar_(new QTabBar(this))
-    , path_(new QLabel(this))
+    , path_(new PathLabel(this))
     , stack_(new QStackedWidget(this))
     , status_(new QLabel(this))
     , space_(new QLabel(this))
@@ -27,9 +45,9 @@ Pane::Pane(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(kBorder, kBorder, kBorder, kBorder);
     layout->setSpacing(0);
-    layout->addWidget(tabBar_);
     layout->addWidget(path_);
     layout->addWidget(stack_, 1);
+    layout->addWidget(tabBar_);
 
     auto* statusRow = new QHBoxLayout;
     statusRow->setContentsMargins(0, 0, 0, 0);
@@ -37,6 +55,7 @@ Pane::Pane(QWidget* parent)
     statusRow->addWidget(space_);
     layout->addLayout(statusRow);
 
+    tabBar_->setShape(QTabBar::RoundedSouth);
     tabBar_->setDocumentMode(true);
     tabBar_->setExpanding(false);
     tabBar_->setDrawBase(false);
@@ -46,6 +65,7 @@ Pane::Pane(QWidget* parent)
 
     path_->setTextFormat(Qt::PlainText);
     path_->setContentsMargins(4, 2, 4, 2);
+    path_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     path_->setBackgroundRole(QPalette::Highlight);
     path_->setForegroundRole(QPalette::WindowText);
     status_->setTextFormat(Qt::PlainText);
@@ -76,10 +96,19 @@ int Pane::tabCount() const
     return stack_->count();
 }
 
+QList<Tab*> Pane::tabs() const
+{
+    QList<Tab*> out;
+    for (int i = 0; i < stack_->count(); ++i)
+        out.append(qobject_cast<Tab*>(stack_->widget(i)));
+    return out;
+}
+
 Tab* Pane::newTab(const core::Location& dir)
 {
     auto* tab = new Tab(this);
     tab->setActive(active_);
+    tab->setCurrent(false);
     const int index = stack_->addWidget(tab);
     tabBar_->addTab(title(dir));
 
@@ -99,6 +128,7 @@ Tab* Pane::newTab(const core::Location& dir)
 
     tab->navigate(dir);
     tabBar_->setCurrentIndex(index);
+    Q_EMIT tabOpened(tab);
     return tab;
 }
 
@@ -128,6 +158,10 @@ void Pane::onCurrentTab(int index)
         return;
     stack_->setCurrentIndex(index);
     Tab* tab = activeTab();
+    if (current_ && current_ != tab)
+        current_->setCurrent(false);
+    current_ = tab;
+    tab->setCurrent(true);
     path_->setText(tab->location().displayPath());
     showStatus(QString(), QString());
     if (hasFocusInside())
