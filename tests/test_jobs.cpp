@@ -58,6 +58,7 @@ class JobsTest : public QObject {
 private Q_SLOTS:
     void createAndRename();
     void copyTree();
+    void copyIntoItself();
     void moveSameFilesystem();
     void conflictAnswers();
     void unattendedSkipsAndLogs();
@@ -67,6 +68,38 @@ private Q_SLOTS:
     void monitor();
     void mkdir();
 };
+
+void JobsTest::copyIntoItself()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString root = tmp.path() + "/root";
+    makeTree(root);
+    // A folder into its own subfolder: refused, nothing created.
+    core::TransferJob into({loc(root)}, loc(root + "/sub"), false);
+    into.setUnattended(true);
+    runJob(into);
+    QCOMPARE(into.log().size(), 1u);
+    QVERIFY(!QFile::exists(root + "/sub/root"));
+    // A folder into its own parent is the folder onto itself: refused, intact.
+    core::TransferJob onto({loc(root)}, loc(tmp.path()), false);
+    onto.setUnattended(true);
+    runJob(onto);
+    QCOMPARE(onto.log().size(), 1u);
+    QCOMPARE(read(root + "/a.txt"), QByteArray("aaa"));
+    // A file onto itself likewise.
+    core::TransferJob file({loc(root + "/a.txt")}, loc(root), false);
+    file.setUnattended(true);
+    runJob(file);
+    QCOMPARE(file.log().size(), 1u);
+    QCOMPARE(read(root + "/a.txt"), QByteArray("aaa"));
+    // Moving onto itself is refused the same way.
+    core::TransferJob mv({loc(root)}, loc(tmp.path()), true);
+    mv.setUnattended(true);
+    runJob(mv);
+    QCOMPARE(mv.log().size(), 1u);
+    QCOMPARE(read(root + "/sub/b.txt"), QByteArray("bbbb"));
+}
 
 void JobsTest::copyTree()
 {

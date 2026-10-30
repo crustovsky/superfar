@@ -339,6 +339,18 @@ void TransferJob::run()
             continue;
         }
         const Location dst = dest_.child(src.basename());
+        // Into itself (or below itself) would copy the copies forever;
+        // onto itself would overwrite the file with its own truncation.
+        if (!dest_.relativePathFrom(src).isNull()) {
+            if (!impl.handleError(src, tr("cannot copy a folder into itself")))
+                break;
+            continue;
+        }
+        if (dst == src) {
+            if (!impl.handleError(src, tr("source and target are the same")))
+                break;
+            continue;
+        }
         const bool ok = isDirInfo(info.get())
             ? impl.transferDir(src, dst)
             : impl.transferFile(src, dst, static_cast<quint64>(g_file_info_get_size(info.get())));

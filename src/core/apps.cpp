@@ -77,6 +77,10 @@ void openDefault(const Location& file, std::function<void(const QString& error)>
             done(error);
             return;
         }
+        if (type == QLatin1String("inode/symlink")) {
+            done(QStringLiteral("Broken link: its target does not exist"));
+            return;
+        }
         GPtr<GAppInfo> app(g_app_info_get_default_for_type(type.toUtf8().constData(), !file.isNative()));
         if (!app) {
             done(QStringLiteral("No application for %1").arg(type));

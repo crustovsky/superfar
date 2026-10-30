@@ -245,7 +245,8 @@ QStringList applyBindings(const QHash<QString, QStringList>& bindings)
         bool ok = true;
         for (const QString& text : it.value()) {
             const QKeySequence seq(text.trimmed(), QKeySequence::PortableText);
-            if (seq.isEmpty()) {
+            // Qt turns text it cannot read into Key_unknown, not an empty sequence.
+            if (seq.isEmpty() || seq[0].key() == Qt::Key_unknown) {
                 problems << QStringLiteral("%1: cannot read key %2").arg(it.key(), text);
                 ok = false;
             } else {
@@ -256,7 +257,10 @@ QStringList applyBindings(const QHash<QString, QStringList>& bindings)
             continue;
         std::erase_if(t, [cmd](const auto& entry) { return entry.second == cmd; });
         for (const QKeySequence& seq : seqs) {
-            std::erase_if(t, [&seq](const auto& entry) { return entry.first == seq; });  // one command per key
+            for (const auto& entry : t)  // one command per key: say whose key this was
+                if (entry.first == seq)
+                    problems << QStringLiteral("%1 takes %2 from %3").arg(it.key(), seq.toString(), name(entry.second));
+            std::erase_if(t, [&seq](const auto& entry) { return entry.first == seq; });
             t.emplace_back(seq, cmd);
         }
     }
