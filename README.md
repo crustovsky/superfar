@@ -27,7 +27,12 @@ you can see in the bar at the bottom.
   and follows the cursor. Images decode in libglycin's sandbox.
 - Quick filter: just type. Marks are separate from the cursor.
 - Clipboard and drag and drop speak the same formats as other file
-  managers. Mounts, the trash and your GTK bookmarks sit in the tree.
+  managers. Mounts, the trash, the network and your GTK bookmarks sit in
+  the tree.
+- Find in tree opens its results as a tab. Multi-rename and folder sync
+  are panels inside the pane, with live previews, presets and undo.
+- Archives open as read-only folders through bsdtar in a child process;
+  thumbnails and video or PDF previews come from tumbler over D-Bus.
 - One process, no indexer, no thumbnailer process, no daemon. About
   5 MB of its own memory with an empty window, under 50 MB with a
   100,000-entry folder open.
@@ -58,14 +63,17 @@ remapped. The defaults:
 | Key | Action |
 |-----|--------|
 | F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal |
-| F5 F6 F7 F8 | copy, move, new folder, trash |
+| F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
+| Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
+| Alt+F7, Alt+Enter | find in tree, properties and permissions |
 | F10 | quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
 | Ctrl+T, Ctrl+W, Ctrl+Tab | new tab, close tab, next tab |
 | Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
-| Ctrl+F3 | recursive sizes and counts for this tab |
+| Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
+| Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Space, Ctrl+A, * | mark and move down, mark, mark all, invert |
 | Ctrl+=, Ctrl+- | mark and unmark by pattern |
 | Enter, Shift+Enter | open with the default app, choose an app |
@@ -83,7 +91,9 @@ set, Space appends to it.
 ## Build
 
 Dependencies: Qt 6 (Core, Gui, Widgets, DBus), GLib and GIO 2.74 or
-newer, libglycin 2, CMake 3.28, Ninja, a C++23 compiler.
+newer, libglycin 2, CMake 3.28, Ninja, a C++23 compiler. At run time,
+bsdtar (libarchive) for archives and tumbler for thumbnails, both
+optional.
 
 ```sh
 cmake -S . -B build -G Ninja
@@ -110,10 +120,10 @@ session and the Ctrl+G history live there too.
 
 ## Status
 
-Milestones 1 to 7 of the plan in [CLAUDE.md](CLAUDE.md) are done. On
-the list: find in tree, multi-rename, folder sync, a properties panel,
-thumbnails, archives as folders. Non-goals: plugins, theming beyond the
-platform theme, media previews, an embedded terminal, a search index.
+All twelve milestones of the plan in [CLAUDE.md](CLAUDE.md) are done.
+Non-goals: plugins, theming beyond the platform theme, an embedded
+terminal, a search index, translations before 1.0. Media and PDF show
+as tumbler thumbnails, never through a decoder in the process.
 
 ## Licence
 
