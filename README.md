@@ -95,7 +95,8 @@ remapped. The defaults:
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
 | Ctrl+D | bookmark this folder, or remove the bookmark |
-| Insert, Space, Ctrl+A, * | mark and move down, mark, mark all, invert |
+| Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
+| Space, Ctrl+A, * | mark, mark all, invert |
 | Ctrl+=, Ctrl+- | mark and unmark by pattern |
 | Enter, Shift+Enter | open with the default app, choose an app |
 | Backspace, Left, Right | go up, go up, enter |
@@ -142,11 +143,13 @@ glib 2.90 and glycin 2 or newer. From a checkout, `tools/mkpkg.sh` and
 ## Config
 
 `~/.config/superfar/superfar.ini` is written with the default keys on
-first run. `[keys]` has one line per command (`Copy=F5`,
-`GoUp=Backspace;Left`, empty unbinds); `[columns/left]` and
-`[columns/right]` hold widths and `hidden=items,modified`; `[layout]`
-has `split=side-by-side|stacked` and `preview=borrow|third`; the
-session and the Ctrl+G history live there too.
+first run and never touched again, so a dotfile manager can own it.
+`[keys]` has one line per command (`Copy=F5`, `GoUp=Backspace;Left`,
+empty unbinds); `[columns/left]` and `[columns/right]` take
+`hidden=items,modified`; `[layout]` has `split=side-by-side|stacked`
+and `preview=borrow|third`. What the app records on its own goes to
+`~/.local/state/superfar/state.ini`: the session, the Ctrl+G history,
+window and splitter sizes, dragged column widths.
 
 ## Status
 

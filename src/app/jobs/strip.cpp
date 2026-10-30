@@ -91,11 +91,6 @@ void JobRow::onProgress(const core::JobProgress& p)
         runClock_.start();
         sampleBytes_ = p.bytesDone;
         sampleMs_ = 0;
-        // A job still going after a couple of seconds deserves its panel.
-        QTimer::singleShot(2000, this, [this] {
-            if (running_ && last_.phase == core::JobProgress::Phase::Running)
-                details_->setChecked(true);
-        });
     }
     last_ = p;
     refresh();
@@ -103,18 +98,28 @@ void JobRow::onProgress(const core::JobProgress& p)
 
 void JobRow::sample()
 {
-    if (!running_ || job_->paused())
+    if (!running_)
         return;
     const qint64 now = runClock_.elapsed();
     const qint64 dt = now - sampleMs_;
+    sampleMs_ = now;
     if (dt <= 0)
         return;
+    if (job_->paused() || waiting_) {
+        refresh();  // idle time counts for nothing
+        return;
+    }
+    activeMs_ += dt;
+    // A job still going after a couple of seconds deserves its panel.
+    if (!autoOpened_ && activeMs_ >= 2000 && last_.phase == core::JobProgress::Phase::Running) {
+        autoOpened_ = true;
+        details_->setChecked(true);
+    }
     // Bytes per second when the job moves bytes, else items per second.
     const bool bytes = last_.bytesTotal > 0;
     const quint64 done = bytes ? last_.bytesDone : last_.itemsDone;
     const double rate = static_cast<double>(done - sampleBytes_) * 1000.0 / dt;
     sampleBytes_ = done;
-    sampleMs_ = now;
     rateSmooth_ = rateSmooth_ == 0 ? rate : rateSmooth_ * 0.7 + rate * 0.3;
     history_.push_back(rate);
     if (history_.size() > kHistory)
@@ -126,7 +131,7 @@ void JobRow::refresh()
 {
     const core::JobProgress& p = last_;
     JobStats stats;
-    stats.elapsedMs = running_ ? runClock_.elapsed() : 0;
+    stats.elapsedMs = activeMs_;
     stats.rate = rateSmooth_;
     stats.bytesUnit = p.bytesTotal > 0;
     stats.history = &history_;
@@ -179,7 +184,9 @@ void JobStrip::addJob(core::Job* job)
 
     connect(job, &core::Job::conflict, this, [this, job, row](const core::Conflict& c) {
         auto* bar = new ConflictBar(c, this);
-        connect(bar, &ConflictBar::answered, this, [this, job, bar](core::ConflictAction a, bool all) {
+        row->setWaiting(true);
+        connect(bar, &ConflictBar::answered, this, [this, job, row, bar](core::ConflictAction a, bool all) {
+            row->setWaiting(false);
             job->answerConflict(a, all);
             removeBar(bar);
         });
@@ -187,7 +194,9 @@ void JobStrip::addJob(core::Job* job)
     });
     connect(job, &core::Job::failure, this, [this, job, row](const core::Failure& f) {
         auto* bar = new ErrorBar(job->title().toLower(), f, this);
-        connect(bar, &ErrorBar::answered, this, [this, job, bar](core::ErrorAction a, bool all) {
+        row->setWaiting(true);
+        connect(bar, &ErrorBar::answered, this, [this, job, row, bar](core::ErrorAction a, bool all) {
+            row->setWaiting(false);
             job->answerError(a, all);
             removeBar(bar);
         });
@@ -268,11 +277,13 @@ void JobStrip::showBar(QWidget* bar, QWidget* under)
 
 void JobStrip::removeBar(QWidget* bar)
 {
-    bar->hide();
-    bar->deleteLater();
     --bars_;
+    // Focus goes back first: hiding a focused widget would otherwise send
+    // it along the focus chain, into the tree.
     if (bars_ == 0 && returnFocus_)
         returnFocus_->setFocus();
+    bar->hide();
+    bar->deleteLater();
     updateVisibility();
 }
 

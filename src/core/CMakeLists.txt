@@ -3,6 +3,7 @@
 qt_add_library(superfar_core STATIC
   location.cpp
   sort.cpp
+  match.cpp
   listing.cpp
   metadata.cpp
   space.cpp

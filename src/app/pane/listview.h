@@ -44,9 +44,12 @@ protected:
     void startDrag(Qt::DropActions supportedActions) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
     void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     QRect rowRect(const QModelIndex& index) const;
+    void fitName();  // Name takes the width the other columns leave
+    void onSectionResized(int column, int oldSize, int newSize);
 
     bool active_ = false;
     bool paintedRows_ = false;

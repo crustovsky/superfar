@@ -36,6 +36,8 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_H), Command::ToggleHidden},
         {QKeySequence(Qt::CTRL | Qt::Key_R), Command::Reload},
         {QKeySequence(Qt::Key_Insert), Command::Mark},
+        {QKeySequence(Qt::SHIFT | Qt::Key_Down), Command::Mark},  // keyboards without Insert
+        {QKeySequence(Qt::SHIFT | Qt::Key_Up), Command::MarkUp},
         {QKeySequence(Qt::Key_Space), Command::MarkToggle},
         {QKeySequence(Qt::CTRL | Qt::Key_A), Command::MarkAll},
         {QKeySequence(Qt::Key_Asterisk), Command::InvertMarks},
@@ -132,6 +134,7 @@ QString label(Command command)
     case Command::ToggleHidden: return QStringLiteral("Hidden");
     case Command::Reload: return QStringLiteral("Reload");
     case Command::Mark: return QStringLiteral("Select");
+    case Command::MarkUp: return QStringLiteral("Select");
     case Command::MarkToggle: return QStringLiteral("Select");
     case Command::MarkAll: return QStringLiteral("Select all");
     case Command::InvertMarks: return QStringLiteral("Invert");
@@ -171,7 +174,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::HideRight, "HideRight"}, {Command::SwitchPane, "SwitchPane"}, {Command::FocusTree, "FocusTree"},
         {Command::NewTab, "NewTab"}, {Command::CloseTab, "CloseTab"}, {Command::NextTab, "NextTab"},
         {Command::PrevTab, "PrevTab"}, {Command::ToggleHidden, "ToggleHidden"}, {Command::Reload, "Reload"},
-        {Command::Mark, "Mark"}, {Command::MarkToggle, "MarkToggle"}, {Command::MarkAll, "MarkAll"},
+        {Command::Mark, "Mark"}, {Command::MarkUp, "MarkUp"}, {Command::MarkToggle, "MarkToggle"}, {Command::MarkAll, "MarkAll"},
         {Command::InvertMarks, "InvertMarks"}, {Command::GoUp, "GoUp"}, {Command::Activate, "Activate"},
         {Command::Preview, "Preview"}, {Command::ToggleSizes, "ToggleSizes"}, {Command::Cancel, "Cancel"},
         {Command::MarkGlob, "MarkGlob"}, {Command::UnmarkGlob, "UnmarkGlob"}, {Command::OpenWith, "OpenWith"},

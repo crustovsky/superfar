@@ -1,5 +1,6 @@
 #include "pane/listmodel.h"
 
+#include "core/match.h"
 #include "core/sort.h"
 #include "uris.h"
 
@@ -258,26 +259,6 @@ void ListModel::pauseWork()
     }
 }
 
-namespace {
-
-// 0 prefix, 1 substring, 2 subsequence, -1 no match. Both already folded.
-int matchRank(const QString& name, const QString& filter)
-{
-    if (name.startsWith(filter))
-        return 0;
-    if (name.contains(filter))
-        return 1;
-    qsizetype at = 0;
-    for (const QChar c : filter) {
-        at = name.indexOf(c, at);
-        if (at < 0)
-            return -1;
-        ++at;
-    }
-    return 2;
-}
-
-} // namespace
 
 void ListModel::rebuildRows()
 {
@@ -292,7 +273,7 @@ void ListModel::rebuildRows()
             rows_.push_back(i);
             continue;
         }
-        const int rank = matchRank(entries_[i].display.toCaseFolded(), filter);
+        const int rank = core::matchRank(entries_[i].display.toCaseFolded(), filter);
         if (rank == 0)
             rows_.push_back(i);
         else if (rank > 0)

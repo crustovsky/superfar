@@ -40,6 +40,7 @@ enum class Command {
     ToggleHidden,
     Reload,
     Mark,         // toggle the cursor row and move down
+    MarkUp,       // toggle the cursor row and move up
     MarkToggle,   // toggle the cursor row, stay
     MarkAll,
     InvertMarks,

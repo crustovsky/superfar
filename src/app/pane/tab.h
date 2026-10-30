@@ -40,6 +40,7 @@ public:
     void goUp();
     // Where the cursor goes once the running load ends.
     void setCursorOnLoad(const QByteArray& name) { cursorName_ = name; }
+    QByteArray currentName() const;  // raw name under the cursor, empty when none
 
     // The marked entries, or the cursor entry when nothing is marked.
     std::vector<core::Location> selectedLocations() const;
@@ -89,7 +90,7 @@ private:
     void load(const core::Location& dir);
     void onBatch(quint64 generation, std::vector<core::Entry> entries);
     void onFinished(quint64 generation);
-    void onFailed(quint64 generation, const QString& message, core::ListFailure why);
+    void onFailed(quint64 generation, const QString& error, core::ListFailure why);
     void onSearchFinished(quint64 generation, quint64 scanned);
     void enterArchive(const core::Location& file);
     void onArchiveListed(quint64 generation, std::vector<core::ArchiveEntry> entries);
@@ -102,7 +103,7 @@ private:
     void rename(const QByteArray& name, const QString& newName);
     void placeCursor();
     void updateStatus();
-    QByteArray currentName() const;
+    void fallBack(const QString& why);
 
     core::Location location_;
     quint64 generation_ = 0;

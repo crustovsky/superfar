@@ -8,6 +8,7 @@
 #include "pane/listview.h"
 #include "services.h"
 
+#include <QFileInfo>
 #include <QLocale>
 #include <QPointer>
 #include <QScrollBar>
@@ -347,6 +348,13 @@ bool Tab::execute(keymap::Command command)
                 view_->setCurrentIndex(model_->index(cur.row() + 1, 0));
         }
         return true;
+    case Command::MarkUp:
+        if (cur.isValid()) {
+            model_->toggleMarked(cur.row());
+            if (cur.row() > 0)
+                view_->setCurrentIndex(model_->index(cur.row() - 1, 0));
+        }
+        return true;
     case Command::MarkToggle:
         if (!model_->filter().isEmpty())
             typed(QStringLiteral(" "));  // Space selects only while no filter is set
@@ -451,7 +459,7 @@ void Tab::onFinished(quint64 generation)
     Q_EMIT loaded();
 }
 
-void Tab::onFailed(quint64 generation, const QString& message, core::ListFailure why)
+void Tab::onFailed(quint64 generation, const QString& error, core::ListFailure why)
 {
     if (generation != generation_)
         return;
@@ -459,15 +467,57 @@ void Tab::onFailed(quint64 generation, const QString& message, core::ListFailure
         enterArchive(location_);
         return;
     }
-    if (why == core::ListFailure::NotSupported && !location_.isNative()) {
-        // trash://, network://, smb:// and friends are gvfs backends.
-        Q_EMIT statusChanged(tr("%1 locations need gvfs, which is not installed")
-                                 .arg(location_.uri().section(QLatin1Char(':'), 0, 0)), QString());
+    if (why == core::ListFailure::NotMounted) {
+        Q_EMIT statusChanged(error, QString());
+        Q_EMIT mountNeeded(location_);
         return;
     }
-    Q_EMIT statusChanged(message, QString());
-    if (why == core::ListFailure::NotMounted)
-        Q_EMIT mountNeeded(location_);
+    if (why == core::ListFailure::NotDirectory) {
+        // A file: its folder, with the cursor on it.
+        if (const core::Location parent = location_.parent(); parent.isValid()) {
+            cursorName_ = location_.basename();
+            Q_EMIT message(tr("%1 is a file").arg(location_.displayName()));
+            load(parent);
+            return;
+        }
+    }
+    if (why == core::ListFailure::NotSupported && !location_.isNative()) {
+        static const QStringList gvfs = {QStringLiteral("trash"), QStringLiteral("network"), QStringLiteral("smb"),
+                                         QStringLiteral("sftp"), QStringLiteral("ssh"), QStringLiteral("ftp"),
+                                         QStringLiteral("ftps"), QStringLiteral("dav"), QStringLiteral("davs"),
+                                         QStringLiteral("mtp"), QStringLiteral("gphoto2"), QStringLiteral("afp"),
+                                         QStringLiteral("afc"), QStringLiteral("nfs"), QStringLiteral("recent"),
+                                         QStringLiteral("computer")};
+        const QString scheme = location_.uri().section(QLatin1Char(':'), 0, 0);
+        fallBack(gvfs.contains(scheme) ? tr("%1 locations need gvfs, which is not installed").arg(scheme)
+                                       : tr("%1: %2").arg(location_.displayPath(), error));
+        return;
+    }
+    if (location_.isNative() && !QFileInfo(location_.displayPath()).isDir()) {
+        fallBack(tr("%1: %2").arg(location_.displayPath(), error));
+        return;
+    }
+    // The folder is there but cannot be read: say so and stay, Backspace
+    // goes up.
+    Q_EMIT statusChanged(error, QString());
+}
+
+void Tab::fallBack(const QString& why)
+{
+    // Nothing can be browsed from a folder that is not there: the nearest
+    // one that is, else home.
+    core::Location target = core::Location::home();
+    if (location_.isNative()) {
+        for (core::Location p = location_.parent(); p.isValid(); p = p.parent()) {
+            if (QFileInfo(p.displayPath()).isDir()) {
+                target = p;
+                break;
+            }
+        }
+    }
+    Q_EMIT message(why);
+    if (target.isValid() && target != location_)
+        load(target);
 }
 
 

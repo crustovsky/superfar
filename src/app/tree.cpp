@@ -443,6 +443,7 @@ void Tree::keyPressEvent(QKeyEvent* event)
     switch (cmd) {
     case Command::None:
     case Command::Mark:
+    case Command::MarkUp:
     case Command::MarkToggle:
     case Command::MarkAll:
     case Command::InvertMarks:

@@ -30,6 +30,9 @@ public:
 
     core::Job* job() const { return job_; }
     void addBar(QWidget* bar);
+    // A conflict or error question is open under the row: the job is
+    // blocked, so the clock stops and the panel does not open on its own.
+    void setWaiting(bool on) { waiting_ = on; }
 
 private:
     void onProgress(const core::JobProgress& p);
@@ -40,6 +43,9 @@ private:
     core::JobProgress last_;
     QElapsedTimer runClock_;
     bool running_ = false;
+    bool waiting_ = false;
+    bool autoOpened_ = false;
+    qint64 activeMs_ = 0;  // running time less pauses and questions
     quint64 sampleBytes_ = 0;
     qint64 sampleMs_ = 0;
     double rateSmooth_ = 0;

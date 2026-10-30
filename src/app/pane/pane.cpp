@@ -7,6 +7,7 @@
 #include "properties.h"
 #include "syncpanel.h"
 #include "pane/tab.h"
+#include "pane/tabbar.h"
 #include "services.h"
 #include "viewer.h"
 
@@ -26,7 +27,7 @@ constexpr int kBorder = 2;
 
 Pane::Pane(const Services& services, QWidget* parent)
     : QWidget(parent)
-    , tabBar_(new QTabBar(this))
+    , tabBar_(new TabBar(this))
     , path_(new ElidedLabel(this))
     , content_(new QStackedWidget(this))
     , stack_(new QStackedWidget(this))
@@ -94,7 +95,8 @@ QList<Config::TabState> Pane::tabStates() const
 {
     QList<Config::TabState> out;
     for (Tab* tab : tabs())
-        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes(), tab->thumbnails()});
+        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes(), tab->thumbnails(),
+                    QString::fromLatin1(tab->currentName().toPercentEncoding())});
     return out;
 }
 
@@ -105,6 +107,8 @@ void Pane::restore(const QList<Config::TabState>& states, int active)
         if (!dir.isValid())
             continue;
         Tab* tab = newTab(dir);
+        if (!s.cursor.isEmpty())
+            tab->setCursorOnLoad(QByteArray::fromPercentEncoding(s.cursor.toLatin1()));
         tab->setShowHidden(s.hidden);
         tab->setRecursiveSizes(s.sizes);
         tab->setThumbnails(s.thumbs);

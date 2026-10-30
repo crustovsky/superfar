@@ -1,5 +1,9 @@
 #include "config.h"
 
+#include "core/match.h"
+
+#include <QFileInfo>
+#include <QStandardPaths>
 #include <algorithm>
 
 namespace {
@@ -17,6 +21,7 @@ QList<Config::TabState> readTabs(QSettings& s, const QString& side)
         t.locked = s.value(QStringLiteral("locked"), false).toBool();
         t.sizes = s.value(QStringLiteral("sizes"), false).toBool();
         t.thumbs = s.value(QStringLiteral("thumbs"), false).toBool();
+        t.cursor = s.value(QStringLiteral("cursor")).toString();
         if (!t.uri.isEmpty())
             out.append(t);
     }
@@ -35,33 +40,71 @@ void writeTabs(QSettings& s, const QString& side, const QList<Config::TabState>&
         s.setValue(QStringLiteral("locked"), tabs[i].locked);
         s.setValue(QStringLiteral("sizes"), tabs[i].sizes);
         s.setValue(QStringLiteral("thumbs"), tabs[i].thumbs);
+        if (!tabs[i].cursor.isEmpty())
+            s.setValue(QStringLiteral("cursor"), tabs[i].cursor);
     }
     s.endArray();
 }
 
-int matchRank(const QString& hay, const QString& needle)
+// Keys the app writes on its own; they belong in the state file.
+bool isState(const QString& key)
 {
-    if (hay.startsWith(needle))
-        return 0;
-    if (hay.contains(needle))
-        return 1;
-    qsizetype at = 0;
-    for (const QChar c : needle) {
-        at = hay.indexOf(c, at);
-        if (at < 0)
-            return -1;
-        ++at;
-    }
-    return 2;
+    if (key.startsWith(QLatin1String("session/")) || key.startsWith(QLatin1String("history/"))
+        || key.startsWith(QLatin1String("window/")))
+        return true;
+    if (key == QLatin1String("layout/tree") || key == QLatin1String("layout/panes"))
+        return true;
+    return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"));
+}
+
+QSettings openConfig(const QString& path)
+{
+    return path.isEmpty() ? QSettings(QSettings::IniFormat, QSettings::UserScope,
+                                      QStringLiteral("superfar"), QStringLiteral("superfar"))
+                          : QSettings(path, QSettings::IniFormat);
+}
+
+QSettings openState(const QString& configPath, const QString& statePath)
+{
+    if (!statePath.isEmpty())
+        return QSettings(statePath, QSettings::IniFormat);
+    if (!configPath.isEmpty())
+        return QSettings(QFileInfo(configPath).absolutePath() + QStringLiteral("/state.ini"), QSettings::IniFormat);
+    return QSettings(QStandardPaths::writableLocation(QStandardPaths::StateLocation) + QStringLiteral("/state.ini"),
+                     QSettings::IniFormat);
 }
 } // namespace
 
-Config::Config(const QString& path, QObject* parent)
+Config::Config(const QString& path, const QString& statePath, QObject* parent)
     : QObject(parent)
-    , settings_(path.isEmpty() ? QSettings(QSettings::IniFormat, QSettings::UserScope,
-                                           QStringLiteral("superfar"), QStringLiteral("superfar"))
-                               : QSettings(path, QSettings::IniFormat))
+    , settings_(openConfig(path))
+    , state_(openState(path, statePath))
 {
+    migrateState();
+}
+
+void Config::migrateState()
+{
+    // Versions before 0.6 kept everything in the config. Move the state
+    // over once, so the config stops changing under the user.
+    if (!state_.allKeys().isEmpty())
+        return;
+    bool moved = false;
+    for (const QString& key : settings_.allKeys()) {
+        if (!isState(key))
+            continue;
+        state_.setValue(key, settings_.value(key));
+        settings_.remove(key);
+        moved = true;
+    }
+    if (moved)
+        sync();
+}
+
+void Config::sync()
+{
+    settings_.sync();
+    state_.sync();
 }
 
 QHash<QString, QStringList> Config::keyBindings() const
@@ -78,31 +121,36 @@ QHash<QString, QStringList> Config::keyBindings() const
 
 void Config::writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults)
 {
-    if (settings_.childGroups().contains(QStringLiteral("keys")))
-        return;
+    // Once per command: a command added in a later version gets its line
+    // too, and nothing the user wrote is touched.
     settings_.beginGroup(QStringLiteral("keys"));
     for (const auto& [name, seqs] : defaults)
-        settings_.setValue(name, seqs.join(QLatin1Char(';')));
+        if (!settings_.contains(name))
+            settings_.setValue(name, seqs.join(QLatin1Char(';')));
     settings_.endGroup();
 }
 
 Config::Columns Config::columns(const QString& side) const
 {
     Columns c;
-    settings_.beginGroup(QStringLiteral("columns/") + side);
-    for (const QString& key : settings_.childKeys()) {
-        if (key == QLatin1String("hidden"))
-            c.hidden = settings_.value(key).toString().split(QLatin1Char(','), Qt::SkipEmptyParts);
-        else
-            c.widths.insert(key, settings_.value(key).toInt());
+    for (QSettings* s : {&settings_, &state_}) {
+        s->beginGroup(QStringLiteral("columns/") + side);
+        for (const QString& key : s->childKeys()) {
+            if (key == QLatin1String("hidden")) {
+                if (s == &settings_)
+                    c.hidden = s->value(key).toString().split(QLatin1Char(','), Qt::SkipEmptyParts);
+            } else {
+                c.widths.insert(key, s->value(key).toInt());  // the state, read last, wins
+            }
+        }
+        s->endGroup();
     }
-    settings_.endGroup();
     return c;
 }
 
 void Config::setColumnWidth(const QString& side, const QString& column, int width)
 {
-    settings_.setValue(QStringLiteral("columns/%1/%2").arg(side, column), width);
+    state_.setValue(QStringLiteral("columns/%1/%2").arg(side, column), width);
 }
 
 bool Config::stackedSplit() const
@@ -120,7 +168,7 @@ bool Config::previewThirdSlot() const
 QList<int> Config::splitterSizes(const QString& name) const
 {
     QList<int> out;
-    for (const QString& s : settings_.value(QStringLiteral("layout/") + name).toString().split(QLatin1Char(','), Qt::SkipEmptyParts))
+    for (const QString& s : state_.value(QStringLiteral("layout/") + name).toString().split(QLatin1Char(','), Qt::SkipEmptyParts))
         out.append(s.toInt());
     return out;
 }
@@ -130,76 +178,76 @@ void Config::setSplitterSizes(const QString& name, const QList<int>& sizes)
     QStringList parts;
     for (int s : sizes)
         parts << QString::number(s);
-    settings_.setValue(QStringLiteral("layout/") + name, parts.join(QLatin1Char(',')));
+    state_.setValue(QStringLiteral("layout/") + name, parts.join(QLatin1Char(',')));
 }
 
 QSize Config::windowSize() const
 {
-    return settings_.value(QStringLiteral("window/size"), QSize()).toSize();
+    return state_.value(QStringLiteral("window/size"), QSize()).toSize();
 }
 
 void Config::setWindowSize(const QSize& size)
 {
-    settings_.setValue(QStringLiteral("window/size"), size);
+    state_.setValue(QStringLiteral("window/size"), size);
 }
 
 Config::Session Config::session() const
 {
     Session s;
-    s.left = readTabs(settings_, QStringLiteral("left"));
-    s.right = readTabs(settings_, QStringLiteral("right"));
-    s.leftActive = settings_.value(QStringLiteral("session/leftActive"), 0).toInt();
-    s.rightActive = settings_.value(QStringLiteral("session/rightActive"), 0).toInt();
-    s.activePane = settings_.value(QStringLiteral("session/activePane"), QStringLiteral("left")).toString();
+    s.left = readTabs(state_, QStringLiteral("left"));
+    s.right = readTabs(state_, QStringLiteral("right"));
+    s.leftActive = state_.value(QStringLiteral("session/leftActive"), 0).toInt();
+    s.rightActive = state_.value(QStringLiteral("session/rightActive"), 0).toInt();
+    s.activePane = state_.value(QStringLiteral("session/activePane"), QStringLiteral("left")).toString();
     s.valid = !s.left.isEmpty() && !s.right.isEmpty();
     return s;
 }
 
 void Config::saveSession(const Session& s)
 {
-    writeTabs(settings_, QStringLiteral("left"), s.left);
-    writeTabs(settings_, QStringLiteral("right"), s.right);
-    settings_.setValue(QStringLiteral("session/leftActive"), s.leftActive);
-    settings_.setValue(QStringLiteral("session/rightActive"), s.rightActive);
-    settings_.setValue(QStringLiteral("session/activePane"), s.activePane);
+    writeTabs(state_, QStringLiteral("left"), s.left);
+    writeTabs(state_, QStringLiteral("right"), s.right);
+    state_.setValue(QStringLiteral("session/leftActive"), s.leftActive);
+    state_.setValue(QStringLiteral("session/rightActive"), s.rightActive);
+    state_.setValue(QStringLiteral("session/activePane"), s.activePane);
 }
 
 void Config::recordVisit(const QString& uri, qint64 now)
 {
     if (uri.isEmpty())
         return;
-    settings_.beginGroup(QStringLiteral("history"));
+    state_.beginGroup(QStringLiteral("history"));
     // Slashes would nest groups; keep the uri as a single key.
     const QString key = QString::fromLatin1(uri.toUtf8().toPercentEncoding("-._~:"));
-    const QStringList old = settings_.value(key).toString().split(QLatin1Char(','));
+    const QStringList old = state_.value(key).toString().split(QLatin1Char(','));
     const int count = old.size() == 2 ? old[0].toInt() + 1 : 1;
-    settings_.setValue(key, QStringLiteral("%1,%2").arg(count).arg(now));
-    QStringList keys = settings_.childKeys();
+    state_.setValue(key, QStringLiteral("%1,%2").arg(count).arg(now));
+    QStringList keys = state_.childKeys();
     if (keys.size() > kHistoryLimit) {
         // Drop the lowest-scoring entries down to the limit.
         QList<Visit> all;
         for (const QString& k : keys) {
-            const QStringList v = settings_.value(k).toString().split(QLatin1Char(','));
+            const QStringList v = state_.value(k).toString().split(QLatin1Char(','));
             all.append({k, v.value(0).toInt(), v.value(1).toLongLong()});
         }
         std::sort(all.begin(), all.end(), [now](const Visit& a, const Visit& b) { return frecency(a, now) < frecency(b, now); });
         for (int i = 0; i < all.size() - kHistoryLimit; ++i)
-            settings_.remove(all[i].uri);
+            state_.remove(all[i].uri);
     }
-    settings_.endGroup();
+    state_.endGroup();
 }
 
 QList<Config::Visit> Config::history() const
 {
     QList<Visit> out;
-    settings_.beginGroup(QStringLiteral("history"));
-    for (const QString& key : settings_.childKeys()) {
-        const QStringList v = settings_.value(key).toString().split(QLatin1Char(','));
+    state_.beginGroup(QStringLiteral("history"));
+    for (const QString& key : state_.childKeys()) {
+        const QStringList v = state_.value(key).toString().split(QLatin1Char(','));
         if (v.size() != 2)
             continue;
         out.append({QString::fromUtf8(QByteArray::fromPercentEncoding(key.toLatin1())), v[0].toInt(), v[1].toLongLong()});
     }
-    settings_.endGroup();
+    state_.endGroup();
     return out;
 }
 
@@ -228,7 +276,7 @@ QList<Config::Visit> Config::rank(const QList<Visit>& visits, const QString& tex
     QList<Scored> scored;
     const QString needle = text.toCaseFolded();
     for (const Visit& v : visits) {
-        const int rank = needle.isEmpty() ? 0 : matchRank(v.uri.toCaseFolded(), needle);
+        const int rank = core::matchRank(v.uri.toCaseFolded(), needle);
         if (rank >= 0)
             scored.append({v, rank, frecency(v, now)});
     }

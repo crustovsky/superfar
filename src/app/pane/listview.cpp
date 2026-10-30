@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QStyle>
+#include <algorithm>
 
 ListView::ListView(QWidget* parent)
     : QTreeView(parent)
@@ -36,10 +37,63 @@ ListView::ListView(QWidget* parent)
     setDropIndicatorShown(true);
     setDragDropMode(DragDrop);
     setDefaultDropAction(Qt::MoveAction);
-    connect(header(), &QHeaderView::sectionResized, this, [this](int column, int, int width) {
-        if (!applying_ && column != ListModel::NameColumn && isVisible())
-            Q_EMIT columnResized(columnName(column), width);
-    });
+    connect(header(), &QHeaderView::sectionResized, this, &ListView::onSectionResized);
+}
+
+void ListView::onSectionResized(int column, int, int newSize)
+{
+    if (applying_)
+        return;
+    QHeaderView* h = header();
+    if (column == ListModel::NameColumn) {
+        // Dragging the edge between Name and the next column resizes that
+        // column; Name itself only ever takes what is left. Qt reports the
+        // drag as absolute sizes, so the next column is computed from the
+        // width Name asks for, not from a delta that would compound.
+        int next = -1, rest = 0;
+        for (int c = column + 1; c < ListModel::ColumnCount; ++c) {
+            if (h->isSectionHidden(c))
+                continue;
+            if (next < 0)
+                next = c;
+            else
+                rest += h->sectionSize(c);
+        }
+        if (next >= 0) {
+            const int width = std::max(h->minimumSectionSize(), viewport()->width() - newSize - rest);
+            applying_ = true;
+            h->resizeSection(next, width);
+            applying_ = false;
+            if (isVisible())
+                Q_EMIT columnResized(columnName(next), width);
+        }
+    } else if (isVisible()) {
+        Q_EMIT columnResized(columnName(column), newSize);
+    }
+    fitName();
+}
+
+void ListView::fitName()
+{
+    QHeaderView* h = header();
+    if (!model() || h->count() < ListModel::ColumnCount)
+        return;
+    int others = 0;
+    for (int c = 1; c < ListModel::ColumnCount; ++c)
+        if (!h->isSectionHidden(c))
+            others += h->sectionSize(c);
+    const int width = std::max(h->minimumSectionSize(), viewport()->width() - others);
+    if (h->sectionSize(ListModel::NameColumn) == width)
+        return;
+    applying_ = true;
+    h->resizeSection(ListModel::NameColumn, width);
+    applying_ = false;
+}
+
+void ListView::resizeEvent(QResizeEvent* event)
+{
+    QTreeView::resizeEvent(event);
+    fitName();
 }
 
 QString ListView::columnName(int column)
@@ -63,6 +117,7 @@ void ListView::applyColumns(const QHash<QString, int>& widths, const QStringList
             header()->resizeSection(c, it.value());
     }
     applying_ = false;
+    fitName();
 }
 
 void ListView::mousePressEvent(QMouseEvent* event)
@@ -106,16 +161,16 @@ void ListView::sizeColumns()
         return;
     const QFontMetrics fm(font());
     const int pad = fm.horizontalAdvance(QLatin1Char('x')) * 2;
-    // Name takes what is left; the others start at their widest string
-    // (rule 12) and can be dragged.
-    h->setSectionResizeMode(ListModel::NameColumn, QHeaderView::Stretch);
-    h->setSectionResizeMode(ListModel::SizeColumn, QHeaderView::Interactive);
-    h->setSectionResizeMode(ListModel::ItemsColumn, QHeaderView::Interactive);
-    h->setSectionResizeMode(ListModel::ModifiedColumn, QHeaderView::Interactive);
+    // The others start at their widest string (rule 12) and can be
+    // dragged at either edge; Name takes what is left (fitName).
+    h->setSectionResizeMode(QHeaderView::Interactive);
+    applying_ = true;
     h->resizeSection(ListModel::SizeColumn, fm.horizontalAdvance(QStringLiteral("8888.8 MiB")) + pad);
     h->resizeSection(ListModel::ItemsColumn, fm.horizontalAdvance(QLocale().toString(88888888)) + pad);
     h->resizeSection(ListModel::ModifiedColumn,
                      fm.horizontalAdvance(QStringLiteral("8888-88-88 88:88")) + pad);
+    applying_ = false;
+    fitName();
 }
 
 void ListView::setThumbnailRows(bool on)

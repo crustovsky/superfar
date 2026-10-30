@@ -101,7 +101,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   tab (tumbler over D-Bus, taller rows)
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
-- Insert selects and moves down; Space selects when the filter is empty;
+- Insert or Shift+Down selects and moves down, Shift+Up selects and
+  moves up; Space selects when the filter is empty;
   Ctrl+= / Ctrl+- select and deselect by glob (keypad + and - too);
   Ctrl+A all; * invert. Selection is marks, separate from the cursor
 - Enter opens a file with its default app; Shift+Enter shows the
@@ -127,14 +128,18 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 ## Config
 
-`~/.config/superfar/superfar.ini`, written with defaults on first run.
-`[keys]` has one line per command (`Copy=F5`, `GoUp=Backspace;Left`;
-empty unbinds). `[columns/left]` and `[columns/right]` hold widths by
-column name and `hidden=items,modified`. `[layout]` has
-`split=side-by-side|stacked`, `preview=borrow|third` and splitter sizes;
-`[window]` the size; `[session]` the tabs per pane with hidden, locked
-and sizes flags, the active tab and pane; `[history]` the folders
-behind Ctrl+G with visit count and last time.
+`~/.config/superfar/superfar.ini`, written with defaults on first run
+and never again: the user owns it (chezmoi and friends must see no
+churn). `[keys]` has one line per command (`Copy=F5`,
+`GoUp=Backspace;Left`; empty unbinds). `[columns/left]` and
+`[columns/right]` hold `hidden=items,modified`. `[layout]` has
+`split=side-by-side|stacked` and `preview=borrow|third`.
+`~/.local/state/superfar/state.ini` holds what the app writes on its
+own: `[session]` the tabs per pane with hidden, locked, sizes, thumbs
+flags and the cursor name, the active tab and pane; `[history]` the
+folders behind Ctrl+G with visit count and last time; `[window]` the
+size; `[layout]` splitter sizes; `[columns/*]` dragged widths. The
+first start after 0.5 moves these out of the config.
 
 ## Layout
 

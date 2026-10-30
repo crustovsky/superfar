@@ -37,6 +37,7 @@ QString describe(keymap::Command c)
     case Command::ToggleHidden: return QStringLiteral("show or hide hidden files");
     case Command::Reload: return QStringLiteral("reload the folder");
     case Command::Mark: return QStringLiteral("mark and move down");
+    case Command::MarkUp: return QStringLiteral("mark and move up");
     case Command::MarkToggle: return QStringLiteral("mark (when no filter is set)");
     case Command::MarkAll: return QStringLiteral("mark all");
     case Command::InvertMarks: return QStringLiteral("invert marks");
