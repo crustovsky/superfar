@@ -244,6 +244,15 @@ AuthBar* JobStrip::auth(const QString& message, const QString& user, const QStri
     return bar;
 }
 
+GoToBar* JobStrip::goTo()
+{
+    auto* bar = new GoToBar(this);
+    connect(bar, &GoToBar::chosen, this, [this, bar] { removeBar(bar); });
+    connect(bar, &GoToBar::rejected, this, [this, bar] { removeBar(bar); });
+    showBar(bar);
+    return bar;
+}
+
 void JobStrip::showBar(QWidget* bar, QWidget* under)
 {
     if (bars_ == 0)

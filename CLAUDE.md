@@ -87,7 +87,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 - Tab switches panes; Shift+Tab focuses the tree
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
-  cycle; a tab can be locked so navigation opens a new tab
+  cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
+  as [name])
 - F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
   F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
@@ -113,6 +114,17 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   the window until Enter; Ctrl+Enter inserts the cursor's name
 - Ctrl+Q preview; Ctrl+C / Ctrl+X / Ctrl+V interoperate with other file
   managers
+
+## Config
+
+`~/.config/superfar/superfar.ini`, written with defaults on first run.
+`[keys]` has one line per command (`Copy=F5`, `GoUp=Backspace;Left`;
+empty unbinds). `[columns/left]` and `[columns/right]` hold widths by
+column name and `hidden=items,modified`. `[layout]` has
+`split=side-by-side|stacked`, `preview=borrow|third` and splitter sizes;
+`[window]` the size; `[session]` the tabs per pane with hidden, locked
+and sizes flags, the active tab and pane; `[history]` the folders
+behind Ctrl+G with visit count and last time.
 
 ## Layout
 

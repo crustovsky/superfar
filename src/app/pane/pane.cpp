@@ -1,6 +1,7 @@
 #include "pane/pane.h"
 
 #include "elidedlabel.h"
+#include "pane/listview.h"
 #include "pane/tab.h"
 #include "viewer.h"
 
@@ -79,6 +80,51 @@ Tab* Pane::activeTab() const
     return qobject_cast<Tab*>(stack_->currentWidget());
 }
 
+int Pane::activeIndex() const
+{
+    return stack_->currentIndex();
+}
+
+QList<Config::TabState> Pane::tabStates() const
+{
+    QList<Config::TabState> out;
+    for (Tab* tab : tabs())
+        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes()});
+    return out;
+}
+
+void Pane::restore(const QList<Config::TabState>& states, int active)
+{
+    for (const Config::TabState& s : states) {
+        const core::Location dir = core::Location::fromUri(s.uri);
+        if (!dir.isValid())
+            continue;
+        Tab* tab = newTab(dir);
+        tab->setShowHidden(s.hidden);
+        tab->setRecursiveSizes(s.sizes);
+        tab->setLocked(s.locked);
+        retitle(tab);
+    }
+    if (active >= 0 && active < stack_->count())
+        tabBar_->setCurrentIndex(active);
+}
+
+void Pane::applyColumns(const Config::Columns& columns)
+{
+    columns_ = columns;
+    for (Tab* tab : tabs())
+        tab->view()->applyColumns(columns.widths, columns.hidden);
+}
+
+void Pane::retitle(Tab* tab)
+{
+    const int i = stack_->indexOf(tab);
+    if (i < 0)
+        return;
+    const QString t = title(tab->location());
+    tabBar_->setTabText(i, tab->isLocked() ? QStringLiteral("[%1]").arg(t) : t);
+}
+
 int Pane::tabCount() const
 {
     return stack_->count();
@@ -101,13 +147,16 @@ Tab* Pane::newTab(const core::Location& dir)
     tabBar_->addTab(title(dir));
 
     connect(tab, &Tab::locationChanged, this, [this, tab](const core::Location& loc) {
-        const int i = stack_->indexOf(tab);
-        tabBar_->setTabText(i, title(loc));
-        if (i == stack_->currentIndex()) {
+        retitle(tab);
+        if (stack_->indexOf(tab) == stack_->currentIndex()) {
             path_->setText(loc.displayPath());
             Q_EMIT locationChanged(loc);
         }
+        Q_EMIT sessionChanged();
     });
+    connect(tab, &Tab::openInNewTab, this, [this](const core::Location& dir) { newTab(dir); });
+    connect(tab->view(), &ListView::columnResized, this, &Pane::columnResized);
+    tab->view()->applyColumns(columns_.widths, columns_.hidden);
     connect(tab, &Tab::statusChanged, this, [this, tab](const QString& items, const QString& space) {
         if (stack_->indexOf(tab) == stack_->currentIndex())
             showStatus(items, space);
@@ -119,9 +168,10 @@ Tab* Pane::newTab(const core::Location& dir)
     });
     connect(tab, &Tab::message, this, &Pane::showMessage);
 
+    Q_EMIT tabOpened(tab);  // before the first navigation, so it counts as a visit
     tab->navigate(dir);
     tabBar_->setCurrentIndex(index);
-    Q_EMIT tabOpened(tab);
+    Q_EMIT sessionChanged();
     return tab;
 }
 
@@ -143,6 +193,7 @@ void Pane::closeTab(int index)
     stack_->removeWidget(w);
     tabBar_->removeTab(index);
     w->deleteLater();
+    Q_EMIT sessionChanged();
 }
 
 void Pane::onCurrentTab(int index)
@@ -162,6 +213,7 @@ void Pane::onCurrentTab(int index)
     Q_EMIT locationChanged(tab->location());
     Q_EMIT cursorChanged(tab->cursorLocation());
     tab->refreshStatus();
+    Q_EMIT sessionChanged();
 }
 
 void Pane::setOverlay(QWidget* widget)
@@ -214,6 +266,12 @@ bool Pane::execute(keymap::Command command)
         return true;
     case Command::PrevTab:
         tabBar_->setCurrentIndex((cur + n - 1) % n);
+        return true;
+    case Command::LockTab:
+        activeTab()->setLocked(!activeTab()->isLocked());
+        retitle(activeTab());
+        showMessage(activeTab()->isLocked() ? tr("Tab locked") : tr("Tab unlocked"));
+        Q_EMIT sessionChanged();
         return true;
     case Command::Cancel:
         if (overlay_ == viewer_ && viewer_) {

@@ -3,6 +3,7 @@
 // roles.
 #pragma once
 
+#include "config.h"
 #include "core/location.h"
 #include "keymap.h"
 #include "pane/tab.h"
@@ -25,9 +26,14 @@ public:
     explicit Pane(core::DirSizePool* sizes, QWidget* parent = nullptr);
 
     Tab* activeTab() const;
+    int activeIndex() const;
     int tabCount() const;
     QList<Tab*> tabs() const;
     Tab* newTab(const core::Location& dir);
+    // Session: what to save, and how to come back.
+    QList<Config::TabState> tabStates() const;
+    void restore(const QList<Config::TabState>& states, int active);
+    void applyColumns(const Config::Columns& columns);
 
     void setActive(bool active);
     bool isActive() const { return active_; }
@@ -46,6 +52,8 @@ Q_SIGNALS:
     void cursorChanged(const core::Location& item);   // of the active tab
     void commandRequested(keymap::Command command);
     void tabOpened(Tab* tab);
+    void sessionChanged();  // tabs opened, closed, moved to, or locked
+    void columnResized(const QString& column, int width);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -55,7 +63,10 @@ private:
     void closeTab(int index);
     void onCurrentTab(int index);
     void showStatus(const QString& items, const QString& space);
+    void retitle(Tab* tab);
     static QString title(const core::Location& dir);
+
+    Config::Columns columns_;
 
     QTabBar* tabBar_;
     QLabel* path_;

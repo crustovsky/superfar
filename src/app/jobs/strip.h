@@ -16,6 +16,7 @@
 class JobPanel;
 class AuthBar;
 class ChoiceBar;
+class GoToBar;
 class PromptBar;
 class QLabel;
 class QProgressBar;
@@ -66,6 +67,7 @@ public:
     ChoiceBar* choose(const QString& message, const QStringList& items);
     AuthBar* auth(const QString& message, const QString& user, const QString& domain, bool needUser,
                   bool needDomain, bool needPassword, bool anonymousOk);
+    GoToBar* goTo();
 
 Q_SIGNALS:
     void jobFinished(core::Job* job);

@@ -2,11 +2,11 @@
 
 #include "bench.h"
 #include "cmdline.h"
+#include "config.h"
+#include "devaids.h"
 #include "core/apps.h"
-#include "core/bookmarks.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
-#include "core/mounts.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "funcbar.h"
@@ -14,65 +14,76 @@
 #include "jobs/strip.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
+#include "places.h"
 #include "preview.h"
 #include "tree.h"
 #include "uris.h"
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCloseEvent>
+#include <QDateTime>
 #include <QMimeData>
 #include <QFile>
 #include <QKeyEvent>
 #include <QPointer>
 #include <QSplitter>
 #include <QTimer>
+#include <memory>
 #include <QVBoxLayout>
 
-MainWindow::MainWindow(const core::Location& left, const core::Location& right, QWidget* parent)
+MainWindow::MainWindow(Config* config, const core::Location& left, const core::Location& right, QWidget* parent)
     : QMainWindow(parent)
+    , config_(config)
     , sizes_(new core::DirSizePool(this))
-    , mounts_(new core::Mounts(this))
-    , bookmarks_(new core::Bookmarks(QByteArray(), this))
     , tree_(new Tree(this))
-    , panes_(new QSplitter(Qt::Horizontal, this))
+    , panes_(new QSplitter(config->stackedSplit() ? Qt::Vertical : Qt::Horizontal, this))
+    , split_(new QSplitter(Qt::Horizontal, this))
+    , vsplit_(new QSplitter(Qt::Vertical, this))
+    , previewSlot_(new QWidget(this))
     , left_(new Pane(sizes_, this))
     , right_(new Pane(sizes_, this))
     , active_(left_)
     , funcbar_(new FuncBar(this))
     , strip_(new JobStrip(this))
     , cmdline_(new CommandLine(this))
+    , sessionTimer_(new QTimer(this))
 {
     setWindowTitle(QStringLiteral("superfar"));
-    resize(1100, 700);
+    resize(config->windowSize().isValid() ? config->windowSize() : QSize(1100, 700));
 
     panes_->setChildrenCollapsible(false);
     panes_->addWidget(left_);
     panes_->addWidget(right_);
-    panes_->setSizes({500, 500});
+    panes_->addWidget(previewSlot_);
+    previewSlot_->hide();
+    auto* slotLayout = new QVBoxLayout(previewSlot_);
+    slotLayout->setContentsMargins(0, 0, 0, 0);
+    const QList<int> paneSizes = config->splitterSizes(QStringLiteral("panes"));
+    panes_->setSizes(paneSizes.size() >= 2 ? paneSizes : QList<int>{500, 500});
 
-    auto* split = new QSplitter(Qt::Horizontal, this);
-    split->setChildrenCollapsible(false);
-    split->addWidget(tree_);
-    split->addWidget(panes_);
-    split->setStretchFactor(0, 0);
-    split->setStretchFactor(1, 1);
-    split->setSizes({220, 880});
+    split_->setChildrenCollapsible(false);
+    split_->addWidget(tree_);
+    split_->addWidget(panes_);
+    split_->setStretchFactor(0, 0);
+    split_->setStretchFactor(1, 1);
+    const QList<int> treeSizes = config->splitterSizes(QStringLiteral("tree"));
+    split_->setSizes(treeSizes.size() == 2 ? treeSizes : QList<int>{220, 880});
 
     // The bar area sits under the panes behind a draggable handle; extra
     // height goes to a job's graph or a log list.
-    auto* vsplit = new QSplitter(Qt::Vertical, this);
-    vsplit->addWidget(split);
-    vsplit->addWidget(strip_);
-    vsplit->setStretchFactor(0, 1);
-    vsplit->setStretchFactor(1, 0);
-    vsplit->setCollapsible(0, false);
-    vsplit->setCollapsible(1, false);
+    vsplit_->addWidget(split_);
+    vsplit_->addWidget(strip_);
+    vsplit_->setStretchFactor(0, 1);
+    vsplit_->setStretchFactor(1, 0);
+    vsplit_->setCollapsible(0, false);
+    vsplit_->setCollapsible(1, false);
 
     auto* central = new QWidget(this);
     auto* layout = new QVBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(vsplit, 1);
+    layout->addWidget(vsplit_, 1);
     layout->addWidget(cmdline_);
     layout->addWidget(funcbar_);
     setCentralWidget(central);
@@ -86,6 +97,12 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     });
 
     for (Pane* pane : {left_, right_}) {
+        const QString side = pane == left_ ? QStringLiteral("left") : QStringLiteral("right");
+        pane->applyColumns(config_->columns(side));
+        connect(pane, &Pane::columnResized, this, [this, side](const QString& column, int width) {
+            config_->setColumnWidth(side, column, width);
+        });
+        connect(pane, &Pane::sessionChanged, this, [this] { sessionTimer_->start(); });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {
                 tree_->reveal(dir);
@@ -101,28 +118,16 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
-    connect(tree_, &Tree::placeChosen, this, [this](const QString& id) { mountPlace(id, core::Location()); });
-    connect(tree_, &Tree::dropRequested, this, &MainWindow::transfer);
-    connect(tree_, &Tree::commandRequested, this, &MainWindow::execute);
-    connect(mounts_, &core::Mounts::changed, this, &MainWindow::rebuildRoots);
-    connect(bookmarks_, &core::Bookmarks::changed, this, &MainWindow::rebuildRoots);
-    connect(mounts_, &core::Mounts::askPassword, this,
-            [this](quint64 token, const QString& message, const QString& user, const QString& domain,
-                   bool needUser, bool needDomain, bool needPassword, bool anonymousOk) {
-                AuthBar* bar = strip_->auth(message, user, domain, needUser, needDomain, needPassword, anonymousOk);
-                connect(bar, &AuthBar::answered, this,
-                        [this, token](const QString& u, const QString& d, const QString& p, bool anon) {
-                            mounts_->answerPassword(token, u, d, p, anon);
-                        });
-                connect(bar, &AuthBar::rejected, this, [this, token] { mounts_->abortPrompt(token); });
-            });
-    connect(mounts_, &core::Mounts::askQuestion, this,
-            [this](quint64 token, const QString& message, const QStringList& choices) {
-                ChoiceBar* bar = strip_->choose(message, choices);
-                connect(bar, &ChoiceBar::chosen, this, [this, token](int i) { mounts_->answerQuestion(token, i); });
-                connect(bar, &ChoiceBar::rejected, this, [this, token] { mounts_->abortPrompt(token); });
-            });
-    rebuildRoots();
+    places_ = new Places(tree_, strip_, this);
+    connect(places_, &Places::openFolder, this, [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
+    connect(places_, &Places::message, this, [this](const QString& text) { active_->showMessage(text); });
+    connect(places_, &Places::leavingMount, this, [this](const core::Location& root) {
+        // Tabs inside the mount leave it first, or the unmount is refused.
+        for (Pane* pane : {left_, right_})
+            for (Tab* tab : pane->tabs())
+                if (!tab->location().relativePathFrom(root).isNull())
+                    tab->navigate(core::Location::home());
+    });
     connect(funcbar_, &FuncBar::commandRequested, this, &MainWindow::execute);
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget* now) {
         if (!now)
@@ -133,73 +138,49 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
             setActivePane(right_);
     });
 
+    sessionTimer_->setSingleShot(true);
+    sessionTimer_->setInterval(2000);
+    connect(sessionTimer_, &QTimer::timeout, this, &MainWindow::saveSession);
+
     auto watchTab = [this](Tab* tab) {
         connect(tab, &Tab::folderChanged, this, [this, tab] { tree_->refresh(tab->location()); });
+        connect(tab, &Tab::navigated, this, [this](const core::Location& dir) {
+            config_->recordVisit(dir.uri(), QDateTime::currentSecsSinceEpoch());
+        });
         connect(tab, &Tab::dropRequested, this, &MainWindow::transfer);
-        connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) { mountFor(tab, dir); });
-    };
-    watchTab(left_->newTab(left));
-    watchTab(right_->newTab(right));
-    for (Pane* pane : {left_, right_})
-        connect(pane, &Pane::tabOpened, this, watchTab);
-    left_->setActive(true);
-    left_->activeTab()->setFocus();
-    cmdline_->setFolder(left.displayPath());
-
-    // Bench aid: SUPERFAR_BENCH_THEN=<folder> navigates there once the
-    // first folder has loaded, so memory after leaving a big folder can
-    // be measured.
-    if (const QByteArray then = qgetenv("SUPERFAR_BENCH_THEN"); !then.isEmpty()) {
-        Tab* tab = left_->activeTab();
-        connect(tab, &Tab::loaded, this, [this, tab, then] {
-            disconnect(tab, &Tab::loaded, this, nullptr);
-            QTimer::singleShot(1000, this, [tab, then] {
-                tab->navigate(core::Location::fromCommandLine(then));
+        connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) {
+            QPointer<Tab> guard(tab);
+            places_->mountFor(dir, [guard, dir] {
+                if (guard && guard->location() == dir)
+                    guard->navigate(dir);
             });
         });
+    };
+    for (Pane* pane : {left_, right_})
+        connect(pane, &Pane::tabOpened, this, watchTab);
+    // The session comes back first; folders on the command line then
+    // replace what the active tabs show.
+    const Config::Session session = config_->session();
+    if (session.valid) {
+        left_->restore(session.left, session.leftActive);
+        right_->restore(session.right, session.rightActive);
     }
+    if (left_->tabCount() == 0)
+        left_->newTab(left.isValid() ? left : core::Location::home());
+    else if (left.isValid())
+        left_->activeTab()->navigate(left);
+    if (right_->tabCount() == 0)
+        right_->newTab(right.isValid() ? right : core::Location::home());
+    else if (right.isValid())
+        right_->activeTab()->navigate(right);
+    Pane* start = session.valid && session.activePane == QLatin1String("right") && !left.isValid() ? right_ : left_;
+    active_ = start;
+    start->setActive(true);
+    start->activeTab()->setFocus();
+    cmdline_->setFolder(start->activeTab()->location().displayPath());
+    tree_->reveal(start->activeTab()->location());
 
-    // Dev aid: SUPERFAR_DEV_KEYS="Ctrl+A;F5;Return" posts those keys to the
-    // focused widget, one every 400 ms, once the first folder has loaded.
-    if (const QByteArray keys = qgetenv("SUPERFAR_DEV_KEYS"); !keys.isEmpty()) {
-        Tab* tab = left_->activeTab();
-        connect(tab, &Tab::loaded, this, [this, keys] {
-            static bool fired = false;
-            if (fired)
-                return;
-            fired = true;
-            const QStringList parts = QString::fromLatin1(keys).split(QLatin1Char(';'), Qt::SkipEmptyParts);
-            for (int i = 0; i < parts.size(); ++i) {
-                QTimer::singleShot(400 * (i + 1), this, [this, part = parts[i]] {
-                    // The window may not be active under a compositor
-                    // that keeps focus elsewhere; its own focus child is
-                    // still what a key would reach.
-                    QWidget* target = QApplication::focusWidget();
-                    if (!target)
-                        target = focusWidget();
-                    if (!target)
-                        return;
-                    const QKeySequence seq(part);
-                    const QKeyCombination combo = seq[0];
-                    const QString text = combo.keyboardModifiers() == Qt::NoModifier && combo.key() < 0x100
-                        ? QString(QChar(static_cast<int>(combo.key()))) : QString();
-                    QApplication::postEvent(target, new QKeyEvent(QEvent::KeyPress, combo.key(), combo.keyboardModifiers(), text));
-                    QApplication::postEvent(target, new QKeyEvent(QEvent::KeyRelease, combo.key(), combo.keyboardModifiers(), text));
-                });
-            }
-        });
-    }
-
-    // Dev aid: SUPERFAR_GRAB=<file.png> renders the window to a file and
-    // quits, so the look can be checked without a screenshot tool.
-    if (const QByteArray grabPath = qgetenv("SUPERFAR_GRAB"); !grabPath.isEmpty()) {
-        const int delay = qEnvironmentVariableIntValue("SUPERFAR_GRAB_MS") > 0
-            ? qEnvironmentVariableIntValue("SUPERFAR_GRAB_MS") : 1500;
-        QTimer::singleShot(delay, this, [this, grabPath] {
-            grab().save(QString::fromLocal8Bit(grabPath));
-            qApp->quit();
-        });
-    }
+    installDevAids(this);
 }
 
 void MainWindow::setActivePane(Pane* pane)
@@ -238,7 +219,7 @@ void MainWindow::execute(keymap::Command command)
     using keymap::Command;
     switch (command) {
     case Command::Quit:
-        qApp->quit();
+        close();  // through closeEvent, so the session is saved
         return;
     case Command::SwitchPane:
         if (tree_->hasFocus())
@@ -297,9 +278,12 @@ void MainWindow::execute(keymap::Command command)
     case Command::EditPath:
         promptPath();
         return;
+    case Command::GoTo:
+        goTo();
+        return;
     case Command::Trash:
         if (tree_->hasFocus() && tree_->currentPlace()) {
-            unmountCurrentPlace();
+            places_->unmountCurrent();
             return;
         }
         confirmRemove(false);
@@ -421,8 +405,11 @@ void MainWindow::openWith()
 void MainWindow::togglePreview()
 {
     if (preview_) {
-        Pane* host = otherPane();
-        host->setOverlay(nullptr);
+        if (config_->previewThirdSlot()) {
+            previewSlot_->hide();
+        } else {
+            otherPane()->setOverlay(nullptr);
+        }
         preview_->deleteLater();
         preview_ = nullptr;
         return;
@@ -434,14 +421,80 @@ void MainWindow::togglePreview()
 
 void MainWindow::placePreview()
 {
-    // The preview borrows the pane opposite the active one; a hidden pane
-    // comes back for it.
+    if (config_->previewThirdSlot()) {
+        // Its own slot right of both panes (Opus style).
+        previewSlot_->layout()->addWidget(preview_);
+        preview_->QWidget::show();
+        previewSlot_->show();
+        return;
+    }
+    // Otherwise the preview borrows the pane opposite the active one; a
+    // hidden pane comes back for it.
     Pane* host = otherPane();
     Pane* other = host == left_ ? right_ : left_;
     if (other->hasOverlay())
         other->setOverlay(nullptr);
     host->show();
     host->setOverlay(preview_);
+}
+
+void MainWindow::goTo()
+{
+    GoToBar* bar = strip_->goTo();
+    const QList<Config::Visit> history = config_->history();
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    // Shown as paths; the uri behind each is kept for the choice.
+    auto shown = std::make_shared<QHash<QString, QString>>();
+    auto refill = [bar, history, now, shown](const QString& text) {
+        QStringList entries;
+        shown->clear();
+        for (const Config::Visit& v : Config::rank(history, text, now)) {
+            const QString path = core::Location::fromUri(v.uri).displayPath();
+            shown->insert(path, v.uri);
+            entries << path;
+            if (entries.size() >= 50)
+                break;
+        }
+        bar->setEntries(entries);
+    };
+    refill(QString());
+    connect(bar, &GoToBar::textChanged, this, refill);
+    connect(bar, &GoToBar::chosen, this, [this, shown](const QString& choice) {
+        const QString uri = shown->value(choice);
+        const core::Location dir = uri.isEmpty() ? core::Location::fromCommandLine(QFile::encodeName(choice))
+                                                 : core::Location::fromUri(uri);
+        if (dir.isValid())
+            active_->activeTab()->navigate(dir);
+    });
+}
+
+void MainWindow::saveSession()
+{
+    Config::Session s;
+    s.left = left_->tabStates();
+    s.right = right_->tabStates();
+    s.leftActive = left_->activeIndex();
+    s.rightActive = right_->activeIndex();
+    s.activePane = active_ == left_ ? QStringLiteral("left") : QStringLiteral("right");
+    config_->saveSession(s);
+    config_->sync();
+}
+
+void MainWindow::saveLayout()
+{
+    config_->setWindowSize(size());
+    config_->setSplitterSizes(QStringLiteral("tree"), split_->sizes());
+    QList<int> panes = panes_->sizes();
+    if (panes.size() > 2)
+        panes.resize(2);  // the preview slot is transient
+    config_->setSplitterSizes(QStringLiteral("panes"), panes);
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    saveLayout();
+    saveSession();
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::runCommand(const QString& command)
@@ -495,80 +548,6 @@ void MainWindow::promptPath()
         QPointer<Tab> guard(tab);
         const core::Location dir = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
         if (guard && dir.isValid())
-            guard->navigate(dir);
-    });
-}
-
-void MainWindow::rebuildRoots()
-{
-    // Bookmarks, mounts and the trash first; the filesystem last, since
-    // it is usually expanded deep and would push the rest out of view.
-    std::vector<TreeModel::Root> roots;
-    for (const core::Bookmark& b : bookmarks_->list())
-        roots.push_back({QStringLiteral("bookmark:") + b.location.uri(), b.name,
-                         {QStringLiteral("folder-symbolic"), QStringLiteral("folder")}, b.location, QString(), false});
-    for (const core::Place& p : mounts_->places())
-        roots.push_back({p.id, p.name, p.iconNames, p.location, p.id, p.canUnmount});
-    roots.push_back({QStringLiteral("trash"), tr("Trash"), {QStringLiteral("user-trash-symbolic"), QStringLiteral("user-trash")},
-                     core::Location::fromUri(QStringLiteral("trash:///")), QString(), false});
-    roots.push_back({QStringLiteral("fs"), tr("Filesystem"), {QStringLiteral("drive-harddisk-symbolic"), QStringLiteral("drive-harddisk")},
-                     core::Location::root(), QString(), false});
-    tree_->setRoots(roots);
-}
-
-void MainWindow::mountPlace(const QString& id, const core::Location& thenOpen)
-{
-    QPointer<MainWindow> guard(this);
-    mounts_->mountPlace(id, [guard, id, thenOpen](const QString& error) {
-        if (!guard)
-            return;
-        if (!error.isEmpty()) {
-            guard->active_->showMessage(error);
-            return;
-        }
-        guard->rebuildRoots();
-        for (const core::Place& p : guard->mounts_->places())
-            if (p.id == id || (thenOpen.isValid() && p.location == thenOpen)) {
-                guard->active_->activeTab()->navigate(p.location);
-                return;
-            }
-    });
-}
-
-void MainWindow::unmountCurrentPlace()
-{
-    const TreeModel::Root* place = tree_->currentPlace();
-    if (!place || !place->canUnmount)
-        return;
-    const QString id = place->placeId;
-    const core::Location root = place->location;
-    PromptBar* bar = strip_->prompt(tr("Unmount %1?").arg(place->name), tr("Unmount"), std::nullopt);
-    connect(bar, &PromptBar::accepted, this, [this, id, root] {
-        // Tabs inside the mount leave it first, or the unmount is refused.
-        for (Pane* pane : {left_, right_})
-            for (Tab* tab : pane->tabs())
-                if (!tab->location().relativePathFrom(root).isNull())
-                    tab->navigate(core::Location::home());
-        QPointer<MainWindow> guard(this);
-        mounts_->unmountPlace(id, [guard](const QString& error) {
-            if (guard && !error.isEmpty())
-                guard->active_->showMessage(error);
-        });
-    });
-}
-
-void MainWindow::mountFor(Tab* tab, const core::Location& dir)
-{
-    QPointer<Tab> guard(tab);
-    QPointer<MainWindow> self(this);
-    mounts_->mountLocation(dir, [self, guard, dir](const QString& error) {
-        if (!self)
-            return;
-        if (!error.isEmpty()) {
-            self->active_->showMessage(error);
-            return;
-        }
-        if (guard && guard->location() == dir)
             guard->navigate(dir);
     });
 }

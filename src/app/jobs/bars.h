@@ -69,6 +69,34 @@ private:
     QCheckBox* anonymous_ = nullptr;
 };
 
+// Ctrl+G: a text field over a list of folders that narrows as you type.
+// Enter takes the highlighted entry, or the text itself when it is a
+// path; Up and Down move in the list from the field.
+class GoToBar : public QFrame {
+    Q_OBJECT
+public:
+    explicit GoToBar(QWidget* parent = nullptr);
+
+    // Replaces the list; the first entry is highlighted.
+    void setEntries(const QStringList& entries);
+    QString text() const;
+
+Q_SIGNALS:
+    void textChanged(const QString& text);
+    void chosen(const QString& entryOrText);
+    void rejected();
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
+private:
+    void accept();
+
+    QLineEdit* edit_;
+    QListWidget* list_;
+};
+
 class ConflictBar : public QFrame {
     Q_OBJECT
 public:

@@ -5,6 +5,7 @@
 
 #include "keymap.h"
 
+#include <QHash>
 #include <QTreeView>
 
 class ListView : public QTreeView {
@@ -14,6 +15,9 @@ public:
 
     // Fixed widths for the numeric columns from font metrics (rule 12).
     void sizeColumns();
+    // Config: saved widths by column name and the hidden set.
+    void applyColumns(const QHash<QString, int>& widths, const QStringList& hidden);
+    static QString columnName(int column);
 
     void setActivePane(bool active);
     // Only the first tab of the first pane reports bench marks.
@@ -27,6 +31,7 @@ Q_SIGNALS:
     void textTyped(const QString& text);
     void cursorMoved();
     void editingFinished();
+    void columnResized(const QString& column, int width);  // by the user
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -46,4 +51,5 @@ private:
     bool benchReporter_ = false;
     QPoint pressPos_;
     int pressRow_ = -1;
+    bool applying_ = false;
 };

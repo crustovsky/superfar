@@ -6,6 +6,9 @@ qt_add_executable(superfar
   keymap.cpp
   funcbar.cpp
   cmdline.cpp
+  config.cpp
+  places.cpp
+  devaids.cpp
   uris.cpp
   fm1.cpp
   viewer.cpp

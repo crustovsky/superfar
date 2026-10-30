@@ -1,10 +1,14 @@
 // Every key the app reacts to goes through this table, and so do the
-// function bar buttons and, later, the menu. Milestone 7 makes it
-// remappable from config; until then the defaults are the table.
+// function bar buttons and, later, the menu. The defaults live here;
+// the [keys] section of the config replaces bindings by command name.
 #pragma once
 
+#include <QHash>
 #include <QKeySequence>
+#include <QList>
+#include <QPair>
 #include <QString>
+#include <QStringList>
 
 class QKeyEvent;
 
@@ -52,11 +56,21 @@ enum class Command {
     CutClip,
     Paste,
     EditPath,     // Ctrl+L: type a path or URI
+    GoTo,         // Ctrl+G: folder history by frecency
+    LockTab,      // navigation in a locked tab opens a new tab
 };
 
 Command lookup(const QKeySequence& key);
 Command lookup(const QKeyEvent* event);
 // Short label for the function bar; empty for None.
 QString label(Command command);
+// Stable names for the config file, and back.
+QString name(Command command);
+Command fromName(const QString& name);
+// The default table as (name, portable key strings), in command order.
+QList<QPair<QString, QStringList>> defaults();
+// Replaces the bindings of the named commands; unknown names and
+// unparsable sequences are returned as problems.
+QStringList applyBindings(const QHash<QString, QStringList>& bindings);
 
 } // namespace keymap

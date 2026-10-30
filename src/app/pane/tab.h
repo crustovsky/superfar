@@ -45,6 +45,11 @@ public:
 
     void setShowHidden(bool on);
     bool showHidden() const;
+    bool recursiveSizes() const;
+    void setRecursiveSizes(bool on);
+    // A locked tab keeps its folder: navigation opens a new tab instead.
+    void setLocked(bool on) { locked_ = on; }
+    bool isLocked() const { return locked_; }
 
     void setActive(bool active);
     void refreshStatus() { updateStatus(); }
@@ -60,6 +65,8 @@ Q_SIGNALS:
     void loaded();
     void folderChanged();  // the monitor saw something; a reload follows
     void cursorChanged(const core::Location& item);  // invalid when none
+    void navigated(const core::Location& dir);       // a user navigation, for history
+    void openInNewTab(const core::Location& dir);    // navigation while locked
     void mountNeeded(const core::Location& dir);     // the load failed for want of a mount
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
     void message(const QString& text);  // an error worth a moment in the status line
@@ -92,5 +99,6 @@ private:
     int scrollValue_ = -1;  // restored after a reload
     bool current_ = true;
     bool dirty_ = false;    // changed while not current or while editing
+    bool locked_ = false;
     bool benchReporter_ = false;
 };

@@ -2,6 +2,7 @@
 
 #include "jobs/format.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QDateTime>
 #include <QHBoxLayout>
@@ -149,6 +150,76 @@ void AuthBar::submit()
 }
 
 void AuthBar::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        Q_EMIT rejected();
+        return;
+    }
+    QFrame::keyPressEvent(event);
+}
+
+GoToBar::GoToBar(QWidget* parent)
+    : QFrame(parent)
+    , edit_(new QLineEdit(this))
+    , list_(new QListWidget(this))
+{
+    frame(this);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(6, 4, 6, 4);
+    layout->setSpacing(2);
+    auto* row = new QHBoxLayout;
+    row->addWidget(new QLabel(tr("Go to"), this));
+    row->addWidget(edit_, 1);
+    layout->addLayout(row);
+    layout->addWidget(list_);
+    list_->setFocusPolicy(Qt::NoFocus);
+    list_->setFixedHeight(list_->fontMetrics().height() * 8 + 2 * list_->frameWidth() + 8);
+    edit_->installEventFilter(this);
+    connect(edit_, &QLineEdit::textChanged, this, &GoToBar::textChanged);
+    connect(edit_, &QLineEdit::returnPressed, this, &GoToBar::accept);
+    connect(list_, &QListWidget::itemActivated, this, &GoToBar::accept);
+    setFocusProxy(edit_);
+}
+
+void GoToBar::setEntries(const QStringList& entries)
+{
+    list_->clear();
+    list_->addItems(entries);
+    if (!entries.isEmpty())
+        list_->setCurrentRow(0);
+}
+
+QString GoToBar::text() const
+{
+    return edit_->text();
+}
+
+void GoToBar::accept()
+{
+    const QString typed = edit_->text().trimmed();
+    QListWidgetItem* item = list_->currentItem();
+    // A typed absolute path or URI wins over the list.
+    if (item && !typed.startsWith(QLatin1Char('/')) && !typed.contains(QLatin1String("://")))
+        Q_EMIT chosen(item->text());
+    else if (!typed.isEmpty())
+        Q_EMIT chosen(typed);
+    else if (item)
+        Q_EMIT chosen(item->text());
+}
+
+bool GoToBar::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == edit_ && event->type() == QEvent::KeyPress) {
+        const int key = static_cast<QKeyEvent*>(event)->key();
+        if (key == Qt::Key_Up || key == Qt::Key_Down || key == Qt::Key_PageUp || key == Qt::Key_PageDown) {
+            QApplication::sendEvent(list_, event);
+            return true;
+        }
+    }
+    return QFrame::eventFilter(watched, event);
+}
+
+void GoToBar::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Escape) {
         Q_EMIT rejected();

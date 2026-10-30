@@ -1,12 +1,15 @@
 #include "bench.h"
+#include "config.h"
 #include "core/location.h"
 #include "fm1.h"
+#include "keymap.h"
 #include "mainwindow.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFile>
 #include <QLoggingCategory>
+#include <cstdio>
 
 int main(int argc, char** argv)
 {
@@ -39,12 +42,16 @@ int main(int argc, char** argv)
         return app.exec();
     }
 
+    Config config;
+    config.writeDefaultKeys(keymap::defaults());
+    for (const QString& problem : keymap::applyBindings(config.keyBindings()))
+        fprintf(stderr, "superfar: config [keys]: %s\n", qPrintable(problem));
+
     const QStringList args = parser.positionalArguments();
     auto at = [&](int i) {
-        return args.size() > i ? core::Location::fromCommandLine(QFile::encodeName(args[i]))
-                               : core::Location::home();
+        return args.size() > i ? core::Location::fromCommandLine(QFile::encodeName(args[i])) : core::Location();
     };
-    MainWindow window(at(0), at(1));
+    MainWindow window(&config, at(0), at(1));
     FileManager1::publish(&window);  // another instance may own the name; that is fine
     window.show();
     return app.exec();

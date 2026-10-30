@@ -14,6 +14,10 @@
 # Data lives in $BENCH_DIR (default /tmp/superfar-bench) and is reused.
 set -euo pipefail
 
+# A throwaway config so bench folders never enter the real session.
+export XDG_CONFIG_HOME=$(mktemp -d)
+trap 'rm -rf "$XDG_CONFIG_HOME"' EXIT
+
 BIN=${SUPERFAR_BIN:-build/src/app/superfar}
 DATA=${BENCH_DIR:-/tmp/superfar-bench}
 SETTLE=${SETTLE:-3}

@@ -35,6 +35,33 @@ ListView::ListView(QWidget* parent)
     setDropIndicatorShown(true);
     setDragDropMode(DragDrop);
     setDefaultDropAction(Qt::MoveAction);
+    connect(header(), &QHeaderView::sectionResized, this, [this](int column, int, int width) {
+        if (!applying_ && column != ListModel::NameColumn && isVisible())
+            Q_EMIT columnResized(columnName(column), width);
+    });
+}
+
+QString ListView::columnName(int column)
+{
+    switch (column) {
+    case ListModel::NameColumn: return QStringLiteral("name");
+    case ListModel::SizeColumn: return QStringLiteral("size");
+    case ListModel::ItemsColumn: return QStringLiteral("items");
+    case ListModel::ModifiedColumn: return QStringLiteral("modified");
+    default: return {};
+    }
+}
+
+void ListView::applyColumns(const QHash<QString, int>& widths, const QStringList& hidden)
+{
+    applying_ = true;
+    for (int c = 0; c < ListModel::ColumnCount; ++c) {
+        const QString name = columnName(c);
+        setColumnHidden(c, hidden.contains(name) && c != ListModel::NameColumn);
+        if (const auto it = widths.constFind(name); it != widths.cend() && it.value() > 0 && c != ListModel::NameColumn)
+            header()->resizeSection(c, it.value());
+    }
+    applying_ = false;
 }
 
 void ListView::mousePressEvent(QMouseEvent* event)

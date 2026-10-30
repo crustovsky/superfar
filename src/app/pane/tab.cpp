@@ -57,8 +57,14 @@ Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
 
 void Tab::navigate(const core::Location& dir)
 {
+    if (locked_ && location_.isValid() && dir != location_) {
+        Q_EMIT openInNewTab(dir);
+        return;
+    }
     pendingMarks_.clear();
     load(dir);
+    if (location_.isValid())
+        Q_EMIT navigated(location_);
 }
 
 void Tab::reload()
@@ -220,6 +226,17 @@ void Tab::setShowHidden(bool on)
 bool Tab::showHidden() const
 {
     return model_->showHidden();
+}
+
+bool Tab::recursiveSizes() const
+{
+    return model_->recursiveSizes();
+}
+
+void Tab::setRecursiveSizes(bool on)
+{
+    model_->setRecursiveSizes(on);
+    updateStatus();
 }
 
 void Tab::setActive(bool active)

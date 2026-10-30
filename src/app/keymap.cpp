@@ -8,9 +8,9 @@ namespace keymap {
 
 namespace {
 
-const std::vector<std::pair<QKeySequence, Command>>& table()
+std::vector<std::pair<QKeySequence, Command>>& table()
 {
-    static const std::vector<std::pair<QKeySequence, Command>> t = {
+    static std::vector<std::pair<QKeySequence, Command>> t = {
         {QKeySequence(Qt::Key_F1), Command::Help},
         {QKeySequence(Qt::Key_F2), Command::Rename},
         {QKeySequence(Qt::Key_F3), Command::View},
@@ -58,6 +58,8 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_X), Command::CutClip},
         {QKeySequence(Qt::CTRL | Qt::Key_V), Command::Paste},
         {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
+        {QKeySequence(Qt::CTRL | Qt::Key_G), Command::GoTo},
+        {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L), Command::LockTab},
     };
     return t;
 }
@@ -140,9 +142,95 @@ QString label(Command command)
     case Command::CutClip: return QStringLiteral("Cut to clipboard");
     case Command::Paste: return QStringLiteral("Paste");
     case Command::EditPath: return QStringLiteral("Path");
+    case Command::GoTo: return QStringLiteral("Go to");
+    case Command::LockTab: return QStringLiteral("Lock tab");
     case Command::None: return {};
     }
     return {};
+}
+
+namespace {
+const std::vector<std::pair<Command, const char*>>& names()
+{
+    static const std::vector<std::pair<Command, const char*>> n = {
+        {Command::Help, "Help"}, {Command::Rename, "Rename"}, {Command::View, "View"}, {Command::Edit, "Edit"},
+        {Command::Copy, "Copy"}, {Command::Move, "Move"}, {Command::Mkdir, "Mkdir"}, {Command::Trash, "Trash"},
+        {Command::Menu, "Menu"}, {Command::Quit, "Quit"}, {Command::NewFile, "NewFile"},
+        {Command::DeletePermanent, "DeletePermanent"}, {Command::Find, "Find"}, {Command::HideLeft, "HideLeft"},
+        {Command::HideRight, "HideRight"}, {Command::SwitchPane, "SwitchPane"}, {Command::FocusTree, "FocusTree"},
+        {Command::NewTab, "NewTab"}, {Command::CloseTab, "CloseTab"}, {Command::NextTab, "NextTab"},
+        {Command::PrevTab, "PrevTab"}, {Command::ToggleHidden, "ToggleHidden"}, {Command::Reload, "Reload"},
+        {Command::Mark, "Mark"}, {Command::MarkToggle, "MarkToggle"}, {Command::MarkAll, "MarkAll"},
+        {Command::InvertMarks, "InvertMarks"}, {Command::GoUp, "GoUp"}, {Command::Activate, "Activate"},
+        {Command::Preview, "Preview"}, {Command::ToggleSizes, "ToggleSizes"}, {Command::Cancel, "Cancel"},
+        {Command::MarkGlob, "MarkGlob"}, {Command::UnmarkGlob, "UnmarkGlob"}, {Command::OpenWith, "OpenWith"},
+        {Command::FocusCommandLine, "FocusCommandLine"}, {Command::CopyClip, "CopyClip"},
+        {Command::CutClip, "CutClip"}, {Command::Paste, "Paste"}, {Command::EditPath, "EditPath"},
+        {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"},
+    };
+    return n;
+}
+} // namespace
+
+QString name(Command command)
+{
+    for (const auto& [c, n] : names())
+        if (c == command)
+            return QString::fromLatin1(n);
+    return {};
+}
+
+Command fromName(const QString& text)
+{
+    for (const auto& [c, n] : names())
+        if (text == QLatin1String(n))
+            return c;
+    return Command::None;
+}
+
+QList<QPair<QString, QStringList>> defaults()
+{
+    QList<QPair<QString, QStringList>> out;
+    for (const auto& [c, n] : names()) {
+        QStringList seqs;
+        for (const auto& [seq, cmd] : table())
+            if (cmd == c)
+                seqs << seq.toString(QKeySequence::PortableText);
+        out.append({QString::fromLatin1(n), seqs});
+    }
+    return out;
+}
+
+QStringList applyBindings(const QHash<QString, QStringList>& bindings)
+{
+    QStringList problems;
+    auto& t = table();
+    for (auto it = bindings.cbegin(); it != bindings.cend(); ++it) {
+        const Command cmd = fromName(it.key());
+        if (cmd == Command::None) {
+            problems << QStringLiteral("unknown command %1").arg(it.key());
+            continue;
+        }
+        std::vector<QKeySequence> seqs;
+        bool ok = true;
+        for (const QString& text : it.value()) {
+            const QKeySequence seq(text.trimmed(), QKeySequence::PortableText);
+            if (seq.isEmpty()) {
+                problems << QStringLiteral("%1: cannot read key %2").arg(it.key(), text);
+                ok = false;
+            } else {
+                seqs.push_back(seq);
+            }
+        }
+        if (!ok)
+            continue;
+        std::erase_if(t, [cmd](const auto& entry) { return entry.second == cmd; });
+        for (const QKeySequence& seq : seqs) {
+            std::erase_if(t, [&seq](const auto& entry) { return entry.first == seq; });  // one command per key
+            t.emplace_back(seq, cmd);
+        }
+    }
+    return problems;
 }
 
 } // namespace keymap
