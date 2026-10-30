@@ -11,9 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     # The same toolchain and library versions the app is developed on.
     container: archlinux:latest
+    env:
+      # Natural sort follows the locale; a bare container has none and
+      # would sort by byte value.
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
     steps:
       - name: Install toolchain and dependencies
-        run: pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin
+        run: |
+          pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin
+          sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
