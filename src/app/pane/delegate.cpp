@@ -4,6 +4,7 @@
 #include "pane/listview.h"
 
 #include <QApplication>
+#include <QKeyEvent>
 #include <QLineEdit>
 #include <QPainter>
 
@@ -22,7 +23,24 @@ void RowDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
     const QString name = edit->text();
     const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
     const bool isDir = index.data(ListModel::IsDirRole).toBool();
-    edit->setSelection(0, static_cast<int>(dot > 0 && !isDir ? dot : name.size()));
+    const int stem = static_cast<int>(dot > 0 && !isDir ? dot : name.size());
+    // The view selects everything right after this call; the stem
+    // selection is applied once that has happened.
+    QMetaObject::invokeMethod(edit, [edit, stem] { edit->setSelection(0, stem); }, Qt::QueuedConnection);
+}
+
+bool RowDelegate::eventFilter(QObject* editor, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress) {
+        const int key = static_cast<QKeyEvent*>(event)->key();
+        if (key == Qt::Key_Up || key == Qt::Key_Down) {
+            auto* w = qobject_cast<QWidget*>(editor);
+            Q_EMIT commitData(w);
+            Q_EMIT closeEditor(w, key == Qt::Key_Down ? EditNextItem : EditPreviousItem);
+            return true;
+        }
+    }
+    return QStyledItemDelegate::eventFilter(editor, event);
 }
 
 void RowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,

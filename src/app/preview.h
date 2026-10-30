@@ -30,14 +30,17 @@ private:
     void showImage(const core::ImageFrame& frame);
     QString detailsText(const core::Details& d) const;
 
+    QString details_;  // the lines shown under the title for this item
+
     core::Location item_;
     quint64 generation_ = 0;
     core::ImageLoader* image_;
     core::Reader* reader_;
     core::DirSizer* sizer_;
     QLabel* title_;
+    QLabel* info_;      // details, always above the content
     QStackedWidget* stack_;
+    QWidget* empty_;
     ImageView* picture_;
     QPlainTextEdit* text_;
-    QLabel* info_;
 };

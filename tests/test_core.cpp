@@ -427,6 +427,7 @@ void CoreTest::imageDecode()
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(frame.width, 2u);
     QCOMPARE(frame.height, 2u);
+    QCOMPARE(frame.sourceWidth, 2u);
     QVERIFY(frame.stride >= 8);
     QCOMPARE(static_cast<quint64>(frame.bgra.size()), static_cast<quint64>(frame.stride) * frame.height);
     const auto* px = reinterpret_cast<const unsigned char*>(frame.bgra.constData());

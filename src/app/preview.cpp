@@ -78,15 +78,17 @@ Preview::Preview(core::DirSizePool* sizes, QWidget* parent)
     , reader_(new core::Reader(this))
     , sizer_(new core::DirSizer(sizes, this))
     , title_(new ElidedLabel(this))
+    , info_(new QLabel(this))
     , stack_(new QStackedWidget(this))
+    , empty_(new QWidget(this))
     , picture_(new ImageView(this))
     , text_(new QPlainTextEdit(this))
-    , info_(new QLabel(this))
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(title_);
+    layout->addWidget(info_);
     layout->addWidget(stack_, 1);
     title_->setContentsMargins(4, 2, 4, 2);
     picture_->setMinimumSize(1, 1);
@@ -97,15 +99,15 @@ Preview::Preview(core::DirSizePool* sizes, QWidget* parent)
     info_->setContentsMargins(6, 4, 6, 4);
     info_->setWordWrap(true);
     info_->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    stack_->addWidget(info_);
+    info_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+    stack_->addWidget(empty_);
     stack_->addWidget(picture_);
     stack_->addWidget(text_);
     setFocusPolicy(Qt::NoFocus);
 
     connect(image_, &core::ImageLoader::decoded, this, &Preview::showImage);
     connect(image_, &core::ImageLoader::failed, this, [this](const QString& m) {
-        info_->setText(tr("Image could not be decoded: %1").arg(m));
-        stack_->setCurrentWidget(info_);
+        info_->setText(details_ + QLatin1Char('\n') + tr("Could not decode: %1").arg(m));
     });
     connect(reader_, &core::Reader::opened, this, [this](quint64) { reader_->read(0, kTextCap); });
     connect(reader_, &core::Reader::data, this, [this](quint64, const QByteArray& bytes) {
@@ -117,13 +119,13 @@ Preview::Preview(core::DirSizePool* sizes, QWidget* parent)
             [this](quint64 gen, const QByteArray&, const core::DirSize& s) {
                 if (gen != generation_)
                     return;
-                QString t = tr("Folder\n%n items directly inside", nullptr, static_cast<int>(s.direct));
+                QString t = tr("%n items directly inside", nullptr, static_cast<int>(s.direct));
                 t += tr("\n%1 in %2 files and %3 folders%4")
                          .arg(jobfmt::bytes(s.bytes))
                          .arg(s.files)
                          .arg(s.dirs)
                          .arg(s.complete ? QString() : tr(" (still counting)"));
-                info_->setText(t);
+                info_->setText(details_ + QLatin1Char('\n') + t);
             });
 }
 
@@ -151,7 +153,8 @@ void Preview::clear()
     text_->clear();
     info_->clear();
     title_->clear();
-    stack_->setCurrentWidget(info_);
+    details_.clear();
+    stack_->setCurrentWidget(empty_);
 }
 
 void Preview::onDetails(const core::Details& d)
@@ -160,8 +163,8 @@ void Preview::onDetails(const core::Details& d)
         info_->setText(tr("Not readable"));
         return;
     }
-    info_->setText(detailsText(d));
-    stack_->setCurrentWidget(info_);
+    details_ = detailsText(d);
+    info_->setText(details_);
     if (d.isDir) {
         sizer_->request(item_.parent(), item_.basename(), generation_, true);
         return;
@@ -186,6 +189,8 @@ void Preview::showImage(const core::ImageFrame& frame)
                        QImage::Format_ARGB32_Premultiplied, [](void* p) { delete static_cast<QByteArray*>(p); },
                        bytes);
     picture_->setImage(image);
+    info_->setText(details_ + QLatin1Char('\n')
+                   + tr("Dimensions: %1 × %2").arg(frame.sourceWidth).arg(frame.sourceHeight));
     stack_->setCurrentWidget(picture_);
 }
 

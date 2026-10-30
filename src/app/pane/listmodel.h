@@ -63,6 +63,11 @@ public:
     QSet<QByteArray> markedNames() const;
     void applyMarks(const QSet<QByteArray>& names);
 
+    // A rename that already happened on disk: the entry changes in place
+    // and keeps its row until the next reload re-sorts, so an editor on
+    // a neighbouring row survives.
+    void renameInPlace(const QByteArray& name, const QByteArray& newName, const QString& display);
+
     int rowOf(const QByteArray& name) const;
     const core::Entry& entryAt(int row) const { return entries_[rows_[row]]; }
     int totalCount() const { return static_cast<int>(entries_.size()); }

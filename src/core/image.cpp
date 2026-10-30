@@ -5,6 +5,8 @@
 #include <glycin.h>
 
 #include <QPointer>
+#include <algorithm>
+#include <cstring>
 
 namespace core {
 
@@ -50,13 +52,41 @@ struct ImageLoader::Call {
             return;
         }
         ImageFrame out;
-        out.width = gly_frame_get_width(frame.get());
-        out.height = gly_frame_get_height(frame.get());
-        out.stride = gly_frame_get_stride(frame.get());
+        out.sourceWidth = gly_frame_get_width(frame.get());
+        out.sourceHeight = gly_frame_get_height(frame.get());
+        const quint32 stride = gly_frame_get_stride(frame.get());
         GBytes* bytes = gly_frame_get_buf_bytes(frame.get());  // borrowed
         gsize len = 0;
-        const auto* p = static_cast<const char*>(g_bytes_get_data(bytes, &len));
-        out.bgra = QByteArray(p, static_cast<qsizetype>(len));
+        const auto* p = static_cast<const unsigned char*>(g_bytes_get_data(bytes, &len));
+        if (len < static_cast<gsize>(stride) * out.sourceHeight) {
+            Q_EMIT call->owner->failed(QStringLiteral("short frame"));
+            return;
+        }
+        const quint32 factor = std::max(1u, std::min(call->maxWidth ? out.sourceWidth / (2 * call->maxWidth) : 1u,
+                                                     call->maxHeight ? out.sourceHeight / (2 * call->maxHeight) : 1u));
+        out.width = std::max(1u, out.sourceWidth / factor);
+        out.height = std::max(1u, out.sourceHeight / factor);
+        out.stride = out.width * 4;
+        out.bgra.resize(static_cast<qsizetype>(out.stride) * out.height);
+        auto* dst = reinterpret_cast<unsigned char*>(out.bgra.data());
+        if (factor == 1) {
+            for (quint32 y = 0; y < out.height; ++y)
+                memcpy(dst + y * out.stride, p + y * stride, out.stride);
+        } else {
+            const quint32 n = factor * factor;
+            for (quint32 y = 0; y < out.height; ++y)
+                for (quint32 x = 0; x < out.width; ++x) {
+                    quint32 sum[4] = {0, 0, 0, 0};
+                    for (quint32 sy = 0; sy < factor; ++sy) {
+                        const unsigned char* row = p + (y * factor + sy) * stride + x * factor * 4;
+                        for (quint32 sx = 0; sx < factor; ++sx)
+                            for (int c = 0; c < 4; ++c)
+                                sum[c] += row[sx * 4 + c];
+                    }
+                    for (int c = 0; c < 4; ++c)
+                        dst[y * out.stride + x * 4 + c] = static_cast<unsigned char>(sum[c] / n);
+                }
+        }
         Q_EMIT call->owner->decoded(out);
     }
 };

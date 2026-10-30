@@ -269,7 +269,11 @@ void JobsTest::createAndRename()
     error = QStringLiteral("pending");
     QByteArray actual;
     core::renameEntry(dir.child("new.txt"), QStringLiteral("renamed.txt"),
-                      [&](const QString& e, const QByteArray& name) { error = e; actual = name; });
+                      [&](const QString& e, const QByteArray& name, const QString& display) {
+                          error = e;
+                          actual = name;
+                          QCOMPARE(display, QStringLiteral("renamed.txt"));
+                      });
     while (error == QStringLiteral("pending"))
         QTest::qWait(5);
     QVERIFY2(error.isEmpty(), qPrintable(error));

@@ -46,6 +46,12 @@ Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     connect(view_, &ListView::textTyped, this, &Tab::typed);
     connect(view_, &ListView::cursorMoved, this, [this] { Q_EMIT cursorChanged(cursorLocation()); });
     connect(model_, &ListModel::renameRequested, this, &Tab::rename);
+    connect(view_, &ListView::editingFinished, this, [this] {
+        if (dirty_ && current_) {
+            dirty_ = false;
+            reload();
+        }
+    });
 }
 
 void Tab::navigate(const core::Location& dir)
@@ -134,15 +140,24 @@ void Tab::rename(const QByteArray& name, const QString& newName)
 {
     const core::Location dir = location_;
     QPointer<Tab> guard(this);
-    core::renameEntry(dir.child(name), newName, [guard, dir](const QString& error, const QByteArray& actual) {
+    core::renameEntry(dir.child(name), newName,
+                      [guard, dir, name](const QString& error, const QByteArray& actual, const QString& display) {
         if (!guard)
             return;
         if (!error.isEmpty()) {
             Q_EMIT guard->message(error);
             return;
         }
-        if (guard->location_ == dir)
+        if (guard->location_ != dir)
+            return;
+        // While a neighbouring row is being edited a reload would close
+        // its editor; the entry changes in place and the reload waits.
+        if (guard->view_->isEditing()) {
+            guard->model_->renameInPlace(name, actual, display);
+            guard->dirty_ = true;
+        } else {
             guard->reloadWithCursor(actual);
+        }
     });
 }
 
@@ -159,7 +174,7 @@ void Tab::setCurrent(bool current)
 
 void Tab::onMonitor()
 {
-    if (!current_) {
+    if (!current_ || view_->isEditing()) {
         dirty_ = true;
         return;
     }

@@ -87,6 +87,6 @@ private:
     QString spaceText_;
     int scrollValue_ = -1;  // restored after a reload
     bool current_ = true;
-    bool dirty_ = false;    // changed while not current
+    bool dirty_ = false;    // changed while not current or while editing
     bool benchReporter_ = false;
 };

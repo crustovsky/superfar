@@ -36,10 +36,12 @@ void ListView::sizeColumns()
         return;
     const QFontMetrics fm(font());
     const int pad = fm.horizontalAdvance(QLatin1Char('x')) * 2;
+    // Name takes what is left; the others start at their widest string
+    // (rule 12) and can be dragged.
     h->setSectionResizeMode(ListModel::NameColumn, QHeaderView::Stretch);
-    h->setSectionResizeMode(ListModel::SizeColumn, QHeaderView::Fixed);
-    h->setSectionResizeMode(ListModel::ItemsColumn, QHeaderView::Fixed);
-    h->setSectionResizeMode(ListModel::ModifiedColumn, QHeaderView::Fixed);
+    h->setSectionResizeMode(ListModel::SizeColumn, QHeaderView::Interactive);
+    h->setSectionResizeMode(ListModel::ItemsColumn, QHeaderView::Interactive);
+    h->setSectionResizeMode(ListModel::ModifiedColumn, QHeaderView::Interactive);
     h->resizeSection(ListModel::SizeColumn, fm.horizontalAdvance(QStringLiteral("8888.8 MiB")) + pad);
     h->resizeSection(ListModel::ItemsColumn, fm.horizontalAdvance(QLocale().toString(88888888)) + pad);
     h->resizeSection(ListModel::ModifiedColumn,
@@ -90,6 +92,13 @@ void ListView::paintEvent(QPaintEvent* event)
         paintedRows_ = true;
         bench::mark("first-rows");
     }
+}
+
+void ListView::closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint)
+{
+    QTreeView::closeEditor(editor, hint);
+    if (!isEditing())
+        Q_EMIT editingFinished();
 }
 
 void ListView::currentChanged(const QModelIndex& current, const QModelIndex& previous)

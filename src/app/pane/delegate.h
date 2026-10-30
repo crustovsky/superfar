@@ -18,6 +18,8 @@ public:
     // The rename editor: a line edit with the stem selected, so typing
     // replaces the name and keeps the extension.
     void setEditorData(QWidget* editor, const QModelIndex& index) const override;
+    // Up and Down commit the edit and open the row above or below.
+    bool eventFilter(QObject* editor, QEvent* event) override;
 
 private:
     ListView* view_;

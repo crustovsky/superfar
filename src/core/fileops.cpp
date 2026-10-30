@@ -33,7 +33,7 @@ struct CreateRequest {
 };
 
 struct RenameRequest {
-    std::function<void(const QString&, const QByteArray&)> done;
+    std::function<void(const QString&, const QByteArray&, const QString&)> done;
 
     static void onDone(GObject* source, GAsyncResult* result, gpointer data)
     {
@@ -42,11 +42,14 @@ struct RenameRequest {
         GPtr<GFile> renamed(g_file_set_display_name_finish(G_FILE(source), result, &error));
         GErrorPtr err(error);
         QByteArray name;
+        QString display;
         if (renamed) {
             GStr base(g_file_get_basename(renamed.get()));
             name = QByteArray(base.get());
+            GStr shown(g_filename_display_name(base.get()));
+            display = QString::fromUtf8(shown.get());
         }
-        req->done(errorMessage(err.get()), name);
+        req->done(errorMessage(err.get()), name, display);
     }
 };
 } // namespace
@@ -62,10 +65,11 @@ void createFile(const Location& file, std::function<void(const QString& error)> 
 }
 
 void renameEntry(const Location& file, const QString& newName,
-                 std::function<void(const QString& error, const QByteArray& actualName)> done)
+                 std::function<void(const QString& error, const QByteArray& actualName,
+                                    const QString& display)> done)
 {
     if (!file.isValid()) {
-        done(QStringLiteral("invalid location"), {});
+        done(QStringLiteral("invalid location"), {}, {});
         return;
     }
     auto* req = new RenameRequest{std::move(done)};

@@ -19,17 +19,20 @@ public:
     // Only the first tab of the first pane reports bench marks.
     void setBenchReporter(bool on) { benchReporter_ = on; }
     bool activePane() const { return active_; }
+    bool isEditing() const { return state() == EditingState; }
 
 Q_SIGNALS:
     void commandRequested(keymap::Command command);
     // A printable key with no command bound: the quick filter takes it.
     void textTyped(const QString& text);
     void cursorMoved();
+    void editingFinished();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+    void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint) override;
 
 private:
     QRect rowRect(const QModelIndex& index) const;

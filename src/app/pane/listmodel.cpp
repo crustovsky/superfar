@@ -279,6 +279,29 @@ bool ListModel::setData(const QModelIndex& index, const QVariant& value, int rol
     return true;
 }
 
+void ListModel::renameInPlace(const QByteArray& name, const QByteArray& newName, const QString& display)
+{
+    for (quint32 i = 0; i < entries_.size(); ++i) {
+        core::Entry& e = entries_[i];
+        if (e.name != name)
+            continue;
+        const int row = rowOf(name);
+        e.name = newName;
+        e.display = display;
+        core::computeSortKey(e);
+        metaCache_.remove(name);
+        metaPending_.remove(name);
+        dirCache_.remove(name);
+        dirPending_.remove(name);
+        if (row >= 0) {
+            rowOfName_.remove(name);
+            rowOfName_.insert(newName, row);
+            Q_EMIT dataChanged(index(row, 0), index(row, ColumnCount - 1));
+        }
+        return;
+    }
+}
+
 int ListModel::rowOf(const QByteArray& name) const
 {
     return rowOfName_.value(name, -1);
