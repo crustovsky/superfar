@@ -64,6 +64,7 @@ private:
     void onCurrentTab(int index);
     void showStatus(const QString& items, const QString& space);
     void retitle(Tab* tab);
+    Viewer* ensureViewer();
     static QString title(const core::Location& dir);
 
     Config::Columns columns_;

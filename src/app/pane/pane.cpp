@@ -2,6 +2,7 @@
 
 #include "elidedlabel.h"
 #include "pane/listview.h"
+#include "help.h"
 #include "pane/tab.h"
 #include "viewer.h"
 
@@ -216,6 +217,18 @@ void Pane::onCurrentTab(int index)
     Q_EMIT sessionChanged();
 }
 
+Viewer* Pane::ensureViewer()
+{
+    if (!viewer_) {
+        viewer_ = new Viewer(this);
+        connect(viewer_, &Viewer::closed, this, [this] {
+            setOverlay(nullptr);
+            activeTab()->setFocus();
+        });
+    }
+    return viewer_;
+}
+
 void Pane::setOverlay(QWidget* widget)
 {
     if (overlay_ == widget)
@@ -280,6 +293,11 @@ bool Pane::execute(keymap::Command command)
             return true;
         }
         return activeTab() && activeTab()->execute(command);
+    case Command::Help:
+        ensureViewer()->showText(tr("Help"), help::text());
+        setOverlay(viewer_);
+        viewer_->setFocus();
+        return true;
     case Command::View: {
         Tab* tab = activeTab();
         if (!tab || tab->execute(command))
@@ -287,14 +305,7 @@ bool Pane::execute(keymap::Command command)
         const core::Location file = tab->cursorLocation();
         if (!file.isValid())
             return true;
-        if (!viewer_) {
-            viewer_ = new Viewer(this);
-            connect(viewer_, &Viewer::closed, this, [this] {
-                setOverlay(nullptr);
-                activeTab()->setFocus();
-            });
-        }
-        viewer_->open(file);
+        ensureViewer()->open(file);
         setOverlay(viewer_);
         viewer_->setFocus();
         return true;

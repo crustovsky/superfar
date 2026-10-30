@@ -201,6 +201,23 @@ QList<QPair<QString, QStringList>> defaults()
     return out;
 }
 
+QList<QKeySequence> keysOf(Command command)
+{
+    QList<QKeySequence> out;
+    for (const auto& [seq, cmd] : table())
+        if (cmd == command)
+            out << seq;
+    return out;
+}
+
+QList<Command> allCommands()
+{
+    QList<Command> out;
+    for (const auto& [c, n] : names())
+        out << c;
+    return out;
+}
+
 QStringList applyBindings(const QHash<QString, QStringList>& bindings)
 {
     QStringList problems;

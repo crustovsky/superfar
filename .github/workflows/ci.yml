@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    # The same toolchain and library versions the app is developed on.
+    container: archlinux:latest
+    steps:
+      - name: Install toolchain and dependencies
+        run: pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build
+        run: cmake --build build
+      - name: Tests
+        # Headless: core and config tests only need QtCore and GIO. Tests
+        # that need a gvfs daemon or a decoder sandbox skip themselves
+        # where the container has neither.
+        run: ctest --test-dir build --output-on-failure

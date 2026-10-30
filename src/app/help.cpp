@@ -1,0 +1,88 @@
+#include "help.h"
+
+#include "keymap.h"
+
+#include <QCoreApplication>
+#include <QStringList>
+
+namespace help {
+
+namespace {
+
+QString describe(keymap::Command c)
+{
+    using keymap::Command;
+    switch (c) {
+    case Command::Help: return QStringLiteral("this help");
+    case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next name, Enter applies");
+    case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
+    case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
+    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane");
+    case Command::Move: return QStringLiteral("move the marked items (or the cursor) to the other pane");
+    case Command::Mkdir: return QStringLiteral("new folder");
+    case Command::Trash: return QStringLiteral("move to trash; on a mount in the tree: unmount");
+    case Command::Menu: return QStringLiteral("menu (not yet)");
+    case Command::Quit: return QStringLiteral("quit, keeping the session");
+    case Command::NewFile: return QStringLiteral("new empty file");
+    case Command::DeletePermanent: return QStringLiteral("delete permanently");
+    case Command::Find: return QStringLiteral("find in tree (not yet)");
+    case Command::HideLeft: return QStringLiteral("hide or show the left pane");
+    case Command::HideRight: return QStringLiteral("hide or show the right pane");
+    case Command::SwitchPane: return QStringLiteral("switch panes");
+    case Command::FocusTree: return QStringLiteral("focus the folder tree");
+    case Command::NewTab: return QStringLiteral("new tab in the same folder");
+    case Command::CloseTab: return QStringLiteral("close the tab");
+    case Command::NextTab: return QStringLiteral("next tab");
+    case Command::PrevTab: return QStringLiteral("previous tab");
+    case Command::ToggleHidden: return QStringLiteral("show or hide hidden files");
+    case Command::Reload: return QStringLiteral("reload the folder");
+    case Command::Mark: return QStringLiteral("mark and move down");
+    case Command::MarkToggle: return QStringLiteral("mark (when no filter is set)");
+    case Command::MarkAll: return QStringLiteral("mark all");
+    case Command::InvertMarks: return QStringLiteral("invert marks");
+    case Command::GoUp: return QStringLiteral("go up; with a filter set, edit the filter");
+    case Command::Activate: return QStringLiteral("enter the folder or open the file with its default app");
+    case Command::Preview: return QStringLiteral("preview of the cursor item in the other pane, follows the cursor");
+    case Command::ToggleSizes: return QStringLiteral("recursive folder sizes and counts for this tab");
+    case Command::Cancel: return QStringLiteral("clear the filter, close the viewer, close the preview");
+    case Command::MarkGlob: return QStringLiteral("mark by pattern");
+    case Command::UnmarkGlob: return QStringLiteral("unmark by pattern");
+    case Command::OpenWith: return QStringLiteral("open the file with a chosen app");
+    case Command::FocusCommandLine: return QStringLiteral("command line: runs in this folder in a terminal; Ctrl+Enter inserts the cursor name");
+    case Command::CopyClip: return QStringLiteral("copy to the clipboard (works with other file managers)");
+    case Command::CutClip: return QStringLiteral("cut to the clipboard");
+    case Command::Paste: return QStringLiteral("paste into this folder");
+    case Command::EditPath: return QStringLiteral("type a path or URI; remote ones are mounted");
+    case Command::GoTo: return QStringLiteral("go to a folder from history, ranked by frecency");
+    case Command::LockTab: return QStringLiteral("lock the tab: navigation opens a new tab");
+    case Command::None: return {};
+    }
+    return {};
+}
+
+} // namespace
+
+QString text()
+{
+    QStringList lines;
+    lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys])");
+    lines << QString();
+    int width = 0;
+    QList<QPair<QString, QString>> rows;
+    for (keymap::Command c : keymap::allCommands()) {
+        QStringList keys;
+        for (const QKeySequence& k : keymap::keysOf(c))
+            keys << k.toString(QKeySequence::NativeText);
+        const QString key = keys.isEmpty() ? QStringLiteral("(unbound)") : keys.join(QStringLiteral(", "));
+        width = std::max<int>(width, static_cast<int>(key.size()));
+        rows.append({key, describe(c)});
+    }
+    for (const auto& [key, what] : rows)
+        lines << key.leftJustified(width + 2) + what;
+    lines << QString();
+    lines << QCoreApplication::translate("help", "Type to filter the list; Backspace edits the filter, Esc clears it.");
+    lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
+    return lines.join(QLatin1Char('\n'));
+}
+
+} // namespace help

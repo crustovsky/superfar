@@ -9,6 +9,7 @@ qt_add_executable(superfar
   config.cpp
   places.cpp
   devaids.cpp
+  help.cpp
   uris.cpp
   fm1.cpp
   viewer.cpp

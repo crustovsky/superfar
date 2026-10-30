@@ -428,6 +428,10 @@ void CoreTest::imageDecode()
     loader.load(core::Location::fromPath(QFile::encodeName(tmp.path() + "/tiny.png")), 64, 64);
     while (!done)
         QTest::qWait(10);
+    if (error.contains(QLatin1String("bwrap"), Qt::CaseInsensitive)
+        || error.contains(QLatin1String("sandbox"), Qt::CaseInsensitive)
+        || error.contains(QLatin1String("Operation not permitted")))
+        QSKIP("no decoder sandbox in this environment");
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(frame.width, 2u);
     QCOMPARE(frame.height, 2u);
@@ -477,7 +481,15 @@ void CoreTest::mountsAndTrash()
     listing.start(core::Location::fromUri(QStringLiteral("trash:///")), 1);
     while (done.isEmpty() && failed.isEmpty())
         QTest::qWait(10);
-    QVERIFY2(failed.isEmpty(), failed.isEmpty() ? "" : qPrintable(failed.first().at(1).toString()));
+    if (!failed.isEmpty()) {
+        const QString why = failed.first().at(1).toString();
+        if (why.contains(QLatin1String("not supported"), Qt::CaseInsensitive)
+            || why.contains(QLatin1String("gvfs"), Qt::CaseInsensitive)
+            || why.contains(QLatin1String("D-Bus"), Qt::CaseInsensitive)
+            || why.contains(QLatin1String("dbus"), Qt::CaseInsensitive))
+            QSKIP("no gvfs trash backend in this environment");
+        QFAIL(qPrintable(why));
+    }
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

@@ -69,6 +69,10 @@ QString name(Command command);
 Command fromName(const QString& name);
 // The default table as (name, portable key strings), in command order.
 QList<QPair<QString, QStringList>> defaults();
+// Current keys of a command, for the help and the function bar.
+QList<QKeySequence> keysOf(Command command);
+// Every command in table order, for the help.
+QList<Command> allCommands();
 // Replaces the bindings of the named commands; unknown names and
 // unparsable sequences are returned as problems.
 QStringList applyBindings(const QHash<QString, QStringList>& bindings);

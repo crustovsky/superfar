@@ -54,6 +54,14 @@ void Viewer::open(const core::Location& file)
     reader_->open(file);
 }
 
+void Viewer::showText(const QString& title, const QString& text)
+{
+    clear();
+    title_->setText(title);
+    text_->setPlainText(text);
+    status_->setText(tr("Esc closes"));
+}
+
 void Viewer::clear()
 {
     reader_->close();
@@ -120,7 +128,7 @@ QString Viewer::hexDump(quint64 offset, const QByteArray& bytes)
 
 void Viewer::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Escape || event->key() == Qt::Key_F3) {
+    if (event->key() == Qt::Key_Escape || event->key() == Qt::Key_F3 || event->key() == Qt::Key_F1) {
         Q_EMIT closed();
         return;
     }

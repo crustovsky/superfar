@@ -17,6 +17,8 @@ public:
     explicit Viewer(QWidget* parent = nullptr);
 
     void open(const core::Location& file);
+    // Shows text that is not a file, such as the help.
+    void showText(const QString& title, const QString& text);
     void clear();
 
 Q_SIGNALS:
