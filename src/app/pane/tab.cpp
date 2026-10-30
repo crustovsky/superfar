@@ -5,19 +5,20 @@
 #include "core/fileops.h"
 #include "pane/listmodel.h"
 #include "pane/listview.h"
+#include "services.h"
 
 #include <QLocale>
 #include <QPointer>
 #include <QScrollBar>
 #include <QVBoxLayout>
 
-Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
+Tab::Tab(const Services& services, QWidget* parent)
     : QWidget(parent)
     , listing_(new core::Listing(this))
     , finder_(new core::Finder(this))
     , space_(new core::SpaceQuery(this))
     , monitor_(new core::Monitor(this))
-    , model_(new ListModel(sizes, this))
+    , model_(new ListModel(services.sizes, services.thumbs, this))
     , view_(new ListView(this))
 {
     auto* layout = new QVBoxLayout(this);
@@ -280,6 +281,21 @@ void Tab::setRecursiveSizes(bool on)
     updateStatus();
 }
 
+bool Tab::thumbnails() const
+{
+    return model_->thumbnails();
+}
+
+void Tab::setThumbnails(bool on)
+{
+    if (on == model_->thumbnails())
+        return;
+    cursorName_ = currentName();
+    model_->setThumbnails(on);
+    view_->setThumbnailRows(on);
+    placeCursor();
+}
+
 void Tab::setActive(bool active)
 {
     view_->setActivePane(active);
@@ -346,6 +362,9 @@ bool Tab::execute(keymap::Command command)
     case Command::ToggleSizes:
         model_->setRecursiveSizes(!model_->recursiveSizes());
         updateStatus();
+        return true;
+    case Command::ToggleThumbnails:
+        setThumbnails(!thumbnails());
         return true;
     case Command::View: {
         // F3 on folders walks them; files get the viewer in milestone 5.

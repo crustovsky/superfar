@@ -20,6 +20,8 @@ public:
     static QString columnName(int column);
 
     void setActivePane(bool active);
+    // Thumbnail mode: taller rows with a bigger decoration.
+    void setThumbnailRows(bool on);
     // Only the first tab of the first pane reports bench marks.
     void setBenchReporter(bool on) { benchReporter_ = on; }
     bool activePane() const { return active_; }

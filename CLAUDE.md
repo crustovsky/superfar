@@ -92,7 +92,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
   F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
-  shows the direct count otherwise)
+  shows the direct count otherwise); Ctrl+F4 toggles thumbnails in the
+  tab (tumbler over D-Bus, taller rows)
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert selects and moves down; Space selects when the filter is empty;

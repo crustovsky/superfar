@@ -7,6 +7,7 @@
 #include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
+#include "core/thumbnails.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "funcbar.h"
@@ -36,13 +37,15 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     : QMainWindow(parent)
     , config_(config)
     , sizes_(new core::DirSizePool(this))
+    , thumbs_(new core::Thumbnailer(this))
+    , services_{sizes_, thumbs_}
     , tree_(new Tree(this))
     , panes_(new QSplitter(config->stackedSplit() ? Qt::Vertical : Qt::Horizontal, this))
     , split_(new QSplitter(Qt::Horizontal, this))
     , vsplit_(new QSplitter(Qt::Vertical, this))
     , previewSlot_(new QWidget(this))
-    , left_(new Pane(sizes_, this))
-    , right_(new Pane(sizes_, this))
+    , left_(new Pane(services_, this))
+    , right_(new Pane(services_, this))
     , active_(left_)
     , funcbar_(new FuncBar(this))
     , strip_(new JobStrip(this))
@@ -427,7 +430,7 @@ void MainWindow::togglePreview()
         preview_ = nullptr;
         return;
     }
-    preview_ = new Preview(sizes_);
+    preview_ = new Preview(services_);
     placePreview();
     preview_->show(active_->activeTab()->cursorLocation());
 }

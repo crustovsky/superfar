@@ -60,6 +60,7 @@ enum class Command {
     LockTab,      // navigation in a locked tab opens a new tab
     Properties,   // Alt+Enter: the properties panel
     Bookmark,     // Ctrl+D: bookmark the current folder, or remove it
+    ToggleThumbnails,  // per tab: thumbnails in taller rows
 };
 
 Command lookup(const QKeySequence& key);

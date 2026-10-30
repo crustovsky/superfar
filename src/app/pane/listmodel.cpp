@@ -11,13 +11,61 @@
 
 #include <malloc.h>
 
-ListModel::ListModel(core::DirSizePool* sizes, QObject* parent)
+ListModel::ListModel(core::DirSizePool* sizes, core::Thumbnailer* thumbs, QObject* parent)
     : QAbstractTableModel(parent)
     , meta_(new core::MetadataQuery(this))
     , sizer_(new core::DirSizer(sizes, this))
+    , thumbs_(thumbs)
 {
     connect(meta_, &core::MetadataQuery::result, this, &ListModel::onMetadata);
     connect(sizer_, &core::DirSizer::result, this, &ListModel::onDirSize);
+    connect(thumbs_, &core::Thumbnailer::ready, this, &ListModel::onThumbnail);
+    connect(thumbs_, &core::Thumbnailer::failed, this, [this](const QString& uri) {
+        const QByteArray name = thumbPending_.take(uri);
+        if (!name.isEmpty())
+            thumbCache_.insert(name, QIcon());  // remembered as "none"
+    });
+}
+
+void ListModel::setThumbnails(bool on)
+{
+    if (on == thumbnails_)
+        return;
+    thumbnails_ = on;
+    thumbCache_.clear();
+    thumbPending_.clear();
+    rowsRepaint();
+}
+
+QIcon ListModel::thumbnail(const core::Entry& entry, const core::Metadata& meta) const
+{
+    const auto it = thumbCache_.constFind(entry.name);
+    if (it != thumbCache_.cend())
+        return it.value();
+    if (meta.contentType.isEmpty() || !thumbs_->supports(meta.contentType))
+        return {};
+    const QString uri = dir_.child(entry.name).uri();
+    if (thumbPending_.contains(uri))
+        return {};
+    const QString path = thumbs_->request(uri, meta.contentType, core::Thumbnailer::Flavor::Normal);
+    if (path.isEmpty()) {
+        thumbPending_.insert(uri, entry.name);
+        return {};
+    }
+    const QIcon icon(path);
+    thumbCache_.insert(entry.name, icon);
+    return icon;
+}
+
+void ListModel::onThumbnail(const QString& uri, const QString& path)
+{
+    const QByteArray name = thumbPending_.take(uri);
+    if (name.isEmpty())
+        return;
+    thumbCache_.insert(name, QIcon(path));
+    const int row = rowOf(name);
+    if (row >= 0)
+        Q_EMIT dataChanged(index(row, NameColumn), index(row, NameColumn));
 }
 
 void ListModel::reset(const core::Location& dir)
@@ -33,6 +81,8 @@ void ListModel::reset(const core::Location& dir)
     metaPending_.clear();
     dirCache_.clear();
     dirPending_.clear();
+    thumbCache_.clear();
+    thumbPending_.clear();
     ++metaGeneration_;
     meta_->cancelAll();
     sizer_->cancelAll();
@@ -510,6 +560,11 @@ QIcon ListModel::icon(const core::Entry& entry) const
     const core::Metadata* m = metadata(entry);
     if (!m || m->iconNames.isEmpty())
         return themeIcon({QStringLiteral("text-x-generic")});
+    if (thumbnails_) {
+        const QIcon thumb = thumbnail(entry, *m);
+        if (!thumb.isNull())
+            return thumb;
+    }
     return themeIcon(m->iconNames);
 }
 

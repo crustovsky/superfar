@@ -2,6 +2,7 @@
 
 #include "elidedlabel.h"
 #include "jobs/format.h"
+#include "services.h"
 
 #include <QDateTime>
 #include <QImage>
@@ -72,11 +73,12 @@ QString permissions(quint32 mode)
 }
 } // namespace
 
-Preview::Preview(core::DirSizePool* sizes, QWidget* parent)
+Preview::Preview(const Services& services, QWidget* parent)
     : QWidget(parent)
     , image_(new core::ImageLoader(this))
     , reader_(new core::Reader(this))
-    , sizer_(new core::DirSizer(sizes, this))
+    , sizer_(new core::DirSizer(services.sizes, this))
+    , thumbs_(services.thumbs)
     , title_(new ElidedLabel(this))
     , info_(new QLabel(this))
     , stack_(new QStackedWidget(this))
@@ -108,6 +110,17 @@ Preview::Preview(core::DirSizePool* sizes, QWidget* parent)
     connect(image_, &core::ImageLoader::decoded, this, &Preview::showImage);
     connect(image_, &core::ImageLoader::failed, this, [this](const QString& m) {
         info_->setText(details_ + QLatin1Char('\n') + tr("Could not decode: %1").arg(m));
+    });
+    connect(thumbs_, &core::Thumbnailer::ready, this, [this](const QString& uri, const QString& path) {
+        if (uri != thumbUri_)
+            return;
+        thumbUri_.clear();
+        picture_->setImage(QImage(path));  // tumbler's own output from the cache
+        stack_->setCurrentWidget(picture_);
+    });
+    connect(thumbs_, &core::Thumbnailer::failed, this, [this](const QString& uri) {
+        if (uri == thumbUri_)
+            thumbUri_.clear();
     });
     connect(reader_, &core::Reader::opened, this, [this](quint64) { reader_->read(0, kTextCap); });
     connect(reader_, &core::Reader::data, this, [this](quint64, const QByteArray& bytes) {
@@ -146,6 +159,7 @@ void Preview::clear()
 {
     ++generation_;
     item_ = core::Location();
+    thumbUri_.clear();
     image_->cancel();
     reader_->close();
     sizer_->cancelAll();
@@ -176,8 +190,22 @@ void Preview::onDetails(const core::Details& d)
     }
     const QByteArray type = d.contentType.toUtf8();
     if (d.contentType.startsWith(QLatin1String("text/")) || type.contains("xml") || type.contains("json")
-        || type.contains("script") || type == "application/x-empty")
+        || type.contains("script") || type == "application/x-empty") {
         reader_->open(item_);
+        return;
+    }
+    // Video, PDF, documents, fonts, audio with cover art: whatever tumbler
+    // has a thumbnailer for, at its largest size.
+    if (thumbs_->supports(d.contentType)) {
+        const QString uri = item_.uri();
+        const QString path = thumbs_->request(uri, d.contentType, core::Thumbnailer::Flavor::XXLarge);
+        if (!path.isEmpty()) {
+            picture_->setImage(QImage(path));
+            stack_->setCurrentWidget(picture_);
+        } else {
+            thumbUri_ = uri;
+        }
+    }
 }
 
 void Preview::showImage(const core::ImageFrame& frame)

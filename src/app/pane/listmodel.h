@@ -7,6 +7,7 @@
 
 #include "core/dirsize.h"
 #include "core/entry.h"
+#include "core/thumbnails.h"
 #include "core/location.h"
 #include "core/metadata.h"
 
@@ -22,7 +23,7 @@ public:
     enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
     enum Role { PartialRole = Qt::UserRole + 1, IsDirRole };  // PartialRole: a total still being walked
 
-    explicit ListModel(core::DirSizePool* sizes, QObject* parent = nullptr);
+    ListModel(core::DirSizePool* sizes, core::Thumbnailer* thumbs, QObject* parent = nullptr);
 
     // A new folder: drops entries and caches.
     void reset(const core::Location& dir);
@@ -47,6 +48,10 @@ public:
     // requestSize() (F3) walks a tree.
     void setRecursiveSizes(bool on);
     bool recursiveSizes() const { return recursive_; }
+    // Thumbnails from tumbler for rows whose type it supports; the view
+    // grows its rows to show them.
+    void setThumbnails(bool on);
+    bool thumbnails() const { return thumbnails_; }
     void requestSize(int row);
     // Stops walks and counts in flight; rows ask again when painted.
     void pauseWork();
@@ -105,6 +110,8 @@ private:
     const core::Metadata* metadata(const core::Entry& entry) const;
     const core::DirSize* dirSize(const core::Entry& entry) const;
     void onDirSize(quint64 generation, const QByteArray& name, const core::DirSize& size);
+    QIcon thumbnail(const core::Entry& entry, const core::Metadata& meta) const;
+    void onThumbnail(const QString& uri, const QString& path);
     QIcon icon(const core::Entry& entry) const;
     QIcon themeIcon(const QStringList& names) const;
     void onMetadata(quint64 generation, const QByteArray& name, const core::Metadata& meta);
@@ -125,7 +132,11 @@ private:
     mutable QHash<QString, QIcon> iconCache_;
 
     core::DirSizer* sizer_;
+    core::Thumbnailer* thumbs_;
     bool recursive_ = false;
+    bool thumbnails_ = false;
+    mutable QHash<QByteArray, QIcon> thumbCache_;   // name -> icon, empty icon = none
+    mutable QHash<QString, QByteArray> thumbPending_;  // uri -> name
     mutable QHash<QByteArray, core::DirSize> dirCache_;
     mutable QHash<QByteArray, bool> dirPending_;  // name -> recursive
 };

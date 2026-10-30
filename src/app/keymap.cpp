@@ -63,6 +63,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},
         {QKeySequence(Qt::ALT | Qt::Key_Enter), Command::Properties},
         {QKeySequence(Qt::CTRL | Qt::Key_D), Command::Bookmark},
+        {QKeySequence(Qt::CTRL | Qt::Key_F4), Command::ToggleThumbnails},
     };
     return t;
 }
@@ -149,6 +150,7 @@ QString label(Command command)
     case Command::LockTab: return QStringLiteral("Lock tab");
     case Command::Properties: return QStringLiteral("Properties");
     case Command::Bookmark: return QStringLiteral("Bookmark");
+    case Command::ToggleThumbnails: return QStringLiteral("Thumbs");
     case Command::None: return {};
     }
     return {};
@@ -172,7 +174,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::FocusCommandLine, "FocusCommandLine"}, {Command::CopyClip, "CopyClip"},
         {Command::CutClip, "CutClip"}, {Command::Paste, "Paste"}, {Command::EditPath, "EditPath"},
         {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"}, {Command::Properties, "Properties"},
-        {Command::Bookmark, "Bookmark"},
+        {Command::Bookmark, "Bookmark"}, {Command::ToggleThumbnails, "ToggleThumbnails"},
     };
     return n;
 }

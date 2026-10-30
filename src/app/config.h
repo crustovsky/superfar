@@ -47,6 +47,7 @@ public:
         bool hidden = false;
         bool locked = false;
         bool sizes = false;
+        bool thumbs = false;
     };
     struct Session {
         QList<TabState> left;

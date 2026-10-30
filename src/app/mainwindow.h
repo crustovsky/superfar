@@ -3,11 +3,13 @@
 #include "core/jobs/job.h"
 #include "core/location.h"
 #include "keymap.h"
+#include "services.h"
 
 #include <QMainWindow>
 
 namespace core {
 class DirSizePool;
+class Thumbnailer;
 }
 class CommandLine;
 class Config;
@@ -66,6 +68,8 @@ private:
 
     Config* config_;
     core::DirSizePool* sizes_;  // one worker pool for every tab (rule 9)
+    core::Thumbnailer* thumbs_;
+    Services services_;
     Tree* tree_;
     QSplitter* panes_;
     QSplitter* split_;   // tree | panes

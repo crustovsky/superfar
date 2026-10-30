@@ -12,6 +12,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QStyle>
 
 ListView::ListView(QWidget* parent)
     : QTreeView(parent)
@@ -115,6 +116,14 @@ void ListView::sizeColumns()
     h->resizeSection(ListModel::ItemsColumn, fm.horizontalAdvance(QLocale().toString(88888888)) + pad);
     h->resizeSection(ListModel::ModifiedColumn,
                      fm.horizontalAdvance(QStringLiteral("8888-88-88 88:88")) + pad);
+}
+
+void ListView::setThumbnailRows(bool on)
+{
+    const int size = on ? 64 : style()->pixelMetric(QStyle::PM_SmallIconSize);
+    setIconSize(QSize(size, size));
+    // Uniform row heights take the first row's hint, so force a relayout.
+    scheduleDelayedItemsLayout();
 }
 
 void ListView::setActivePane(bool active)

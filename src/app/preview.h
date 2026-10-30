@@ -9,8 +9,11 @@
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/reader.h"
+#include "core/thumbnails.h"
 
 #include <QWidget>
+
+struct Services;
 
 class ImageView;
 class QLabel;
@@ -20,7 +23,7 @@ class QStackedWidget;
 class Preview : public QWidget {
     Q_OBJECT
 public:
-    explicit Preview(core::DirSizePool* sizes, QWidget* parent = nullptr);
+    explicit Preview(const Services& services, QWidget* parent = nullptr);
 
     void show(const core::Location& item);
     void clear();
@@ -37,6 +40,8 @@ private:
     core::ImageLoader* image_;
     core::Reader* reader_;
     core::DirSizer* sizer_;
+    core::Thumbnailer* thumbs_;
+    QString thumbUri_;  // the thumbnail awaited for the current item
     QLabel* title_;
     QLabel* info_;      // details, always above the content
     QStackedWidget* stack_;

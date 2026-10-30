@@ -5,6 +5,7 @@
 #include "help.h"
 #include "properties.h"
 #include "pane/tab.h"
+#include "services.h"
 #include "viewer.h"
 
 #include <QApplication>
@@ -21,7 +22,7 @@ constexpr int kBorder = 2;
 
 } // namespace
 
-Pane::Pane(core::DirSizePool* sizes, QWidget* parent)
+Pane::Pane(const Services& services, QWidget* parent)
     : QWidget(parent)
     , tabBar_(new QTabBar(this))
     , path_(new ElidedLabel(this))
@@ -30,7 +31,7 @@ Pane::Pane(core::DirSizePool* sizes, QWidget* parent)
     , status_(new QLabel(this))
     , space_(new QLabel(this))
     , messageTimer_(new QTimer(this))
-    , sizes_(sizes)
+    , services_(services)
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(kBorder, kBorder, kBorder, kBorder);
@@ -91,7 +92,7 @@ QList<Config::TabState> Pane::tabStates() const
 {
     QList<Config::TabState> out;
     for (Tab* tab : tabs())
-        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes()});
+        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes(), tab->thumbnails()});
     return out;
 }
 
@@ -104,6 +105,7 @@ void Pane::restore(const QList<Config::TabState>& states, int active)
         Tab* tab = newTab(dir);
         tab->setShowHidden(s.hidden);
         tab->setRecursiveSizes(s.sizes);
+        tab->setThumbnails(s.thumbs);
         tab->setLocked(s.locked);
         retitle(tab);
     }
@@ -142,7 +144,7 @@ QList<Tab*> Pane::tabs() const
 
 Tab* Pane::makeTab(const core::Location& dir)
 {
-    auto* tab = new Tab(sizes_, this);
+    auto* tab = new Tab(services_, this);
     tab->setActive(active_);
     tab->setCurrent(false);
     const int index = stack_->addWidget(tab);
@@ -320,7 +322,7 @@ bool Pane::execute(keymap::Command command)
         if (items.empty())
             return true;
         if (!props_) {
-            props_ = new PropertiesPanel(sizes_, this);
+            props_ = new PropertiesPanel(services_.sizes, this);
             connect(props_, &PropertiesPanel::closed, this, &Pane::closeOwnOverlay);
             connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
             connect(props_, &PropertiesPanel::changed, this, [this] {

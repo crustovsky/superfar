@@ -17,14 +17,12 @@ class PropertiesPanel;
 class QTimer;
 class Viewer;
 
-namespace core {
-class DirSizePool;
-}
+struct Services;
 
 class Pane : public QWidget {
     Q_OBJECT
 public:
-    explicit Pane(core::DirSizePool* sizes, QWidget* parent = nullptr);
+    explicit Pane(const Services& services, QWidget* parent = nullptr);
 
     Tab* activeTab() const;
     int activeIndex() const;
@@ -83,7 +81,7 @@ private:
     QLabel* status_;
     QLabel* space_;
     QTimer* messageTimer_;
-    core::DirSizePool* sizes_;
+    const Services& services_;
     QString statusText_;
     Tab* current_ = nullptr;
     bool active_ = false;

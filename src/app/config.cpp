@@ -16,6 +16,7 @@ QList<Config::TabState> readTabs(QSettings& s, const QString& side)
         t.hidden = s.value(QStringLiteral("hidden"), false).toBool();
         t.locked = s.value(QStringLiteral("locked"), false).toBool();
         t.sizes = s.value(QStringLiteral("sizes"), false).toBool();
+        t.thumbs = s.value(QStringLiteral("thumbs"), false).toBool();
         if (!t.uri.isEmpty())
             out.append(t);
     }
@@ -33,6 +34,7 @@ void writeTabs(QSettings& s, const QString& side, const QList<Config::TabState>&
         s.setValue(QStringLiteral("hidden"), tabs[i].hidden);
         s.setValue(QStringLiteral("locked"), tabs[i].locked);
         s.setValue(QStringLiteral("sizes"), tabs[i].sizes);
+        s.setValue(QStringLiteral("thumbs"), tabs[i].thumbs);
     }
     s.endArray();
 }

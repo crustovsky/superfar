@@ -14,14 +14,12 @@
 
 class ListModel;
 class ListView;
-namespace core {
-class DirSizePool;
-}
+struct Services;
 
 class Tab : public QWidget {
     Q_OBJECT
 public:
-    explicit Tab(core::DirSizePool* sizes, QWidget* parent = nullptr);
+    explicit Tab(const Services& services, QWidget* parent = nullptr);
 
     const core::Location& location() const { return location_; }
     void navigate(const core::Location& dir);
@@ -52,6 +50,8 @@ public:
     bool showHidden() const;
     bool recursiveSizes() const;
     void setRecursiveSizes(bool on);
+    bool thumbnails() const;
+    void setThumbnails(bool on);
     // A locked tab keeps its folder: navigation opens a new tab instead.
     void setLocked(bool on) { locked_ = on; }
     bool isLocked() const { return locked_; }
