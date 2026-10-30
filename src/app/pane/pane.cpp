@@ -3,6 +3,7 @@
 #include "elidedlabel.h"
 #include "pane/listview.h"
 #include "help.h"
+#include "properties.h"
 #include "pane/tab.h"
 #include "viewer.h"
 
@@ -122,7 +123,7 @@ void Pane::retitle(Tab* tab)
     const int i = stack_->indexOf(tab);
     if (i < 0)
         return;
-    const QString t = title(tab->location());
+    QString t = tab->searchPattern().isEmpty() ? title(tab->location()) : tr("Find %1").arg(tab->searchPattern());
     tabBar_->setTabText(i, tab->isLocked() ? QStringLiteral("[%1]").arg(t) : t);
 }
 
@@ -139,7 +140,7 @@ QList<Tab*> Pane::tabs() const
     return out;
 }
 
-Tab* Pane::newTab(const core::Location& dir)
+Tab* Pane::makeTab(const core::Location& dir)
 {
     auto* tab = new Tab(sizes_, this);
     tab->setActive(active_);
@@ -170,8 +171,22 @@ Tab* Pane::newTab(const core::Location& dir)
     connect(tab, &Tab::message, this, &Pane::showMessage);
 
     Q_EMIT tabOpened(tab);  // before the first navigation, so it counts as a visit
-    tab->navigate(dir);
     tabBar_->setCurrentIndex(index);
+    return tab;
+}
+
+Tab* Pane::newTab(const core::Location& dir)
+{
+    Tab* tab = makeTab(dir);
+    tab->navigate(dir);
+    Q_EMIT sessionChanged();
+    return tab;
+}
+
+Tab* Pane::newSearchTab(const core::Location& root, const QString& pattern)
+{
+    Tab* tab = makeTab(root);
+    tab->search(root, pattern);
     Q_EMIT sessionChanged();
     return tab;
 }
@@ -217,6 +232,13 @@ void Pane::onCurrentTab(int index)
     Q_EMIT sessionChanged();
 }
 
+void Pane::closeOwnOverlay()
+{
+    setOverlay(nullptr);
+    if (Tab* tab = activeTab())
+        tab->setFocus();
+}
+
 Viewer* Pane::ensureViewer()
 {
     if (!viewer_) {
@@ -237,8 +259,8 @@ void Pane::setOverlay(QWidget* widget)
         content_->removeWidget(overlay_);
         if (overlay_ == viewer_)
             viewer_->clear();
-        else
-            overlay_->setParent(nullptr);
+        else if (overlay_ != props_)
+            overlay_->setParent(nullptr);  // the preview belongs to the window
         overlay_ = nullptr;
     }
     if (widget) {
@@ -287,12 +309,30 @@ bool Pane::execute(keymap::Command command)
         Q_EMIT sessionChanged();
         return true;
     case Command::Cancel:
-        if (overlay_ == viewer_ && viewer_) {
-            setOverlay(nullptr);
-            activeTab()->setFocus();
+        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_)) {
+            closeOwnOverlay();
             return true;
         }
         return activeTab() && activeTab()->execute(command);
+    case Command::Properties: {
+        Tab* tab = activeTab();
+        const auto items = tab ? tab->selectedLocations() : std::vector<core::Location>();
+        if (items.empty())
+            return true;
+        if (!props_) {
+            props_ = new PropertiesPanel(sizes_, this);
+            connect(props_, &PropertiesPanel::closed, this, &Pane::closeOwnOverlay);
+            connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
+            connect(props_, &PropertiesPanel::changed, this, [this] {
+                if (Tab* t = activeTab())
+                    t->reload();
+            });
+        }
+        props_->show(items);
+        setOverlay(props_);
+        props_->setFocus();
+        return true;
+    }
     case Command::Help:
         ensureViewer()->showText(tr("Help"), help::text());
         setOverlay(viewer_);

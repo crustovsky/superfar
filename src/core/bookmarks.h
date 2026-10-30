@@ -26,6 +26,9 @@ public:
     ~Bookmarks() override;
 
     const std::vector<Bookmark>& list() const { return list_; }
+    bool contains(const Location& dir) const;
+    // Adds or removes the folder; returns true when it is now bookmarked.
+    bool toggle(const Location& dir);
 
     static std::vector<Bookmark> parse(const QByteArray& content);
 

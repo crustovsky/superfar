@@ -58,6 +58,8 @@ enum class Command {
     EditPath,     // Ctrl+L: type a path or URI
     GoTo,         // Ctrl+G: folder history by frecency
     LockTab,      // navigation in a locked tab opens a new tab
+    Properties,   // Alt+Enter: the properties panel
+    Bookmark,     // Ctrl+D: bookmark the current folder, or remove it
 };
 
 Command lookup(const QKeySequence& key);

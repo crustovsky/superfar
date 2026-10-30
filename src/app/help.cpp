@@ -25,7 +25,7 @@ QString describe(keymap::Command c)
     case Command::Quit: return QStringLiteral("quit, keeping the session");
     case Command::NewFile: return QStringLiteral("new empty file");
     case Command::DeletePermanent: return QStringLiteral("delete permanently");
-    case Command::Find: return QStringLiteral("find in tree (not yet)");
+    case Command::Find: return QStringLiteral("find in this folder and below by name; results open in a tab");
     case Command::HideLeft: return QStringLiteral("hide or show the left pane");
     case Command::HideRight: return QStringLiteral("hide or show the right pane");
     case Command::SwitchPane: return QStringLiteral("switch panes");
@@ -55,6 +55,8 @@ QString describe(keymap::Command c)
     case Command::EditPath: return QStringLiteral("type a path or URI; remote ones are mounted");
     case Command::GoTo: return QStringLiteral("go to a folder from history, ranked by frecency");
     case Command::LockTab: return QStringLiteral("lock the tab: navigation opens a new tab");
+    case Command::Properties: return QStringLiteral("properties and permissions of the marked items or the cursor item");
+    case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::None: return {};
     }
     return {};

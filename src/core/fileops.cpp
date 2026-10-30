@@ -52,7 +52,32 @@ struct RenameRequest {
         req->done(errorMessage(err.get()), name, display);
     }
 };
+struct ModeRequest {
+    std::function<void(const QString&)> done;
+
+    static void onDone(GObject* source, GAsyncResult* result, gpointer data)
+    {
+        std::unique_ptr<ModeRequest> req(static_cast<ModeRequest*>(data));
+        GError* error = nullptr;
+        g_file_set_attributes_finish(G_FILE(source), result, nullptr, &error);
+        GErrorPtr err(error);
+        req->done(errorMessage(err.get()));
+    }
+};
 } // namespace
+
+void setMode(const Location& file, quint32 mode, std::function<void(const QString& error)> done)
+{
+    if (!file.isValid()) {
+        done(QStringLiteral("invalid location"));
+        return;
+    }
+    GPtr<GFileInfo> info(g_file_info_new());
+    g_file_info_set_attribute_uint32(info.get(), G_FILE_ATTRIBUTE_UNIX_MODE, mode);
+    auto* req = new ModeRequest{std::move(done)};
+    g_file_set_attributes_async(file.gfile(), info.get(), G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, G_PRIORITY_DEFAULT,
+                                nullptr, &ModeRequest::onDone, req);
+}
 
 void createFile(const Location& file, std::function<void(const QString& error)> done)
 {

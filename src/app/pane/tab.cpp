@@ -14,6 +14,7 @@
 Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     : QWidget(parent)
     , listing_(new core::Listing(this))
+    , finder_(new core::Finder(this))
     , space_(new core::SpaceQuery(this))
     , monitor_(new core::Monitor(this))
     , model_(new ListModel(sizes, this))
@@ -38,6 +39,8 @@ Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     connect(listing_, &core::Listing::batch, this, &Tab::onBatch);
     connect(listing_, &core::Listing::finished, this, &Tab::onFinished);
     connect(listing_, &core::Listing::failed, this, &Tab::onFailed);
+    connect(finder_, &core::Finder::matches, this, &Tab::onBatch);
+    connect(finder_, &core::Finder::finished, this, &Tab::onSearchFinished);
     connect(space_, &core::SpaceQuery::result, this, &Tab::onSpace);
     connect(monitor_, &core::Monitor::changed, this, &Tab::onMonitor);
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
@@ -72,7 +75,43 @@ void Tab::reload()
     pendingMarks_ = model_->markedNames();
     cursorName_ = currentName();
     scrollValue_ = view_->verticalScrollBar()->value();
-    load(location_);
+    if (!search_.isEmpty())
+        search(location_, search_);
+    else
+        load(location_);
+}
+
+void Tab::search(const core::Location& root, const QString& pattern)
+{
+    if (!root.isValid() || pattern.isEmpty())
+        return;
+    ++generation_;
+    listing_->cancel();
+    monitor_->stop();
+    location_ = root;
+    search_ = pattern;
+    spaceText_.clear();
+    model_->setFilter(QString());
+    model_->reset(root);
+    finder_->start(root, pattern, generation_);
+    Q_EMIT locationChanged(location_);
+    Q_EMIT statusChanged(tr("Searching for %1").arg(pattern), QString());
+}
+
+void Tab::onSearchFinished(quint64 generation, quint64 scanned)
+{
+    if (generation != generation_)
+        return;
+    model_->finishLoad();
+    if (!pendingMarks_.isEmpty()) {
+        model_->applyMarks(pendingMarks_);
+        pendingMarks_.clear();
+    }
+    placeCursor();
+    Q_EMIT statusChanged(tr("%n matches for %1", nullptr, model_->rowCount()).arg(search_)
+                             + tr(", %n entries scanned", nullptr, static_cast<int>(scanned)),
+                         QString());
+    Q_EMIT loaded();
 }
 
 void Tab::reloadWithCursor(const QByteArray& name)
@@ -194,6 +233,8 @@ void Tab::load(const core::Location& dir)
     if (!dir.isValid())
         return;
     ++generation_;
+    finder_->cancel();
+    search_.clear();
     monitor_->stop();
     location_ = dir;
     spaceText_.clear();
@@ -418,7 +459,7 @@ void Tab::updateStatus()
     const int hidden = model_->hiddenCount();
     const int marked = model_->markedCount();
     QString text = model_->filter().isEmpty()
-        ? tr("%n items", nullptr, shown)
+        ? (search_.isEmpty() ? tr("%n items", nullptr, shown) : tr("%n matches for %1", nullptr, shown).arg(search_))
         : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
     if (marked > 0)
         text += tr(", %n selected", nullptr, marked);

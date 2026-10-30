@@ -13,6 +13,7 @@
 class QLabel;
 class QStackedWidget;
 class QTabBar;
+class PropertiesPanel;
 class QTimer;
 class Viewer;
 
@@ -30,6 +31,7 @@ public:
     int tabCount() const;
     QList<Tab*> tabs() const;
     Tab* newTab(const core::Location& dir);
+    Tab* newSearchTab(const core::Location& root, const QString& pattern);
     // Session: what to save, and how to come back.
     QList<Config::TabState> tabStates() const;
     void restore(const QList<Config::TabState>& states, int active);
@@ -65,6 +67,8 @@ private:
     void showStatus(const QString& items, const QString& space);
     void retitle(Tab* tab);
     Viewer* ensureViewer();
+    Tab* makeTab(const core::Location& dir);  // adds and wires a tab without loading it
+    void closeOwnOverlay();
     static QString title(const core::Location& dir);
 
     Config::Columns columns_;
@@ -74,6 +78,7 @@ private:
     QStackedWidget* content_;  // the tab stack, or an overlay
     QStackedWidget* stack_;
     Viewer* viewer_ = nullptr;
+    PropertiesPanel* props_ = nullptr;
     QWidget* overlay_ = nullptr;
     QLabel* status_;
     QLabel* space_;

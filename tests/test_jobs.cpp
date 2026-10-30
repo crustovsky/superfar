@@ -280,6 +280,13 @@ void JobsTest::createAndRename()
     QCOMPARE(actual, QByteArray("renamed.txt"));
     QVERIFY(!QFile::exists(tmp.path() + "/new.txt"));
     QVERIFY(QFile::exists(tmp.path() + "/renamed.txt"));
+
+    error = QStringLiteral("pending");
+    core::setMode(dir.child("renamed.txt"), 0600, [&](const QString& e) { error = e; });
+    while (error == QStringLiteral("pending"))
+        QTest::qWait(5);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(QFile::permissions(tmp.path() + "/renamed.txt") & (QFileDevice::ReadGroup | QFileDevice::ReadOther), QFileDevice::Permissions());
 }
 
 QTEST_GUILESS_MAIN(JobsTest)

@@ -22,6 +22,8 @@ public:
     Places(Tree* tree, JobStrip* strip, QObject* parent = nullptr);
 
     void rebuildRoots();
+    // Ctrl+D: adds or removes the folder; says which in a message.
+    void toggleBookmark(const core::Location& dir);
     void mountPlace(const QString& id);  // then openFolder() with its root
     void unmountCurrent();               // the mount under the tree cursor, after a confirm
     // Mounts whatever holds a remote location, then runs the continuation.

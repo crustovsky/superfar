@@ -13,6 +13,7 @@ qt_add_library(superfar_core STATIC
   image.cpp
   mounts.cpp
   bookmarks.cpp
+  finder.cpp
   fileops.cpp
   jobs/job.cpp
   jobs/transfer.cpp

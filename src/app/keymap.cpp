@@ -60,6 +60,9 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
         {QKeySequence(Qt::CTRL | Qt::Key_G), Command::GoTo},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L), Command::LockTab},
+        {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},
+        {QKeySequence(Qt::ALT | Qt::Key_Enter), Command::Properties},
+        {QKeySequence(Qt::CTRL | Qt::Key_D), Command::Bookmark},
     };
     return t;
 }
@@ -144,6 +147,8 @@ QString label(Command command)
     case Command::EditPath: return QStringLiteral("Path");
     case Command::GoTo: return QStringLiteral("Go to");
     case Command::LockTab: return QStringLiteral("Lock tab");
+    case Command::Properties: return QStringLiteral("Properties");
+    case Command::Bookmark: return QStringLiteral("Bookmark");
     case Command::None: return {};
     }
     return {};
@@ -166,7 +171,8 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::MarkGlob, "MarkGlob"}, {Command::UnmarkGlob, "UnmarkGlob"}, {Command::OpenWith, "OpenWith"},
         {Command::FocusCommandLine, "FocusCommandLine"}, {Command::CopyClip, "CopyClip"},
         {Command::CutClip, "CutClip"}, {Command::Paste, "Paste"}, {Command::EditPath, "EditPath"},
-        {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"},
+        {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"}, {Command::Properties, "Properties"},
+        {Command::Bookmark, "Bookmark"},
     };
     return n;
 }

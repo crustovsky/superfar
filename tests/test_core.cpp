@@ -2,6 +2,7 @@
 #include "core/apps.h"
 #include "core/bookmarks.h"
 #include "core/dirsize.h"
+#include "core/finder.h"
 #include "core/mounts.h"
 #include "core/image.h"
 #include "core/listing.h"
@@ -62,6 +63,8 @@ private Q_SLOTS:
     void imageDecode();
     void bookmarks();
     void mountsAndTrash();
+    void findInTree();
+    void bookmarkToggle();
 };
 
 namespace {
@@ -490,6 +493,73 @@ void CoreTest::mountsAndTrash()
             QSKIP("no gvfs trash backend in this environment");
         QFAIL(qPrintable(why));
     }
+}
+
+void CoreTest::findInTree()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString d = tmp.path();
+    QVERIFY(QDir(d).mkpath("sub/deep"));
+    touch(d + "/alpha.txt");
+    touch(d + "/sub/beta.md");
+    touch(d + "/sub/deep/gamma.txt");
+    touch(d + "/sub/deep/.hidden-gamma");
+    const core::Location root = core::Location::fromPath(QFile::encodeName(d));
+
+    auto search = [&](const QString& pattern) {
+        core::Finder finder;
+        std::vector<core::Entry> all;
+        bool done = false;
+        connect(&finder, &core::Finder::matches, [&](quint64 gen, std::vector<core::Entry> e) {
+            QCOMPARE(gen, 3u);
+            all.insert(all.end(), e.begin(), e.end());
+        });
+        connect(&finder, &core::Finder::finished, [&](quint64, quint64 scanned) {
+            QVERIFY(scanned >= 6);
+            done = true;
+        });
+        finder.start(root, pattern, 3);
+        while (!done)
+            QTest::qWait(5);
+        QStringList names;
+        for (const auto& e : all)
+            names << e.display;
+        names.sort();  // collation order is the locale's business, not this test's
+        return names;
+    };
+    QCOMPARE(search(QStringLiteral("gam")), QStringList({"sub/deep/.hidden-gamma", "sub/deep/gamma.txt"}));
+    QCOMPARE(search(QStringLiteral("A")), QStringList({"alpha.txt", "sub/beta.md", "sub/deep/.hidden-gamma", "sub/deep/gamma.txt"}));
+    QCOMPARE(search(QStringLiteral("zzz")), QStringList());
+    QVERIFY(core::Finder::nameMatches(QStringLiteral("gamma.txt"), QStringLiteral("gtx")));
+    QVERIFY(!core::Finder::nameMatches(QStringLiteral("gamma.txt"), QStringLiteral("xg")));
+
+    // Cancelling mid-walk neither crashes nor reports.
+    core::Finder finder;
+    QSignalSpy fin(&finder, &core::Finder::finished);
+    finder.start(root, QStringLiteral("a"), 9);
+    finder.cancel();
+    QTest::qWait(50);
+    QVERIFY(fin.isEmpty());
+}
+
+void CoreTest::bookmarkToggle()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/marks/bookmarks";
+    core::Bookmarks marks(QFile::encodeName(path));
+    QVERIFY(marks.list().empty());
+    const core::Location usr = core::Location::fromPath("/usr");
+    QVERIFY(marks.toggle(usr));
+    QVERIFY(marks.contains(usr));
+    QCOMPARE(marks.list().size(), 1u);
+    QVERIFY(!marks.toggle(usr));
+    QVERIFY(marks.list().empty());
+
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    QCOMPARE(f.readAll(), QByteArray(""));
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

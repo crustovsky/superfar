@@ -2,6 +2,7 @@
 // the list view. History and filter land here in later milestones.
 #pragma once
 
+#include "core/finder.h"
 #include "core/listing.h"
 #include "core/location.h"
 #include "core/monitor.h"
@@ -24,6 +25,10 @@ public:
 
     const core::Location& location() const { return location_; }
     void navigate(const core::Location& dir);
+    // Find in tree: the tab lists matches below root, named by their
+    // path relative to it, and otherwise behaves like a folder.
+    void search(const core::Location& root, const QString& pattern);
+    const QString& searchPattern() const { return search_; }
     void reload();  // same folder again, keeping cursor, marks and scroll
     void reloadWithCursor(const QByteArray& name);
     void goUp();
@@ -76,6 +81,7 @@ private:
     void onBatch(quint64 generation, std::vector<core::Entry> entries);
     void onFinished(quint64 generation);
     void onFailed(quint64 generation, const QString& message, bool notMounted);
+    void onSearchFinished(quint64 generation, quint64 scanned);
     void onSpace(quint64 generation, bool ok, quint64 freeBytes);
     void onMonitor();
     void activate(const QModelIndex& index);
@@ -89,6 +95,8 @@ private:
     core::Location location_;
     quint64 generation_ = 0;
     core::Listing* listing_;
+    core::Finder* finder_;
+    QString search_;  // non-empty while this tab shows search results
     core::SpaceQuery* space_;
     core::Monitor* monitor_;
     ListModel* model_;

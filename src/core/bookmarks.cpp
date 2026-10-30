@@ -59,6 +59,41 @@ std::vector<Bookmark> Bookmarks::parse(const QByteArray& content)
     return out;
 }
 
+bool Bookmarks::contains(const Location& dir) const
+{
+    for (const Bookmark& b : list_)
+        if (b.location == dir)
+            return true;
+    return false;
+}
+
+bool Bookmarks::toggle(const Location& dir)
+{
+    if (!dir.isValid())
+        return false;
+    const bool had = contains(dir);
+    QByteArray content;
+    for (const Bookmark& b : list_) {
+        if (had && b.location == dir)
+            continue;
+        content += b.location.uri().toUtf8();
+        if (b.name != b.location.displayName())
+            content += ' ' + b.name.toUtf8();
+        content += '\n';
+    }
+    if (!had)
+        content += dir.uri().toUtf8() + '\n';
+    GStr path(g_file_get_path(file_.gfile()));
+    if (path) {
+        GStr parent(g_path_get_dirname(path.get()));
+        g_mkdir_with_parents(parent.get(), 0700);
+        g_file_set_contents(path.get(), content.constData(), content.size(), nullptr);
+    }
+    reload();
+    Q_EMIT changed();
+    return !had;
+}
+
 void Bookmarks::reload()
 {
     gchar* data = nullptr;

@@ -37,6 +37,14 @@ Places::Places(Tree* tree, JobStrip* strip, QObject* parent)
     rebuildRoots();
 }
 
+void Places::toggleBookmark(const core::Location& dir)
+{
+    if (!dir.isValid())
+        return;
+    const bool now = bookmarks_->toggle(dir);
+    Q_EMIT message(now ? tr("Bookmarked %1").arg(dir.displayName()) : tr("Bookmark removed"));
+}
+
 void Places::rebuildRoots()
 {
     // Bookmarks, mounts and the trash first; the filesystem last, since
@@ -47,6 +55,9 @@ void Places::rebuildRoots()
                          {QStringLiteral("folder-symbolic"), QStringLiteral("folder")}, b.location, QString(), false});
     for (const core::Place& p : mounts_->places())
         roots.push_back({p.id, p.name, p.iconNames, p.location, p.id, p.canUnmount});
+    roots.push_back({QStringLiteral("network"), tr("Network"),
+                     {QStringLiteral("network-workgroup-symbolic"), QStringLiteral("network-workgroup")},
+                     core::Location::fromUri(QStringLiteral("network:///")), QString(), false});
     roots.push_back({QStringLiteral("trash"), tr("Trash"), {QStringLiteral("user-trash-symbolic"), QStringLiteral("user-trash")},
                      core::Location::fromUri(QStringLiteral("trash:///")), QString(), false});
     roots.push_back({QStringLiteral("fs"), tr("Filesystem"), {QStringLiteral("drive-harddisk-symbolic"), QStringLiteral("drive-harddisk")},

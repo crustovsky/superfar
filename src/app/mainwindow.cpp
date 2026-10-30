@@ -281,6 +281,19 @@ void MainWindow::execute(keymap::Command command)
     case Command::GoTo:
         goTo();
         return;
+    case Command::Find: {
+        Tab* tab = active_->activeTab();
+        const core::Location root = tab->location();
+        PromptBar* bar = strip_->prompt(tr("Find in %1").arg(root.displayName()), tr("Find"), QString());
+        connect(bar, &PromptBar::accepted, this, [this, root](const QString& text) {
+            if (!text.trimmed().isEmpty())
+                active_->newSearchTab(root, text.trimmed());
+        });
+        return;
+    }
+    case Command::Bookmark:
+        places_->toggleBookmark(active_->activeTab()->location());
+        return;
     case Command::Trash:
         if (tree_->hasFocus() && tree_->currentPlace()) {
             places_->unmountCurrent();
