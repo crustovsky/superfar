@@ -26,6 +26,7 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::ALT | Qt::Key_F7), Command::Find},
         {QKeySequence(Qt::CTRL | Qt::Key_F1), Command::HideLeft},
         {QKeySequence(Qt::CTRL | Qt::Key_F2), Command::HideRight},
+        {QKeySequence(Qt::CTRL | Qt::Key_F3), Command::ToggleSizes},
         {QKeySequence(Qt::Key_Tab), Command::SwitchPane},
         {QKeySequence(Qt::SHIFT | Qt::Key_Tab), Command::FocusTree},
         {QKeySequence(Qt::CTRL | Qt::Key_T), Command::NewTab},
@@ -106,6 +107,7 @@ QString label(Command command)
     case Command::GoUp: return QStringLiteral("Up");
     case Command::Activate: return QStringLiteral("Enter");
     case Command::Preview: return QStringLiteral("Preview");
+    case Command::ToggleSizes: return QStringLiteral("Sizes");
     case Command::None: return {};
     }
     return {};

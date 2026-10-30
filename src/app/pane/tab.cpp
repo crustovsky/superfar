@@ -8,12 +8,12 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
-Tab::Tab(QWidget* parent)
+Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     : QWidget(parent)
     , listing_(new core::Listing(this))
     , space_(new core::SpaceQuery(this))
     , monitor_(new core::Monitor(this))
-    , model_(new ListModel(this))
+    , model_(new ListModel(sizes, this))
     , view_(new ListView(this))
 {
     auto* layout = new QVBoxLayout(this);
@@ -97,6 +97,8 @@ bool Tab::monitoring() const
 void Tab::setCurrent(bool current)
 {
     current_ = current;
+    if (!current)
+        model_->pauseWork();  // rule 13: walks stop with the tab out of sight
     if (current && dirty_) {
         dirty_ = false;
         reload();
@@ -190,6 +192,25 @@ bool Tab::execute(keymap::Command command)
     case Command::ToggleHidden:
         setShowHidden(!showHidden());
         return true;
+    case Command::ToggleSizes:
+        model_->setRecursiveSizes(!model_->recursiveSizes());
+        updateStatus();
+        return true;
+    case Command::View: {
+        // F3 on folders walks them; files get the viewer in milestone 5.
+        bool any = false;
+        if (model_->markedCount() > 0) {
+            for (int row = 0; row < model_->rowCount(); ++row)
+                if (model_->isMarked(row) && model_->entryAt(row).isDir()) {
+                    model_->requestSize(row);
+                    any = true;
+                }
+        } else if (cur.isValid() && model_->entryAt(cur.row()).isDir()) {
+            model_->requestSize(cur.row());
+            any = true;
+        }
+        return any;
+    }
     default:
         return false;
     }
@@ -284,6 +305,8 @@ void Tab::updateStatus()
         text += tr(", %n selected", nullptr, marked);
     if (hidden > 0 && !model_->showHidden())
         text += tr(", %n hidden", nullptr, hidden);
+    if (model_->recursiveSizes())
+        text += tr(", sizes");
     Q_EMIT statusChanged(text, spaceText_);
 }
 

@@ -30,6 +30,8 @@ void RowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
         if (!cursor)
             opt.palette.setColor(QPalette::Text, opt.palette.color(QPalette::Highlight));
     }
+    if (index.data(ListModel::PartialRole).toBool())
+        opt.font.setItalic(true);  // a folder total still being walked
 
     const QWidget* widget = opt.widget;
     QStyle* style = widget ? widget->style() : QApplication::style();

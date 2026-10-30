@@ -5,6 +5,7 @@
 #include "pane/listmodel.h"
 
 #include <QFontMetrics>
+#include <QLocale>
 #include <QHeaderView>
 #include <QKeyEvent>
 #include <QPainter>
@@ -37,8 +38,10 @@ void ListView::sizeColumns()
     const int pad = fm.horizontalAdvance(QLatin1Char('x')) * 2;
     h->setSectionResizeMode(ListModel::NameColumn, QHeaderView::Stretch);
     h->setSectionResizeMode(ListModel::SizeColumn, QHeaderView::Fixed);
+    h->setSectionResizeMode(ListModel::ItemsColumn, QHeaderView::Fixed);
     h->setSectionResizeMode(ListModel::ModifiedColumn, QHeaderView::Fixed);
     h->resizeSection(ListModel::SizeColumn, fm.horizontalAdvance(QStringLiteral("8888.8 MiB")) + pad);
+    h->resizeSection(ListModel::ItemsColumn, fm.horizontalAdvance(QLocale().toString(88888888)) + pad);
     h->resizeSection(ListModel::ModifiedColumn,
                      fm.horizontalAdvance(QStringLiteral("8888-88-88 88:88")) + pad);
 }

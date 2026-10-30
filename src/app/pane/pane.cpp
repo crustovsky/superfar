@@ -33,7 +33,7 @@ protected:
 };
 } // namespace
 
-Pane::Pane(QWidget* parent)
+Pane::Pane(core::DirSizePool* sizes, QWidget* parent)
     : QWidget(parent)
     , tabBar_(new QTabBar(this))
     , path_(new PathLabel(this))
@@ -41,6 +41,7 @@ Pane::Pane(QWidget* parent)
     , status_(new QLabel(this))
     , space_(new QLabel(this))
     , messageTimer_(new QTimer(this))
+    , sizes_(sizes)
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(kBorder, kBorder, kBorder, kBorder);
@@ -106,7 +107,7 @@ QList<Tab*> Pane::tabs() const
 
 Tab* Pane::newTab(const core::Location& dir)
 {
-    auto* tab = new Tab(this);
+    auto* tab = new Tab(sizes_, this);
     tab->setActive(active_);
     tab->setCurrent(false);
     const int index = stack_->addWidget(tab);

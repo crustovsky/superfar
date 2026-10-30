@@ -7,11 +7,13 @@
 
 #include <malloc.h>
 
-ListModel::ListModel(QObject* parent)
+ListModel::ListModel(core::DirSizePool* sizes, QObject* parent)
     : QAbstractTableModel(parent)
     , meta_(new core::MetadataQuery(this))
+    , sizer_(new core::DirSizer(sizes, this))
 {
     connect(meta_, &core::MetadataQuery::result, this, &ListModel::onMetadata);
+    connect(sizer_, &core::DirSizer::result, this, &ListModel::onDirSize);
 }
 
 void ListModel::reset(const core::Location& dir)
@@ -25,8 +27,11 @@ void ListModel::reset(const core::Location& dir)
     rowOfName_.clear();
     metaCache_.clear();
     metaPending_.clear();
+    dirCache_.clear();
+    dirPending_.clear();
     ++metaGeneration_;
     meta_->cancelAll();
+    sizer_->cancelAll();
     endResetModel();
     // Hand freed pages back so memory after leaving a big folder reflects
     // what is still held, not what glibc keeps around.
@@ -136,6 +141,47 @@ void ListModel::setShowHidden(bool on)
     endResetModel();
 }
 
+void ListModel::setRecursiveSizes(bool on)
+{
+    if (on == recursive_)
+        return;
+    recursive_ = on;
+    pauseWork();
+    if (!on) {
+        // Finished walks keep their direct count and drop the rest, so
+        // the folder shows what the plain mode would have found.
+        for (auto& d : dirCache_)
+            d.recursive = false;
+    }
+    rowsRepaint();
+}
+
+void ListModel::requestSize(int row)
+{
+    const core::Entry& e = entryAt(row);
+    if (!e.isDir())
+        return;
+    const auto have = dirCache_.constFind(e.name);
+    if (have != dirCache_.cend() && have->recursive)
+        return;
+    if (dirPending_.value(e.name, false))
+        return;
+    dirPending_.insert(e.name, true);
+    sizer_->request(dir_, e.name, metaGeneration_, true);
+}
+
+void ListModel::pauseWork()
+{
+    sizer_->cancelAll();
+    dirPending_.clear();
+    for (auto it = dirCache_.begin(); it != dirCache_.end();) {
+        if (it->complete)
+            ++it;
+        else
+            it = dirCache_.erase(it);
+    }
+}
+
 void ListModel::rebuildRows()
 {
     rows_.clear();
@@ -183,13 +229,26 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
         case NameColumn:
             return e.display;
         case SizeColumn: {
-            if (e.isDir())
-                return {};
+            if (e.isDir()) {
+                const core::DirSize* d = dirSize(e);
+                if (!d || !d->ok || !d->recursive)
+                    return {};
+                return QLocale().formattedDataSize(static_cast<qint64>(d->bytes), 1,
+                                                   QLocale::DataSizeIecFormat);
+            }
             const core::Metadata* m = metadata(e);
             if (!m || !m->ok)
                 return {};
             return QLocale().formattedDataSize(static_cast<qint64>(m->size), 1,
                                                QLocale::DataSizeIecFormat);
+        }
+        case ItemsColumn: {
+            if (!e.isDir())
+                return {};
+            const core::DirSize* d = dirSize(e);
+            if (!d || !d->ok)
+                return {};
+            return QLocale().toString(static_cast<qint64>(d->recursive ? d->total() : d->direct));
         }
         case ModifiedColumn: {
             const core::Metadata* m = metadata(e);
@@ -205,9 +264,15 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
             return icon(e);
         return {};
     case Qt::TextAlignmentRole:
-        if (index.column() == SizeColumn)
+        if (index.column() == SizeColumn || index.column() == ItemsColumn)
             return static_cast<int>(Qt::AlignRight | Qt::AlignVCenter);
         return {};
+    case PartialRole: {
+        if (!e.isDir() || (index.column() != SizeColumn && index.column() != ItemsColumn))
+            return false;
+        const auto it = dirCache_.constFind(e.name);
+        return it != dirCache_.cend() && !it->complete;
+    }
     default:
         return {};
     }
@@ -222,6 +287,8 @@ QVariant ListModel::headerData(int section, Qt::Orientation orientation, int rol
         return tr("Name");
     case SizeColumn:
         return tr("Size");
+    case ItemsColumn:
+        return tr("Items");
     case ModifiedColumn:
         return tr("Modified");
     default:
@@ -239,6 +306,39 @@ const core::Metadata* ListModel::metadata(const core::Entry& entry) const
         meta_->request(dir_, entry.name, metaGeneration_);
     }
     return nullptr;
+}
+
+const core::DirSize* ListModel::dirSize(const core::Entry& entry) const
+{
+    const auto it = dirCache_.constFind(entry.name);
+    const core::DirSize* have = it != dirCache_.cend() ? &it.value() : nullptr;
+    if (have && (have->recursive || !recursive_))
+        return have;
+    // Automatic work stays on local filesystems (rule 9); F3 may still
+    // ask for a remote folder explicitly.
+    if (!dir_.isNative())
+        return have;
+    const auto pending = dirPending_.constFind(entry.name);
+    if (pending == dirPending_.cend() || (recursive_ && !pending.value())) {
+        dirPending_.insert(entry.name, recursive_);
+        sizer_->request(dir_, entry.name, metaGeneration_, recursive_);
+    }
+    return have;
+}
+
+void ListModel::onDirSize(quint64 generation, const QByteArray& name, const core::DirSize& size)
+{
+    if (generation != metaGeneration_)
+        return;
+    if (size.complete)
+        dirPending_.remove(name);
+    const auto have = dirCache_.constFind(name);
+    if (have != dirCache_.cend() && have->recursive && !size.recursive)
+        return;  // a count that arrived after the walk; the walk wins
+    dirCache_.insert(name, size);
+    const int row = rowOf(name);
+    if (row >= 0)
+        Q_EMIT dataChanged(index(row, SizeColumn), index(row, ItemsColumn));
 }
 
 QIcon ListModel::icon(const core::Entry& entry) const

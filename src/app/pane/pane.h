@@ -14,10 +14,14 @@ class QStackedWidget;
 class QTabBar;
 class QTimer;
 
+namespace core {
+class DirSizePool;
+}
+
 class Pane : public QWidget {
     Q_OBJECT
 public:
-    explicit Pane(QWidget* parent = nullptr);
+    explicit Pane(core::DirSizePool* sizes, QWidget* parent = nullptr);
 
     Tab* activeTab() const;
     int tabCount() const;
@@ -53,6 +57,7 @@ private:
     QLabel* status_;
     QLabel* space_;
     QTimer* messageTimer_;
+    core::DirSizePool* sizes_;
     QString statusText_;
     Tab* current_ = nullptr;
     bool active_ = false;

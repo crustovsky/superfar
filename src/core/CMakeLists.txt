@@ -7,6 +7,7 @@ qt_add_library(superfar_core STATIC
   metadata.cpp
   space.cpp
   monitor.cpp
+  dirsize.cpp
   fileops.cpp
   jobs/job.cpp
   jobs/transfer.cpp

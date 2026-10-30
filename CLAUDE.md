@@ -90,6 +90,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   cycle; a tab can be locked so navigation opens a new tab
 - F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
   F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
+  shows the direct count otherwise)
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert selects and moves down; Space selects when the filter is empty;

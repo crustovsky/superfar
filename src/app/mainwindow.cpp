@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include "bench.h"
+#include "core/dirsize.h"
 #include "core/fileops.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -21,10 +22,11 @@
 
 MainWindow::MainWindow(const core::Location& left, const core::Location& right, QWidget* parent)
     : QMainWindow(parent)
+    , sizes_(new core::DirSizePool(this))
     , tree_(new Tree(this))
     , panes_(new QSplitter(Qt::Horizontal, this))
-    , left_(new Pane(this))
-    , right_(new Pane(this))
+    , left_(new Pane(sizes_, this))
+    , right_(new Pane(sizes_, this))
     , active_(left_)
     , funcbar_(new FuncBar(this))
     , strip_(new JobStrip(this))
@@ -111,15 +113,20 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     // focused widget, one every 400 ms, once the first folder has loaded.
     if (const QByteArray keys = qgetenv("SUPERFAR_DEV_KEYS"); !keys.isEmpty()) {
         Tab* tab = left_->activeTab();
-        connect(tab, &Tab::loaded, this, [keys] {
+        connect(tab, &Tab::loaded, this, [this, keys] {
             static bool fired = false;
             if (fired)
                 return;
             fired = true;
             const QStringList parts = QString::fromLatin1(keys).split(QLatin1Char(';'), Qt::SkipEmptyParts);
             for (int i = 0; i < parts.size(); ++i) {
-                QTimer::singleShot(400 * (i + 1), qApp, [part = parts[i]] {
+                QTimer::singleShot(400 * (i + 1), this, [this, part = parts[i]] {
+                    // The window may not be active under a compositor
+                    // that keeps focus elsewhere; its own focus child is
+                    // still what a key would reach.
                     QWidget* target = QApplication::focusWidget();
+                    if (!target)
+                        target = focusWidget();
                     if (!target)
                         return;
                     const QKeySequence seq(part);

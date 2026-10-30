@@ -42,6 +42,7 @@ enum class Command {
     GoUp,
     Activate,  // enter the cursor folder
     Preview,
+    ToggleSizes,  // per tab: recursive folder sizes and counts
 };
 
 Command lookup(const QKeySequence& key);

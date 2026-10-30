@@ -1,13 +1,17 @@
 // Headless tests for core against a real temp directory (never a mock).
+#include "core/dirsize.h"
 #include "core/listing.h"
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/sort.h"
 
+#include <QDir>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <unistd.h>
 
 namespace {
 
@@ -44,7 +48,38 @@ private Q_SLOTS:
     void listingCancel();
     void naturalSort();
     void metadata();
+    void dirSizeCount();
+    void dirSizeWalk();
+    void dirSizeCancel();
 };
+
+namespace {
+
+// Asks the pool for one folder and returns the complete result.
+core::DirSize sizeOf(core::DirSizePool& pool, const core::Location& dir, const QByteArray& name,
+                     bool recursive, int* partials = nullptr)
+{
+    core::DirSizer sizer(&pool);
+    core::DirSize got;
+    bool done = false;
+    QObject::connect(&sizer, &core::DirSizer::result,
+                     [&](quint64 gen, const QByteArray& n, const core::DirSize& s) {
+                         if (gen != 5 || n != name)
+                             return;
+                         if (s.complete) {
+                             got = s;
+                             done = true;
+                         } else if (partials) {
+                             ++*partials;
+                         }
+                     });
+    sizer.request(dir, name, 5, recursive);
+    while (!done)
+        QTest::qWait(5);
+    return got;
+}
+
+} // namespace
 
 void CoreTest::location()
 {
@@ -186,6 +221,102 @@ void CoreTest::metadata()
     while (gotGen == 0)
         QTest::qWait(10);
     QVERIFY(!got.ok);
+}
+
+void CoreTest::dirSizeCount()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString d = tmp.path();
+    QVERIFY(QDir(d).mkpath("top/sub/deep"));
+    touch(d + "/top/a", QByteArray(100, 'a'));
+    touch(d + "/top/.hidden", QByteArray(7, 'h'));
+    touch(d + "/top/sub/b", QByteArray(200, 'b'));
+    touch(d + "/top/sub/deep/c", QByteArray(50, 'c'));
+    const core::Location dir = core::Location::fromPath(QFile::encodeName(d));
+
+    core::DirSizePool pool;
+    const core::DirSize count = sizeOf(pool, dir, "top", false);
+    QVERIFY(count.ok);
+    QVERIFY(!count.recursive);
+    QCOMPARE(count.direct, 3u);  // a, .hidden, sub
+    QCOMPARE(count.dirs, 1u);
+    QCOMPARE(count.files, 2u);
+    QCOMPARE(count.bytes, 0u);
+
+    const core::DirSize missing = sizeOf(pool, dir, "nowhere", false);
+    QVERIFY(!missing.ok);
+    QVERIFY(missing.complete);
+}
+
+void CoreTest::dirSizeWalk()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString d = tmp.path();
+    QVERIFY(QDir(d).mkpath("top/sub/deep"));
+    touch(d + "/top/a", QByteArray(100, 'a'));
+    touch(d + "/top/sub/b", QByteArray(200, 'b'));
+    touch(d + "/top/sub/deep/c", QByteArray(50, 'c'));
+    // A symlink counts as itself (its path length), never its target.
+    QVERIFY(QFile::link("a", d + "/top/link"));
+    // A hard link to a file inside the tree is counted once.
+    QVERIFY(::link(QFile::encodeName(d + "/top/a").constData(),
+                   QFile::encodeName(d + "/top/sub/a-again").constData()) == 0);
+    // A linked folder is not descended into.
+    QVERIFY(QDir(d).mkpath("outside"));
+    touch(d + "/outside/big", QByteArray(5000, 'x'));
+    QVERIFY(QFile::link("../outside", d + "/top/to-outside"));
+    const core::Location dir = core::Location::fromPath(QFile::encodeName(d));
+
+    core::DirSizePool pool;
+    const core::DirSize walk = sizeOf(pool, dir, "top", true);
+    QVERIFY(walk.ok);
+    QVERIFY(walk.recursive);
+    QCOMPARE(walk.direct, 4u);  // a, sub, link, to-outside
+    QCOMPARE(walk.dirs, 2u);    // sub, sub/deep
+    QCOMPARE(walk.files, 6u);   // a, link, to-outside, b, a-again, c
+    QCOMPARE(walk.bytes, 100u + 200u + 50u + 1u + 10u);  // "a" and "../outside" are the link sizes
+    QCOMPARE(walk.unreadable, 0u);
+
+    // A second ask is answered from the cache with the same numbers.
+    const core::DirSize again = sizeOf(pool, dir, "top", true);
+    QCOMPARE(again.bytes, walk.bytes);
+    QCOMPARE(again.total(), walk.total());
+
+    // Touching the folder changes its mtime and so misses the cache.
+    touch(d + "/top/new", QByteArray(9, 'n'));
+    const core::DirSize after = sizeOf(pool, dir, "top", true);
+    QCOMPARE(after.bytes, walk.bytes + 9);
+    QCOMPARE(after.direct, 5u);
+}
+
+void CoreTest::dirSizeCancel()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString d = tmp.path();
+    for (int i = 0; i < 40; ++i) {
+        QVERIFY(QDir(d).mkpath(QStringLiteral("top/d%1").arg(i)));
+        for (int j = 0; j < 50; ++j)
+            touch(d + QStringLiteral("/top/d%1/f%2").arg(i).arg(j));
+    }
+    const core::Location dir = core::Location::fromPath(QFile::encodeName(d));
+
+    core::DirSizePool pool;
+    core::DirSizer sizer(&pool);
+    QSignalSpy results(&sizer, &core::DirSizer::result);
+    sizer.request(dir, "top", 1, true);
+    sizer.cancelAll();
+    QTest::qWait(200);
+    QCOMPARE(results.count(), 0);
+
+    // The client is usable again afterwards.
+    sizer.request(dir, "top", 2, true);
+    while (results.isEmpty() || !results.last().at(2).value<core::DirSize>().complete)
+        QTest::qWait(5);
+    QCOMPARE(results.last().at(0).toULongLong(), 2u);
+    QCOMPARE(results.last().at(2).value<core::DirSize>().files, 2000u);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

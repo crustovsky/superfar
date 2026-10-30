@@ -1,9 +1,11 @@
 // Table model over core's vector<Entry>. Rows are an index vector into the
 // entries so hiding and sorting never copy entries, and nothing is
 // allocated per row (rule 2). Size, date and icon are fetched when a row
-// is first painted and cached by name (rule 1).
+// is first painted and cached by name (rule 1). Folders get their item
+// count the same way; with recursive sizes on, a walk instead (rule 9).
 #pragma once
 
+#include "core/dirsize.h"
 #include "core/entry.h"
 #include "core/location.h"
 #include "core/metadata.h"
@@ -17,9 +19,10 @@
 class ListModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { NameColumn, SizeColumn, ModifiedColumn, ColumnCount };
+    enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
+    enum Role { PartialRole = Qt::UserRole + 1 };  // a total still being walked
 
-    explicit ListModel(QObject* parent = nullptr);
+    explicit ListModel(core::DirSizePool* sizes, QObject* parent = nullptr);
 
     // A new folder: drops entries and caches.
     void reset(const core::Location& dir);
@@ -30,6 +33,15 @@ public:
 
     void setShowHidden(bool on);
     bool showHidden() const { return showHidden_; }
+
+    // Recursive sizes and counts for every folder row as it is painted.
+    // Off, folders show their direct item count and only an explicit
+    // requestSize() (F3) walks a tree.
+    void setRecursiveSizes(bool on);
+    bool recursiveSizes() const { return recursive_; }
+    void requestSize(int row);
+    // Stops walks and counts in flight; rows ask again when painted.
+    void pauseWork();
 
     // Marks (the selection) live here, separate from the cursor. They are
     // per entry, so hiding rows keeps them; a load clears them and the
@@ -60,6 +72,8 @@ private:
     void rebuildRows();
     void rowsRepaint();
     const core::Metadata* metadata(const core::Entry& entry) const;
+    const core::DirSize* dirSize(const core::Entry& entry) const;
+    void onDirSize(quint64 generation, const QByteArray& name, const core::DirSize& size);
     QIcon icon(const core::Entry& entry) const;
     QIcon themeIcon(const QStringList& names) const;
     void onMetadata(quint64 generation, const QByteArray& name, const core::Metadata& meta);
@@ -77,4 +91,9 @@ private:
     mutable QHash<QByteArray, core::Metadata> metaCache_;
     mutable QSet<QByteArray> metaPending_;
     mutable QHash<QString, QIcon> iconCache_;
+
+    core::DirSizer* sizer_;
+    bool recursive_ = false;
+    mutable QHash<QByteArray, core::DirSize> dirCache_;
+    mutable QHash<QByteArray, bool> dirPending_;  // name -> recursive
 };

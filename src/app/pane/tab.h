@@ -13,11 +13,14 @@
 
 class ListModel;
 class ListView;
+namespace core {
+class DirSizePool;
+}
 
 class Tab : public QWidget {
     Q_OBJECT
 public:
-    explicit Tab(QWidget* parent = nullptr);
+    explicit Tab(core::DirSizePool* sizes, QWidget* parent = nullptr);
 
     const core::Location& location() const { return location_; }
     void navigate(const core::Location& dir);

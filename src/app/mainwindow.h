@@ -6,6 +6,9 @@
 
 #include <QMainWindow>
 
+namespace core {
+class DirSizePool;
+}
 class FuncBar;
 class JobStrip;
 class Pane;
@@ -33,6 +36,7 @@ private:
     void runJob(core::Job* job, Tab* sourceTab, const core::Location& destination);
     void refreshAt(const core::Location& dir);
 
+    core::DirSizePool* sizes_;  // one worker pool for every tab (rule 9)
     Tree* tree_;
     QSplitter* panes_;
     Pane* left_;
