@@ -46,7 +46,10 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Return), Command::Activate},
         {QKeySequence(Qt::Key_Enter), Command::Activate},
         {QKeySequence(Qt::Key_Escape), Command::Cancel},
-        {QKeySequence(Qt::KeypadModifier | Qt::Key_Plus), Command::MarkGlob},
+        {QKeySequence(Qt::CTRL | Qt::Key_Equal), Command::MarkGlob},
+        {QKeySequence(Qt::CTRL | Qt::Key_Plus), Command::MarkGlob},
+        {QKeySequence(Qt::CTRL | Qt::Key_Minus), Command::UnmarkGlob},
+        {QKeySequence(Qt::KeypadModifier | Qt::Key_Plus), Command::MarkGlob},  // keypads, where present
         {QKeySequence(Qt::KeypadModifier | Qt::Key_Minus), Command::UnmarkGlob},
         {QKeySequence(Qt::SHIFT | Qt::Key_Return), Command::OpenWith},
         {QKeySequence(Qt::SHIFT | Qt::Key_Enter), Command::OpenWith},

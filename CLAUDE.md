@@ -95,8 +95,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert selects and moves down; Space selects when the filter is empty;
-  Gray + / Gray - select and deselect by glob; Ctrl+A all; * invert.
-  Selection is marks, separate from the cursor
+  Ctrl+= / Ctrl+- select and deselect by glob (keypad + and - too);
+  Ctrl+A all; * invert. Selection is marks, separate from the cursor
 - Enter opens a file with its default app; Shift+Enter shows the
   in-window open-with list; Esc clears the filter, closes the viewer,
   then the preview
