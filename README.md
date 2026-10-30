@@ -55,6 +55,27 @@ Folder history on Ctrl+G, ranked by frecency:
 
 ![Go to](docs/screenshots/go-to.png)
 
+Multi-rename on Shift+F2, with the clashes called out before anything
+is renamed:
+
+![Multi-rename](docs/screenshots/multi-rename.png)
+
+Folder sync on Shift+F5, comparing the two panes:
+
+![Folder sync](docs/screenshots/folder-sync.png)
+
+An archive opened as a folder, with its tab named after it:
+
+![Archive](docs/screenshots/archive.png)
+
+Find in tree on Alt+F7, results in a tab:
+
+![Find](docs/screenshots/find.png)
+
+Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache:
+
+![Thumbnails](docs/screenshots/thumbnails.png)
+
 ## Keys
 
 F1 shows the full table inside the window, with whatever you have
@@ -102,8 +123,8 @@ ctest --test-dir build
 build/src/app/superfar [left-folder [right-folder]]
 ```
 
-`cmake --install build --prefix ~/.local` installs the binary and the
-desktop entry. To make it the default for folders:
+`cmake --install build --prefix ~/.local` installs the binary, the
+desktop entry and the icon. To make it the default for folders:
 
 ```sh
 xdg-mime default superfar.desktop inode/directory
