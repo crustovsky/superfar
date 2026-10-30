@@ -91,6 +91,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   as [name])
 - F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
   F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- Shift+F2 multi-rename panel for the marked items (wildcard, regex,
+  find and replace, {n} numbering, case, presets, undo)
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
   shows the direct count otherwise); Ctrl+F4 toggles thumbnails in the
   tab (tumbler over D-Bus, taller rows)

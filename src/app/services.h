@@ -6,8 +6,10 @@ namespace core {
 class DirSizePool;
 class Thumbnailer;
 }
+class Config;
 
 struct Services {
     core::DirSizePool* sizes = nullptr;
     core::Thumbnailer* thumbs = nullptr;
+    Config* config = nullptr;
 };

@@ -11,6 +11,7 @@ qt_add_executable(superfar
   devaids.cpp
   help.cpp
   properties.cpp
+  multirename.cpp
   uris.cpp
   fm1.cpp
   viewer.cpp

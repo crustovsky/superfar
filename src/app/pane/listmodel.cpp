@@ -167,6 +167,15 @@ QSet<QByteArray> ListModel::markedNames() const
     return names;
 }
 
+std::vector<QByteArray> ListModel::markedNamesInOrder() const
+{
+    std::vector<QByteArray> names;
+    for (quint32 i = 0; i < entries_.size(); ++i)
+        if (marked_[i])
+            names.push_back(entries_[i].name);
+    return names;
+}
+
 void ListModel::applyMarks(const QSet<QByteArray>& names)
 {
     markedCount_ = 0;

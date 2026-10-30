@@ -13,6 +13,7 @@
 class QLabel;
 class QStackedWidget;
 class QTabBar;
+class MultiRenamePanel;
 class PropertiesPanel;
 class QTimer;
 class Viewer;
@@ -77,6 +78,7 @@ private:
     QStackedWidget* stack_;
     Viewer* viewer_ = nullptr;
     PropertiesPanel* props_ = nullptr;
+    MultiRenamePanel* rename_ = nullptr;
     QWidget* overlay_ = nullptr;
     QLabel* status_;
     QLabel* space_;

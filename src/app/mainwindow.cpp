@@ -38,7 +38,7 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     , config_(config)
     , sizes_(new core::DirSizePool(this))
     , thumbs_(new core::Thumbnailer(this))
-    , services_{sizes_, thumbs_}
+    , services_{sizes_, thumbs_, config}
     , tree_(new Tree(this))
     , panes_(new QSplitter(config->stackedSplit() ? Qt::Vertical : Qt::Horizontal, this))
     , split_(new QSplitter(Qt::Horizontal, this))

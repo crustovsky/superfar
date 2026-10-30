@@ -58,6 +58,7 @@ QString describe(keymap::Command c)
     case Command::Properties: return QStringLiteral("properties and permissions of the marked items or the cursor item");
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
+    case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
     case Command::None: return {};
     }
     return {};

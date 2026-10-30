@@ -3,6 +3,7 @@
 #include "elidedlabel.h"
 #include "pane/listview.h"
 #include "help.h"
+#include "multirename.h"
 #include "properties.h"
 #include "pane/tab.h"
 #include "services.h"
@@ -261,7 +262,7 @@ void Pane::setOverlay(QWidget* widget)
         content_->removeWidget(overlay_);
         if (overlay_ == viewer_)
             viewer_->clear();
-        else if (overlay_ != props_)
+        else if (overlay_ != props_ && overlay_ != rename_)
             overlay_->setParent(nullptr);  // the preview belongs to the window
         overlay_ = nullptr;
     }
@@ -311,11 +312,30 @@ bool Pane::execute(keymap::Command command)
         Q_EMIT sessionChanged();
         return true;
     case Command::Cancel:
-        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_)) {
+        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_ || overlay_ == rename_)) {
             closeOwnOverlay();
             return true;
         }
         return activeTab() && activeTab()->execute(command);
+    case Command::MultiRename: {
+        Tab* tab = activeTab();
+        const auto items = tab ? tab->selectedLocations() : std::vector<core::Location>();
+        if (items.empty())
+            return true;
+        if (!rename_) {
+            rename_ = new MultiRenamePanel(services_.config, this);
+            connect(rename_, &MultiRenamePanel::closed, this, &Pane::closeOwnOverlay);
+            connect(rename_, &MultiRenamePanel::message, this, &Pane::showMessage);
+            connect(rename_, &MultiRenamePanel::renamed, this, [this](const QByteArray& first) {
+                if (Tab* t = activeTab())
+                    t->reloadWithCursor(first);
+            });
+        }
+        rename_->show(items, tab->entryNames());
+        setOverlay(rename_);
+        rename_->setFocus();
+        return true;
+    }
     case Command::Properties: {
         Tab* tab = activeTab();
         const auto items = tab ? tab->selectedLocations() : std::vector<core::Location>();

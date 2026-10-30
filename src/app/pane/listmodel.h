@@ -66,6 +66,7 @@ public:
     void invertMarks();
     int markedCount() const { return markedCount_; }
     QSet<QByteArray> markedNames() const;
+    std::vector<QByteArray> markedNamesInOrder() const;  // list order, hidden included
     void applyMarks(const QSet<QByteArray>& names);
 
     // A rename that already happened on disk: the entry changes in place
@@ -75,6 +76,7 @@ public:
 
     int rowOf(const QByteArray& name) const;
     const core::Entry& entryAt(int row) const { return entries_[rows_[row]]; }
+    const core::Entry& entryAtIndex(int index) const { return entries_[static_cast<size_t>(index)]; }  // hidden too
     int totalCount() const { return static_cast<int>(entries_.size()); }
     int hiddenCount() const;
 

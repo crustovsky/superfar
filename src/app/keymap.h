@@ -61,6 +61,7 @@ enum class Command {
     Properties,   // Alt+Enter: the properties panel
     Bookmark,     // Ctrl+D: bookmark the current folder, or remove it
     ToggleThumbnails,  // per tab: thumbnails in taller rows
+    MultiRename,       // Shift+F2: the multi-rename panel
 };
 
 Command lookup(const QKeySequence& key);

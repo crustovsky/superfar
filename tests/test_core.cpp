@@ -7,6 +7,7 @@
 #include "core/image.h"
 #include "core/listing.h"
 #include "core/reader.h"
+#include "core/rename.h"
 #include "core/thumbnails.h"
 #include "core/location.h"
 #include "core/metadata.h"
@@ -69,6 +70,7 @@ private Q_SLOTS:
     void findInTree();
     void bookmarkToggle();
     void thumbnails();
+    void renameRules();
 };
 
 namespace {
@@ -1096,6 +1098,65 @@ void CoreTest::thumbnails()
     QVERIFY(QFile::exists(got));
     QCOMPARE(thumbs.request(fileUri, QStringLiteral("image/png"), core::Thumbnailer::Flavor::Normal), got);
     QFile::remove(got);
+}
+
+void CoreTest::renameRules()
+{
+    using core::RenameRule;
+    RenameRule r;  // wildcard, "*" -> "*", keeps everything
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 0), QStringLiteral("IMG_0042.JPG"));
+
+    r.pattern = QStringLiteral("IMG_*");
+    r.replacement = QStringLiteral("holiday_*");
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 0), QStringLiteral("holiday_0042.JPG"));
+    QCOMPARE(core::applyRule(r, QStringLiteral("notes.txt"), 0), QStringLiteral("notes.txt"));  // no match
+
+    r.replacement = QStringLiteral("holiday_{n}");
+    r.numberStart = 10;
+    r.numberStep = 5;
+    r.numberDigits = 3;
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 2), QStringLiteral("holiday_020.JPG"));
+
+    r.replacement = QStringLiteral("{name}-{ext}");
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 0), QStringLiteral("IMG_0042-JPG.JPG"));
+
+    r.pattern = QStringLiteral("*");
+    r.replacement = QStringLiteral("*");
+    r.caseChange = RenameRule::Case::Lower;
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 0), QStringLiteral("img_0042.JPG"));
+    r.ignoreExtension = false;
+    QCOMPARE(core::applyRule(r, QStringLiteral("IMG_0042.JPG"), 0), QStringLiteral("img_0042.jpg"));
+    r.caseChange = RenameRule::Case::Title;
+    QCOMPARE(core::applyRule(r, QStringLiteral("my holiday photos.jpg"), 0), QStringLiteral("My Holiday Photos.Jpg"));
+
+    RenameRule re;
+    re.mode = RenameRule::Mode::Regex;
+    re.pattern = QStringLiteral("^(\\d+)-(.*)$");
+    re.replacement = QStringLiteral("\\2 (\\1)");
+    QCOMPARE(core::applyRule(re, QStringLiteral("01-intro.mp3"), 0), QStringLiteral("intro (01).mp3"));
+
+    RenameRule rep;
+    rep.mode = RenameRule::Mode::Replace;
+    rep.pattern = QStringLiteral(" ");
+    rep.replacement = QStringLiteral("_");
+    QCOMPARE(core::applyRule(rep, QStringLiteral("a b c.txt"), 0), QStringLiteral("a_b_c.txt"));
+
+    // Plan: clashes within the batch and with bystanders.
+    RenameRule all;
+    all.pattern = QStringLiteral("*");
+    all.replacement = QStringLiteral("x");
+    const core::RenamePlan plan = core::planRename(all, {QStringLiteral("a.txt"), QStringLiteral("b.txt"), QStringLiteral("c.md")},
+                                                   {QStringLiteral("a.txt"), QStringLiteral("b.txt"), QStringLiteral("c.md"), QStringLiteral("x.md")});
+    QCOMPARE(plan.newNames, QStringList({"x.txt", "x.txt", "x.md"}));
+    QVERIFY(plan.clash[0] && plan.clash[1]);  // duplicate within the batch
+    QVERIFY(plan.clash[2]);                   // x.md exists and is not being renamed
+    QCOMPARE(plan.changed, 3);
+
+    const QString text = re.serialize();
+    const RenameRule back = RenameRule::deserialize(text);
+    QCOMPARE(back.mode, RenameRule::Mode::Regex);
+    QCOMPARE(back.pattern, re.pattern);
+    QCOMPARE(back.replacement, re.replacement);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

@@ -40,6 +40,7 @@ public:
     bool monitoring() const;
     // The cursor entry; invalid when the list is empty.
     core::Location cursorLocation() const;
+    QStringList entryNames() const;  // display names of every entry, hidden included
     bool cursorIsDir() const;
     void markGlob(const QString& pattern, bool on);
 

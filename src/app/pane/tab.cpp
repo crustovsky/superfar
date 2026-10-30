@@ -126,7 +126,7 @@ std::vector<core::Location> Tab::selectedLocations() const
 {
     std::vector<core::Location> out;
     if (model_->markedCount() > 0) {
-        for (const QByteArray& name : model_->markedNames())
+        for (const QByteArray& name : model_->markedNamesInOrder())
             out.push_back(location_.child(name));
     } else if (const QByteArray name = currentName(); !name.isEmpty()) {
         out.push_back(location_.child(name));
@@ -151,6 +151,14 @@ void Tab::clearMarks()
 bool Tab::monitoring() const
 {
     return monitor_->active();
+}
+
+QStringList Tab::entryNames() const
+{
+    QStringList out;
+    for (int i = 0; i < model_->totalCount(); ++i)
+        out << model_->entryAtIndex(i).display;
+    return out;
 }
 
 core::Location Tab::cursorLocation() const

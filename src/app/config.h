@@ -74,6 +74,7 @@ public:
     static double frecency(const Visit& v, qint64 now);
 
     void sync() { settings_.sync(); }
+    QSettings& settings() { return settings_; }
 
 private:
     mutable QSettings settings_;
