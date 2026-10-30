@@ -7,6 +7,7 @@
 #include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
+#include "core/jobs/extract.h"
 #include "core/thumbnails.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -343,6 +344,22 @@ void MainWindow::execute(keymap::Command command)
 void MainWindow::startTransfer(bool move)
 {
     Tab* tab = active_->activeTab();
+    if (tab->isArchive()) {
+        // Out of an archive: bsdtar extracts the members into the target.
+        const std::vector<QByteArray> members = tab->archiveMembers();
+        if (members.empty())
+            return;
+        const core::Location dest = otherPane()->activeTab()->location();
+        PromptBar* bar = strip_->prompt(tr("Extract %1 to").arg(tab->selectionText()), tr("Extract"), dest.displayPath());
+        const core::Location archive = tab->archiveFile();
+        const int depth = tab->archiveDepth();
+        connect(bar, &PromptBar::accepted, this, [this, tab, archive, members, depth](const QString& text) {
+            const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
+            if (target.isValid())
+                runJob(new core::ExtractJob(archive, members, target, depth), tab, target);
+        });
+        return;
+    }
     const auto sources = tab->selectedLocations();
     if (sources.empty())
         return;
@@ -360,6 +377,10 @@ void MainWindow::startTransfer(bool move)
 void MainWindow::promptMkdir()
 {
     Tab* tab = active_->activeTab();
+    if (tab->isArchive()) {
+        active_->showMessage(tr("Archives are read-only here"));
+        return;
+    }
     PromptBar* bar = strip_->prompt(tr("New folder"), tr("Create"), QString());
     connect(bar, &PromptBar::accepted, this, [this, tab](const QString& text) {
         const QByteArray name = QFile::encodeName(text.trimmed());
@@ -382,6 +403,10 @@ void MainWindow::promptMkdir()
 void MainWindow::promptNewFile()
 {
     Tab* tab = active_->activeTab();
+    if (tab->isArchive()) {
+        active_->showMessage(tr("Archives are read-only here"));
+        return;
+    }
     PromptBar* bar = strip_->prompt(tr("New file"), tr("Create"), QString());
     connect(bar, &PromptBar::accepted, this, [this, tab](const QString& text) {
         const QByteArray name = QFile::encodeName(text.trimmed());
@@ -543,6 +568,10 @@ void MainWindow::runCommand(const QString& command)
 
 void MainWindow::copyToClipboard(bool cut)
 {
+    if (active_->activeTab()->isArchive()) {
+        active_->showMessage(tr("F5 extracts archive members"));
+        return;
+    }
     const auto files = active_->activeTab()->selectedLocations();
     if (files.empty())
         return;
@@ -553,6 +582,10 @@ void MainWindow::copyToClipboard(bool cut)
 
 void MainWindow::paste()
 {
+    if (active_->activeTab()->isArchive()) {
+        active_->showMessage(tr("Archives are read-only here"));
+        return;
+    }
     std::vector<core::Location> files;
     bool cut = false;
     if (!uris::read(QApplication::clipboard()->mimeData(), &files, &cut))
@@ -617,6 +650,10 @@ void MainWindow::raiseWindow()
 void MainWindow::confirmRemove(bool permanent)
 {
     Tab* tab = active_->activeTab();
+    if (tab->isArchive()) {
+        active_->showMessage(tr("Archives are read-only here"));
+        return;
+    }
     const auto sources = tab->selectedLocations();
     if (sources.empty())
         return;

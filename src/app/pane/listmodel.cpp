@@ -118,6 +118,19 @@ void ListModel::append(std::vector<core::Entry> batch)
     endInsertRows();
 }
 
+void ListModel::presetMetadata(const QByteArray& name, const core::Metadata& meta)
+{
+    metaCache_.insert(name, meta);
+}
+
+void ListModel::presetDirCount(const QByteArray& name, quint64 direct)
+{
+    core::DirSize d;
+    d.ok = d.complete = true;
+    d.direct = direct;
+    dirCache_.insert(name, d);
+}
+
 void ListModel::finishLoad()
 {
     beginResetModel();

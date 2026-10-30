@@ -23,6 +23,7 @@ qt_add_executable(superfar
   jobs/strip.cpp
   pane/pane.cpp
   pane/tab.cpp
+  pane/tab_archive.cpp
   pane/listview.cpp
   pane/listmodel.cpp
 )

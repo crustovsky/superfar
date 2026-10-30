@@ -155,7 +155,7 @@ Tab* Pane::makeTab(const core::Location& dir)
     connect(tab, &Tab::locationChanged, this, [this, tab](const core::Location& loc) {
         retitle(tab);
         if (stack_->indexOf(tab) == stack_->currentIndex()) {
-            path_->setText(loc.displayPath());
+            path_->setText(tab->displayPath());
             Q_EMIT locationChanged(loc);
         }
         Q_EMIT sessionChanged();
@@ -226,7 +226,7 @@ void Pane::onCurrentTab(int index)
         current_->setCurrent(false);
     current_ = tab;
     tab->setCurrent(true);
-    path_->setText(tab->location().displayPath());
+    path_->setText(tab->displayPath());
     showStatus(QString(), QString());
     if (hasFocusInside())
         tab->setFocus();
@@ -381,6 +381,10 @@ bool Pane::execute(keymap::Command command)
         Tab* tab = activeTab();
         if (!tab || tab->execute(command))
             return true;  // folders: sizes
+        if (tab->isArchive()) {
+            showMessage(tr("F5 extracts the member first"));
+            return true;
+        }
         const core::Location file = tab->cursorLocation();
         if (!file.isValid())
             return true;

@@ -67,9 +67,14 @@ struct Listing::Job {
 
     void fail(GErrorPtr error)
     {
-        if (owner && !isCancelled(error.get()))
-            Q_EMIT owner->failed(generation, errorMessage(error.get()),
-                                 g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_MOUNTED));
+        if (owner && !isCancelled(error.get())) {
+            ListFailure why = ListFailure::Other;
+            if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_MOUNTED))
+                why = ListFailure::NotMounted;
+            else if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_DIRECTORY))
+                why = ListFailure::NotDirectory;
+            Q_EMIT owner->failed(generation, errorMessage(error.get()), why);
+        }
         detach();
         delete this;
     }
@@ -151,7 +156,7 @@ void Listing::start(const Location& dir, quint64 generation)
 {
     cancel();
     if (!dir.isValid()) {
-        Q_EMIT failed(generation, QStringLiteral("invalid location"), false);
+        Q_EMIT failed(generation, QStringLiteral("invalid location"), ListFailure::Other);
         return;
     }
     auto* job = new Job;

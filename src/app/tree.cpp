@@ -190,7 +190,7 @@ void TreeModel::listDirs(Node* node, void (TreeModel::*done)(Node*, std::vector<
     connect(node->listing, &core::Listing::finished, this,
             [this, node, done](quint64) { (this->*done)(node, std::move(node->pending)); });
     connect(node->listing, &core::Listing::failed, this,
-            [this, node, done](quint64, const QString&, bool) { (this->*done)(node, {}); });
+            [this, node, done](quint64, const QString&, core::ListFailure) { (this->*done)(node, {}); });
     node->listing->start(node->location, 0);
 }
 

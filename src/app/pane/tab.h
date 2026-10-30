@@ -2,6 +2,7 @@
 // the list view. History and filter land here in later milestones.
 #pragma once
 
+#include "core/archive.h"
 #include "core/finder.h"
 #include "core/listing.h"
 #include "core/location.h"
@@ -27,6 +28,13 @@ public:
     // path relative to it, and otherwise behaves like a folder.
     void search(const core::Location& root, const QString& pattern);
     const QString& searchPattern() const { return search_; }
+    // Inside an archive (opened by Enter on it): the tab shows one folder
+    // of its listing; F5 extracts, everything else is read-only.
+    bool isArchive() const { return archive_.isValid(); }
+    const core::Location& archiveFile() const { return archive_; }
+    int archiveDepth() const;  // folders below the archive root
+    std::vector<QByteArray> archiveMembers() const;  // marked or cursor, as paths inside
+    QString displayPath() const;
     void reload();  // same folder again, keeping cursor, marks and scroll
     void reloadWithCursor(const QByteArray& name);
     void goUp();
@@ -81,8 +89,11 @@ private:
     void load(const core::Location& dir);
     void onBatch(quint64 generation, std::vector<core::Entry> entries);
     void onFinished(quint64 generation);
-    void onFailed(quint64 generation, const QString& message, bool notMounted);
+    void onFailed(quint64 generation, const QString& message, core::ListFailure why);
     void onSearchFinished(quint64 generation, quint64 scanned);
+    void enterArchive(const core::Location& file);
+    void onArchiveListed(quint64 generation, std::vector<core::ArchiveEntry> entries);
+    void showArchiveDir(const QByteArray& dir);
     void onSpace(quint64 generation, bool ok, quint64 freeBytes);
     void onMonitor();
     void activate(const QModelIndex& index);
@@ -98,6 +109,10 @@ private:
     core::Listing* listing_;
     core::Finder* finder_;
     QString search_;  // non-empty while this tab shows search results
+    core::ArchiveLister* lister_;
+    core::Location archive_;
+    QByteArray archiveDir_;  // folder inside the archive, '/' separated, no slashes at the ends
+    std::vector<core::ArchiveEntry> archiveEntries_;
     core::SpaceQuery* space_;
     core::Monitor* monitor_;
     ListModel* model_;

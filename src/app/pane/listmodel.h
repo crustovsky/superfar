@@ -29,6 +29,9 @@ public:
     void reset(const core::Location& dir);
     // Appends a batch while loading; the batch is sorted on its own.
     void append(std::vector<core::Entry> batch);
+    // Known values for rows no query can answer (archive members).
+    void presetMetadata(const QByteArray& name, const core::Metadata& meta);
+    void presetDirCount(const QByteArray& name, quint64 direct);
     // The load is complete: one full sort and reset.
     void finishLoad();
 

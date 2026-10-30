@@ -17,7 +17,7 @@ QString describe(keymap::Command c)
     case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next name, Enter applies");
     case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
     case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
-    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane");
+    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them");
     case Command::Move: return QStringLiteral("move the marked items (or the cursor) to the other pane");
     case Command::Mkdir: return QStringLiteral("new folder");
     case Command::Trash: return QStringLiteral("move to trash; on a mount in the tree: unmount");
@@ -41,7 +41,7 @@ QString describe(keymap::Command c)
     case Command::MarkAll: return QStringLiteral("mark all");
     case Command::InvertMarks: return QStringLiteral("invert marks");
     case Command::GoUp: return QStringLiteral("go up; with a filter set, edit the filter");
-    case Command::Activate: return QStringLiteral("enter the folder or open the file with its default app");
+    case Command::Activate: return QStringLiteral("enter the folder, open the file with its default app, or open an archive as a folder");
     case Command::Preview: return QStringLiteral("preview of the cursor item in the other pane, follows the cursor");
     case Command::ToggleSizes: return QStringLiteral("recursive folder sizes and counts for this tab");
     case Command::Cancel: return QStringLiteral("clear the filter, close the viewer, close the preview");

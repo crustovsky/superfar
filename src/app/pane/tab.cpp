@@ -3,6 +3,7 @@
 #include "bench.h"
 #include "core/apps.h"
 #include "core/fileops.h"
+#include "core/sort.h"
 #include "pane/listmodel.h"
 #include "pane/listview.h"
 #include "services.h"
@@ -16,6 +17,7 @@ Tab::Tab(const Services& services, QWidget* parent)
     : QWidget(parent)
     , listing_(new core::Listing(this))
     , finder_(new core::Finder(this))
+    , lister_(new core::ArchiveLister(this))
     , space_(new core::SpaceQuery(this))
     , monitor_(new core::Monitor(this))
     , model_(new ListModel(services.sizes, services.thumbs, this))
@@ -42,6 +44,11 @@ Tab::Tab(const Services& services, QWidget* parent)
     connect(listing_, &core::Listing::failed, this, &Tab::onFailed);
     connect(finder_, &core::Finder::matches, this, &Tab::onBatch);
     connect(finder_, &core::Finder::finished, this, &Tab::onSearchFinished);
+    connect(lister_, &core::ArchiveLister::listed, this, &Tab::onArchiveListed);
+    connect(lister_, &core::ArchiveLister::failed, this, [this](quint64 gen, const QString& m) {
+        if (gen == generation_)
+            Q_EMIT statusChanged(m, QString());
+    });
     connect(space_, &core::SpaceQuery::result, this, &Tab::onSpace);
     connect(monitor_, &core::Monitor::changed, this, &Tab::onMonitor);
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
@@ -78,6 +85,8 @@ void Tab::reload()
     scrollValue_ = view_->verticalScrollBar()->value();
     if (!search_.isEmpty())
         search(location_, search_);
+    else if (isArchive())
+        showArchiveDir(archiveDir_);  // the listing is in hand; stay in this folder
     else
         load(location_);
 }
@@ -244,6 +253,10 @@ void Tab::load(const core::Location& dir)
     ++generation_;
     finder_->cancel();
     search_.clear();
+    lister_->cancel();
+    archive_ = core::Location();
+    archiveDir_.clear();
+    archiveEntries_.clear();
     monitor_->stop();
     location_ = dir;
     spaceText_.clear();
@@ -256,6 +269,12 @@ void Tab::load(const core::Location& dir)
 
 void Tab::goUp()
 {
+    if (isArchive() && !archiveDir_.isEmpty()) {
+        const int slash = archiveDir_.lastIndexOf('/');
+        cursorName_ = slash < 0 ? archiveDir_ : archiveDir_.mid(slash + 1);
+        showArchiveDir(slash < 0 ? QByteArray() : archiveDir_.left(slash));
+        return;
+    }
     const core::Location parent = location_.parent();
     if (!parent.isValid())
         return;
@@ -333,12 +352,16 @@ bool Tab::execute(keymap::Command command)
         setFilter(QString());
         return true;
     case Command::Rename:
+        if (isArchive()) {
+            Q_EMIT message(tr("Archives are read-only here"));
+            return true;
+        }
         if (cur.isValid())
             view_->edit(cur.siblingAtColumn(ListModel::NameColumn));
         return true;
     case Command::Edit: {
         const QByteArray name = currentName();
-        if (name.isEmpty() || cursorIsDir())
+        if (name.isEmpty() || cursorIsDir() || isArchive())
             return true;
         QString error;
         if (!core::runInTerminal(location_, core::editorCommand() + QLatin1Char(' ')
@@ -421,14 +444,19 @@ void Tab::onFinished(quint64 generation)
     Q_EMIT loaded();
 }
 
-void Tab::onFailed(quint64 generation, const QString& message, bool notMounted)
+void Tab::onFailed(quint64 generation, const QString& message, core::ListFailure why)
 {
     if (generation != generation_)
         return;
+    if (why == core::ListFailure::NotDirectory && core::isArchiveName(location_.basename())) {
+        enterArchive(location_);
+        return;
+    }
     Q_EMIT statusChanged(message, QString());
-    if (notMounted)
+    if (why == core::ListFailure::NotMounted)
         Q_EMIT mountNeeded(location_);
 }
+
 
 void Tab::onSpace(quint64 generation, bool ok, quint64 freeBytes)
 {
@@ -445,7 +473,17 @@ void Tab::activate(const QModelIndex& index)
     if (!index.isValid())
         return;
     const core::Entry& e = model_->entryAt(index.row());
-    if (e.isDir()) {
+    if (isArchive()) {
+        if (e.isDir()) {
+            cursorName_.clear();
+            showArchiveDir(archiveDir_.isEmpty() ? e.name : archiveDir_ + '/' + e.name);
+        } else {
+            Q_EMIT message(tr("F5 extracts; open it from the extracted copy"));
+        }
+        return;
+    }
+    if (e.isDir() || core::isArchiveName(e.name)) {
+        // A folder, or an archive that the failed listing turns into one.
         cursorName_.clear();
         navigate(location_.child(e.name));
         return;
@@ -488,6 +526,8 @@ void Tab::updateStatus()
     QString text = model_->filter().isEmpty()
         ? (search_.isEmpty() ? tr("%n items", nullptr, shown) : tr("%n matches for %1", nullptr, shown).arg(search_))
         : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
+    if (isArchive())
+        text += tr(", in archive");
     if (marked > 0)
         text += tr(", %n selected", nullptr, marked);
     if (hidden > 0 && !model_->showHidden())

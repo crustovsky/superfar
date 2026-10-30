@@ -49,6 +49,7 @@ QString Job::title() const
     case JobKind::Move: return tr("Move");
     case JobKind::Trash: return tr("Trash");
     case JobKind::Delete: return tr("Delete");
+    case JobKind::Extract: return tr("Extract");
     }
     return {};
 }

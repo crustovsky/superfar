@@ -12,6 +12,8 @@
 
 namespace core {
 
+enum class ListFailure { Other, NotMounted, NotDirectory };
+
 class Listing : public QObject {
     Q_OBJECT
 public:
@@ -26,8 +28,7 @@ public:
 Q_SIGNALS:
     void batch(quint64 generation, std::vector<core::Entry> entries);
     void finished(quint64 generation);
-    // notMounted: the location needs its volume mounted first.
-    void failed(quint64 generation, const QString& message, bool notMounted);
+    void failed(quint64 generation, const QString& message, core::ListFailure why);
 
 private:
     struct Job;

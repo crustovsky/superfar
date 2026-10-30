@@ -110,7 +110,10 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+D bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
-- Backspace and Left go up; Right and Enter open the cursor folder
+- Backspace and Left go up; Right and Enter open the cursor folder;
+  Enter on an archive (zip, tar.*, 7z, rar, iso, ...) opens it as a
+  read-only folder listed by bsdtar in a child process, F5 extracts the
+  marked members to the other pane
 - Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
   with credentials asked in the window); Ctrl+G go to folder, fuzzy over
   history by frecency; Ctrl+H toggles hidden files

@@ -1,9 +1,11 @@
 // Headless tests for core against a real temp directory (never a mock).
 #include "core/apps.h"
+#include "core/archive.h"
 #include "core/bookmarks.h"
 #include "core/compare.h"
 #include "core/dirsize.h"
 #include "core/finder.h"
+#include "core/jobs/extract.h"
 #include "core/mounts.h"
 #include "core/image.h"
 #include "core/listing.h"
@@ -17,6 +19,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QProcess>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -74,6 +77,7 @@ private Q_SLOTS:
     void thumbnails();
     void renameRules();
     void compareTrees();
+    void archiveListing();
 };
 
 namespace {
@@ -1226,6 +1230,67 @@ void CoreTest::compareTrees()
     const auto hashed = compare(true);
     QCOMPARE(hashed.value("content.txt"), core::Difference::ContentDiffers);
     QCOMPARE(hashed.value("same.txt"), core::Difference::Same);
+}
+
+void CoreTest::archiveListing()
+{
+    const QByteArray sample =
+        "drwxr-xr-x  0 michal michal      0 Oct 30 12:14 src/\n"
+        "-rw-r--r--  0 michal michal      3 Oct 30 12:14 src/a.txt\n"
+        "-rw-r--r--  0 michal michal      4 Oct 30 12:14 src/sub/with space.txt\n"
+        "lrwxrwxrwx  0 michal michal      0 Jan  5  2021 src/link -> a.txt\n"
+        "garbage line\n";
+    const auto entries = core::parseArchiveListing(sample, 2026);
+    QCOMPARE(entries.size(), 4u);
+    QCOMPARE(entries[0].path, QByteArray("src"));
+    QVERIFY(entries[0].isDir);
+    QCOMPARE(entries[1].size, 3u);
+    QCOMPARE(entries[2].path, QByteArray("src/sub/with space.txt"));
+    QCOMPARE(QDateTime::fromSecsSinceEpoch(entries[2].modified).date(), QDate(2026, 10, 30));
+    QVERIFY(entries[3].symlink);
+    QCOMPARE(entries[3].path, QByteArray("src/link"));
+    QCOMPARE(QDateTime::fromSecsSinceEpoch(entries[3].modified).date(), QDate(2021, 1, 5));
+    QVERIFY(core::isArchiveName("photos.ZIP"));
+    QVERIFY(core::isArchiveName("backup.tar.zst"));
+    QVERIFY(!core::isArchiveName("notes.txt"));
+
+    // A real archive through bsdtar, then one member extracted.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QVERIFY(QDir().mkpath(tmp.path() + "/src/sub"));
+    touch(tmp.path() + "/src/a.txt", "hello");
+    touch(tmp.path() + "/src/sub/b.txt", "world!");
+    QProcess tar;
+    tar.setWorkingDirectory(tmp.path());
+    tar.start(QStringLiteral("bsdtar"), {QStringLiteral("-cf"), QStringLiteral("demo.zip"), QStringLiteral("src")});
+    if (!tar.waitForFinished(10000) || tar.exitCode() != 0)
+        QSKIP("bsdtar not available");
+    const core::Location zip = core::Location::fromPath(QFile::encodeName(tmp.path() + "/demo.zip"));
+
+    core::ArchiveLister lister;
+    std::vector<core::ArchiveEntry> listed;
+    bool done = false;
+    connect(&lister, &core::ArchiveLister::listed, [&](quint64, std::vector<core::ArchiveEntry> e) { listed = e; done = true; });
+    connect(&lister, &core::ArchiveLister::failed, [&](quint64, const QString& m) { QFAIL(qPrintable(m)); });
+    lister.start(zip, 1);
+    while (!done)
+        QTest::qWait(5);
+    QStringList paths;
+    for (const auto& e : listed)
+        paths << QString::fromUtf8(e.path);
+    paths.sort();
+    QCOMPARE(paths, QStringList({"src", "src/a.txt", "src/sub", "src/sub/b.txt"}));
+
+    QVERIFY(QDir().mkpath(tmp.path() + "/out"));
+    core::ExtractJob job(zip, {QByteArray("src/sub/b.txt")}, core::Location::fromPath(QFile::encodeName(tmp.path() + "/out")), 2);
+    QSignalSpy finished(&job, &core::Job::finished);
+    job.start();
+    while (finished.isEmpty())
+        QTest::qWait(5);
+    QVERIFY2(job.log().empty(), job.log().empty() ? "" : qPrintable(job.log().front().message));
+    QFile out(tmp.path() + "/out/b.txt");
+    QVERIFY(out.open(QIODevice::ReadOnly));
+    QCOMPARE(out.readAll(), QByteArray("world!"));
 }
 
 QTEST_GUILESS_MAIN(CoreTest)
