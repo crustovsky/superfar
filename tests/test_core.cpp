@@ -1,6 +1,8 @@
 // Headless tests for core against a real temp directory (never a mock).
 #include "core/apps.h"
+#include "core/bookmarks.h"
 #include "core/dirsize.h"
+#include "core/mounts.h"
 #include "core/image.h"
 #include "core/listing.h"
 #include "core/reader.h"
@@ -58,6 +60,8 @@ private Q_SLOTS:
     void details();
     void shellQuoting();
     void imageDecode();
+    void bookmarks();
+    void mountsAndTrash();
 };
 
 namespace {
@@ -434,6 +438,46 @@ void CoreTest::imageDecode()
     QCOMPARE(int(px[2]), 255);  // first pixel red, in BGRA
     QCOMPARE(int(px[1]), 0);
     QCOMPARE(int(px[3]), 255);
+}
+
+void CoreTest::bookmarks()
+{
+    const auto list = core::Bookmarks::parse("file:///usr/share Shared stuff\n\nfile:///tmp\n# not a uri\n");
+    QCOMPARE(list.size(), 2u);
+    QCOMPARE(list[0].name, QStringLiteral("Shared stuff"));
+    QCOMPARE(list[0].location.path(), QByteArray("/usr/share"));
+    QCOMPARE(list[1].name, QStringLiteral("tmp"));
+
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/bookmarks";
+    touch(path, "file:///usr\n");
+    core::Bookmarks marks(QFile::encodeName(path));
+    QCOMPARE(marks.list().size(), 1u);
+    QSignalSpy changed(&marks, &core::Bookmarks::changed);
+    touch(path, "file:///usr\nfile:///etc Config\n");
+    while (changed.isEmpty())
+        QTest::qWait(10);
+    QCOMPARE(marks.list().size(), 2u);
+    QCOMPARE(marks.list()[1].name, QStringLiteral("Config"));
+}
+
+void CoreTest::mountsAndTrash()
+{
+    core::Mounts mounts;
+    for (const core::Place& p : mounts.places()) {
+        QVERIFY(!p.id.isEmpty());
+        QVERIFY(!p.name.isEmpty());
+        QCOMPARE(p.location.isValid(), p.mounted);
+    }
+    // The trash lists like any folder (it may be empty).
+    core::Listing listing;
+    QSignalSpy done(&listing, &core::Listing::finished);
+    QSignalSpy failed(&listing, &core::Listing::failed);
+    listing.start(core::Location::fromUri(QStringLiteral("trash:///")), 1);
+    while (done.isEmpty() && failed.isEmpty())
+        QTest::qWait(10);
+    QVERIFY2(failed.isEmpty(), failed.isEmpty() ? "" : qPrintable(failed.first().at(1).toString()));
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

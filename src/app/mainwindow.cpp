@@ -3,8 +3,10 @@
 #include "bench.h"
 #include "cmdline.h"
 #include "core/apps.h"
+#include "core/bookmarks.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
+#include "core/mounts.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "funcbar.h"
@@ -14,8 +16,11 @@
 #include "pane/tab.h"
 #include "preview.h"
 #include "tree.h"
+#include "uris.h"
 
 #include <QApplication>
+#include <QClipboard>
+#include <QMimeData>
 #include <QFile>
 #include <QKeyEvent>
 #include <QPointer>
@@ -26,6 +31,8 @@
 MainWindow::MainWindow(const core::Location& left, const core::Location& right, QWidget* parent)
     : QMainWindow(parent)
     , sizes_(new core::DirSizePool(this))
+    , mounts_(new core::Mounts(this))
+    , bookmarks_(new core::Bookmarks(QByteArray(), this))
     , tree_(new Tree(this))
     , panes_(new QSplitter(Qt::Horizontal, this))
     , left_(new Pane(sizes_, this))
@@ -94,7 +101,28 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
+    connect(tree_, &Tree::placeChosen, this, [this](const QString& id) { mountPlace(id, core::Location()); });
+    connect(tree_, &Tree::dropRequested, this, &MainWindow::transfer);
     connect(tree_, &Tree::commandRequested, this, &MainWindow::execute);
+    connect(mounts_, &core::Mounts::changed, this, &MainWindow::rebuildRoots);
+    connect(bookmarks_, &core::Bookmarks::changed, this, &MainWindow::rebuildRoots);
+    connect(mounts_, &core::Mounts::askPassword, this,
+            [this](quint64 token, const QString& message, const QString& user, const QString& domain,
+                   bool needUser, bool needDomain, bool needPassword, bool anonymousOk) {
+                AuthBar* bar = strip_->auth(message, user, domain, needUser, needDomain, needPassword, anonymousOk);
+                connect(bar, &AuthBar::answered, this,
+                        [this, token](const QString& u, const QString& d, const QString& p, bool anon) {
+                            mounts_->answerPassword(token, u, d, p, anon);
+                        });
+                connect(bar, &AuthBar::rejected, this, [this, token] { mounts_->abortPrompt(token); });
+            });
+    connect(mounts_, &core::Mounts::askQuestion, this,
+            [this](quint64 token, const QString& message, const QStringList& choices) {
+                ChoiceBar* bar = strip_->choose(message, choices);
+                connect(bar, &ChoiceBar::chosen, this, [this, token](int i) { mounts_->answerQuestion(token, i); });
+                connect(bar, &ChoiceBar::rejected, this, [this, token] { mounts_->abortPrompt(token); });
+            });
+    rebuildRoots();
     connect(funcbar_, &FuncBar::commandRequested, this, &MainWindow::execute);
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget* now) {
         if (!now)
@@ -107,6 +135,8 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
 
     auto watchTab = [this](Tab* tab) {
         connect(tab, &Tab::folderChanged, this, [this, tab] { tree_->refresh(tab->location()); });
+        connect(tab, &Tab::dropRequested, this, &MainWindow::transfer);
+        connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) { mountFor(tab, dir); });
     };
     watchTab(left_->newTab(left));
     watchTab(right_->newTab(right));
@@ -234,9 +264,6 @@ void MainWindow::execute(keymap::Command command)
     case Command::Mkdir:
         promptMkdir();
         return;
-    case Command::Trash:
-        confirmRemove(false);
-        return;
     case Command::DeletePermanent:
         confirmRemove(true);
         return;
@@ -257,6 +284,25 @@ void MainWindow::execute(keymap::Command command)
         return;
     case Command::FocusCommandLine:
         cmdline_->setFocus();
+        return;
+    case Command::CopyClip:
+        copyToClipboard(false);
+        return;
+    case Command::CutClip:
+        copyToClipboard(true);
+        return;
+    case Command::Paste:
+        paste();
+        return;
+    case Command::EditPath:
+        promptPath();
+        return;
+    case Command::Trash:
+        if (tree_->hasFocus() && tree_->currentPlace()) {
+            unmountCurrentPlace();
+            return;
+        }
+        confirmRemove(false);
         return;
     case Command::Cancel:
         if (active_->execute(command))
@@ -403,6 +449,153 @@ void MainWindow::runCommand(const QString& command)
     QString error;
     if (!core::runInTerminal(active_->activeTab()->location(), command, true, &error))
         active_->showMessage(error);
+}
+
+void MainWindow::copyToClipboard(bool cut)
+{
+    const auto files = active_->activeTab()->selectedLocations();
+    if (files.empty())
+        return;
+    QApplication::clipboard()->setMimeData(uris::make(files, cut));
+    active_->showMessage(cut ? tr("%n items cut", nullptr, static_cast<int>(files.size()))
+                             : tr("%n items copied", nullptr, static_cast<int>(files.size())));
+}
+
+void MainWindow::paste()
+{
+    std::vector<core::Location> files;
+    bool cut = false;
+    if (!uris::read(QApplication::clipboard()->mimeData(), &files, &cut))
+        return;
+    transfer(files, active_->activeTab()->location(), cut);
+    if (cut)
+        QApplication::clipboard()->clear();
+}
+
+void MainWindow::transfer(const std::vector<core::Location>& sources, const core::Location& target, bool move)
+{
+    if (sources.empty() || !target.isValid())
+        return;
+    // The job's "source tab" clears its marks when done; the tab showing
+    // the sources' folder is the best guess.
+    Tab* from = active_->activeTab();
+    const core::Location parent = sources.front().parent();
+    for (Pane* pane : {left_, right_})
+        for (Tab* tab : pane->tabs())
+            if (tab->location() == parent)
+                from = tab;
+    runJob(new core::TransferJob(sources, target, move), from, target);
+}
+
+void MainWindow::promptPath()
+{
+    Tab* tab = active_->activeTab();
+    PromptBar* bar = strip_->prompt(tr("Go to"), tr("Go"), tab->location().displayPath());
+    connect(bar, &PromptBar::accepted, this, [tab](const QString& text) {
+        QPointer<Tab> guard(tab);
+        const core::Location dir = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
+        if (guard && dir.isValid())
+            guard->navigate(dir);
+    });
+}
+
+void MainWindow::rebuildRoots()
+{
+    // Bookmarks, mounts and the trash first; the filesystem last, since
+    // it is usually expanded deep and would push the rest out of view.
+    std::vector<TreeModel::Root> roots;
+    for (const core::Bookmark& b : bookmarks_->list())
+        roots.push_back({QStringLiteral("bookmark:") + b.location.uri(), b.name,
+                         {QStringLiteral("folder-symbolic"), QStringLiteral("folder")}, b.location, QString(), false});
+    for (const core::Place& p : mounts_->places())
+        roots.push_back({p.id, p.name, p.iconNames, p.location, p.id, p.canUnmount});
+    roots.push_back({QStringLiteral("trash"), tr("Trash"), {QStringLiteral("user-trash-symbolic"), QStringLiteral("user-trash")},
+                     core::Location::fromUri(QStringLiteral("trash:///")), QString(), false});
+    roots.push_back({QStringLiteral("fs"), tr("Filesystem"), {QStringLiteral("drive-harddisk-symbolic"), QStringLiteral("drive-harddisk")},
+                     core::Location::root(), QString(), false});
+    tree_->setRoots(roots);
+}
+
+void MainWindow::mountPlace(const QString& id, const core::Location& thenOpen)
+{
+    QPointer<MainWindow> guard(this);
+    mounts_->mountPlace(id, [guard, id, thenOpen](const QString& error) {
+        if (!guard)
+            return;
+        if (!error.isEmpty()) {
+            guard->active_->showMessage(error);
+            return;
+        }
+        guard->rebuildRoots();
+        for (const core::Place& p : guard->mounts_->places())
+            if (p.id == id || (thenOpen.isValid() && p.location == thenOpen)) {
+                guard->active_->activeTab()->navigate(p.location);
+                return;
+            }
+    });
+}
+
+void MainWindow::unmountCurrentPlace()
+{
+    const TreeModel::Root* place = tree_->currentPlace();
+    if (!place || !place->canUnmount)
+        return;
+    const QString id = place->placeId;
+    const core::Location root = place->location;
+    PromptBar* bar = strip_->prompt(tr("Unmount %1?").arg(place->name), tr("Unmount"), std::nullopt);
+    connect(bar, &PromptBar::accepted, this, [this, id, root] {
+        // Tabs inside the mount leave it first, or the unmount is refused.
+        for (Pane* pane : {left_, right_})
+            for (Tab* tab : pane->tabs())
+                if (!tab->location().relativePathFrom(root).isNull())
+                    tab->navigate(core::Location::home());
+        QPointer<MainWindow> guard(this);
+        mounts_->unmountPlace(id, [guard](const QString& error) {
+            if (guard && !error.isEmpty())
+                guard->active_->showMessage(error);
+        });
+    });
+}
+
+void MainWindow::mountFor(Tab* tab, const core::Location& dir)
+{
+    QPointer<Tab> guard(tab);
+    QPointer<MainWindow> self(this);
+    mounts_->mountLocation(dir, [self, guard, dir](const QString& error) {
+        if (!self)
+            return;
+        if (!error.isEmpty()) {
+            self->active_->showMessage(error);
+            return;
+        }
+        if (guard && guard->location() == dir)
+            guard->navigate(dir);
+    });
+}
+
+void MainWindow::showFolder(const core::Location& dir)
+{
+    if (dir.isValid())
+        active_->activeTab()->navigate(dir);
+    raiseWindow();
+}
+
+void MainWindow::showItem(const core::Location& item)
+{
+    const core::Location parent = item.parent();
+    if (parent.isValid()) {
+        Tab* tab = active_->activeTab();
+        tab->navigate(parent);
+        tab->setCursorOnLoad(item.basename());
+    }
+    raiseWindow();
+}
+
+void MainWindow::raiseWindow()
+{
+    show();
+    raise();
+    activateWindow();
 }
 
 void MainWindow::confirmRemove(bool permanent)

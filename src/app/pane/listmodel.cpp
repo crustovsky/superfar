@@ -1,9 +1,11 @@
 #include "pane/listmodel.h"
 
 #include "core/sort.h"
+#include "uris.h"
 
 #include <QDateTime>
 #include <QLocale>
+#include <QMimeData>
 #include <QRegularExpression>
 #include <algorithm>
 
@@ -261,10 +263,58 @@ void ListModel::markGlob(const QString& pattern, bool on)
 
 Qt::ItemFlags ListModel::flags(const QModelIndex& index) const
 {
-    Qt::ItemFlags f = QAbstractTableModel::flags(index);
-    if (index.isValid() && index.column() == NameColumn)
+    if (!index.isValid())
+        return Qt::ItemIsDropEnabled;  // empty space: into this folder
+    Qt::ItemFlags f = QAbstractTableModel::flags(index) | Qt::ItemIsDragEnabled;
+    if (index.column() == NameColumn)
         f |= Qt::ItemIsEditable;
+    if (entryAt(index.row()).isDir())
+        f |= Qt::ItemIsDropEnabled;
     return f;
+}
+
+QStringList ListModel::mimeTypes() const
+{
+    return {QStringLiteral("text/uri-list"), QStringLiteral("x-special/gnome-copied-files")};
+}
+
+std::vector<core::Location> ListModel::dragLocations(int row) const
+{
+    std::vector<core::Location> out;
+    if (markedCount_ > 0) {
+        for (quint32 idx : rows_)
+            if (marked_[idx])
+                out.push_back(dir_.child(entries_[idx].name));
+    } else if (row >= 0 && row < rowCount()) {
+        out.push_back(dir_.child(entryAt(row).name));
+    }
+    return out;
+}
+
+QMimeData* ListModel::mimeData(const QModelIndexList& indexes) const
+{
+    return uris::make(dragLocations(indexes.isEmpty() ? -1 : indexes.first().row()), false);
+}
+
+bool ListModel::canDropMimeData(const QMimeData* data, Qt::DropAction, int, int, const QModelIndex&) const
+{
+    return uris::holdsFiles(data);
+}
+
+bool ListModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int, int, const QModelIndex& parent)
+{
+    std::vector<core::Location> sources;
+    bool cut = false;
+    if (!uris::read(data, &sources, &cut))
+        return false;
+    core::Location target = dir_;
+    if (parent.isValid() && entryAt(parent.row()).isDir())
+        target = dir_.child(entryAt(parent.row()).name);
+    for (const core::Location& s : sources)
+        if (s == target || s.parent() == target)
+            return false;  // onto itself or where it already is
+    Q_EMIT dropRequested(sources, target, action == Qt::MoveAction);
+    return true;
 }
 
 bool ListModel::setData(const QModelIndex& index, const QVariant& value, int role)

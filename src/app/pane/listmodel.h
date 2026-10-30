@@ -81,9 +81,23 @@ public:
     // Editing the name column asks for a rename; the tab performs it.
     bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
+    // Drag and drop: the marks travel, or the dragged row when nothing
+    // is marked; a drop lands in the folder row under it or in this
+    // folder. The tab runs the resulting job.
+    QStringList mimeTypes() const override;
+    QMimeData* mimeData(const QModelIndexList& indexes) const override;
+    Qt::DropActions supportedDragActions() const override { return Qt::CopyAction | Qt::MoveAction; }
+    Qt::DropActions supportedDropActions() const override { return Qt::CopyAction | Qt::MoveAction; }
+    bool canDropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column,
+                         const QModelIndex& parent) const override;
+    bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column,
+                      const QModelIndex& parent) override;
+    std::vector<core::Location> dragLocations(int row) const;
+
 Q_SIGNALS:
     void marksChanged();
     void renameRequested(const QByteArray& name, const QString& newName);
+    void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
 
 private:
     void rebuildRows();

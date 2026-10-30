@@ -46,6 +46,7 @@ Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     connect(view_, &ListView::textTyped, this, &Tab::typed);
     connect(view_, &ListView::cursorMoved, this, [this] { Q_EMIT cursorChanged(cursorLocation()); });
     connect(model_, &ListModel::renameRequested, this, &Tab::rename);
+    connect(model_, &ListModel::dropRequested, this, &Tab::dropRequested);
     connect(view_, &ListView::editingFinished, this, [this] {
         if (dirty_ && current_) {
             dirty_ = false;
@@ -335,11 +336,13 @@ void Tab::onFinished(quint64 generation)
     Q_EMIT loaded();
 }
 
-void Tab::onFailed(quint64 generation, const QString& message)
+void Tab::onFailed(quint64 generation, const QString& message, bool notMounted)
 {
     if (generation != generation_)
         return;
     Q_EMIT statusChanged(message, QString());
+    if (notMounted)
+        Q_EMIT mountNeeded(location_);
 }
 
 void Tab::onSpace(quint64 generation, bool ok, quint64 freeBytes)

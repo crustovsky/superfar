@@ -48,6 +48,10 @@ enum class Command {
     UnmarkGlob,
     OpenWith,     // choose an app for the cursor file
     FocusCommandLine,
+    CopyClip,     // clipboard, interoperable with other file managers
+    CutClip,
+    Paste,
+    EditPath,     // Ctrl+L: type a path or URI
 };
 
 Command lookup(const QKeySequence& key);

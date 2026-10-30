@@ -1,5 +1,6 @@
 #include "bench.h"
 #include "core/location.h"
+#include "fm1.h"
 #include "mainwindow.h"
 
 #include <QApplication>
@@ -44,6 +45,7 @@ int main(int argc, char** argv)
                                : core::Location::home();
     };
     MainWindow window(at(0), at(1));
+    FileManager1::publish(&window);  // another instance may own the name; that is fine
     window.show();
     return app.exec();
 }

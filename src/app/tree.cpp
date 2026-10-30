@@ -2,10 +2,12 @@
 
 #include "core/listing.h"
 #include "core/sort.h"
+#include "uris.h"
 
 #include <QHeaderView>
-#include <QSet>
 #include <QKeyEvent>
+#include <QSet>
+#include <algorithm>
 
 struct TreeModel::Node {
     enum State { Unloaded, Loading, Loaded };
@@ -20,6 +22,7 @@ struct TreeModel::Node {
     std::vector<std::unique_ptr<Node>> children;
     std::vector<core::Entry> pending;
     core::Listing* listing = nullptr;
+    std::unique_ptr<TreeModel::Root> root;  // set on top-level nodes
 };
 
 TreeModel::TreeModel(QObject* parent)
@@ -28,13 +31,92 @@ TreeModel::TreeModel(QObject* parent)
     , folderIcon_(QIcon::fromTheme(QStringLiteral("folder")))
 {
     root_->state = Node::Loaded;
-    auto fs = std::make_unique<Node>();
-    fs->location = core::Location::root();
-    fs->name = "/";
-    fs->display = QStringLiteral("/");
-    fs->parent = root_.get();
-    fs->row = 0;
-    root_->children.push_back(std::move(fs));
+}
+
+namespace {
+std::unique_ptr<TreeModel::Node> makeRootNode(TreeModel::Node* parent, const TreeModel::Root& r, int row)
+{
+    auto node = std::make_unique<TreeModel::Node>();
+    node->location = r.location;
+    node->name = r.key.toUtf8();
+    node->display = r.name;
+    node->parent = parent;
+    node->row = row;
+    node->root = std::make_unique<TreeModel::Root>(r);
+    if (!r.location.isValid())
+        node->state = TreeModel::Node::Loaded;  // nothing to expand until mounted
+    return node;
+}
+} // namespace
+
+void TreeModel::setRoots(const std::vector<Root>& roots)
+{
+    Node* top = root_.get();
+    // Remove roots that are gone.
+    for (int i = static_cast<int>(top->children.size()) - 1; i >= 0; --i) {
+        bool keep = false;
+        for (const Root& r : roots)
+            keep = keep || r.key == top->children[i]->root->key;
+        if (keep)
+            continue;
+        beginRemoveRows({}, i, i);
+        top->children.erase(top->children.begin() + i);
+        for (size_t j = i; j < top->children.size(); ++j)
+            top->children[j]->row = static_cast<int>(j);
+        endRemoveRows();
+    }
+    // Insert new ones at their position; update the rest in place.
+    for (size_t pos = 0; pos < roots.size(); ++pos) {
+        const Root& r = roots[pos];
+        Node* have = nullptr;
+        for (const auto& c : top->children)
+            if (c->root->key == r.key)
+                have = c.get();
+        if (have) {
+            const bool mountedNow = r.location.isValid() && !have->location.isValid();
+            *have->root = r;
+            have->display = r.name;
+            have->location = r.location;
+            if (mountedNow)
+                have->state = Node::Unloaded;
+            const QModelIndex idx = indexOf(have);
+            Q_EMIT dataChanged(idx, idx);
+            continue;
+        }
+        const int at = static_cast<int>(std::min(pos, top->children.size()));
+        beginInsertRows({}, at, at);
+        top->children.insert(top->children.begin() + at, makeRootNode(top, r, at));
+        for (size_t j = at + 1; j < top->children.size(); ++j)
+            top->children[j]->row = static_cast<int>(j);
+        endInsertRows();
+    }
+}
+
+const TreeModel::Root* TreeModel::rootAt(const QModelIndex& index) const
+{
+    if (!index.isValid())
+        return nullptr;
+    return nodeAt(index)->root.get();
+}
+
+QModelIndex TreeModel::rootFor(const core::Location& dir) const
+{
+    QModelIndex best;
+    int bestDepth = -1;
+    for (const auto& c : root_->children) {
+        if (!c->location.isValid())
+            continue;
+        const QByteArray rel = dir.relativePathFrom(c->location);
+        if (rel.isNull())
+            continue;
+        const int depth = rel.isEmpty() ? 1000 : 1000 - static_cast<int>(rel.count('/'));
+        // The deepest root (fewest remaining components) wins.
+        if (depth > bestDepth) {
+            bestDepth = depth;
+            best = indexOf(c.get());
+        }
+    }
+    return best;
 }
 
 TreeModel::~TreeModel() = default;
@@ -53,7 +135,7 @@ QModelIndex TreeModel::indexOf(Node* node) const
 
 QModelIndex TreeModel::rootIndex() const
 {
-    return indexOf(root_->children.front().get());
+    return root_->children.empty() ? QModelIndex() : indexOf(root_->children.front().get());
 }
 
 core::Location TreeModel::locationAt(const QModelIndex& index) const
@@ -77,7 +159,9 @@ QModelIndex TreeModel::childNamed(const QModelIndex& parent, const QByteArray& n
 
 QModelIndex TreeModel::indexFor(const core::Location& dir) const
 {
-    QModelIndex idx = rootIndex();
+    QModelIndex idx = rootFor(dir);
+    if (!idx.isValid())
+        return {};
     const QByteArray rel = dir.relativePathFrom(locationAt(idx));
     if (rel.isNull())
         return {};
@@ -106,7 +190,7 @@ void TreeModel::listDirs(Node* node, void (TreeModel::*done)(Node*, std::vector<
     connect(node->listing, &core::Listing::finished, this,
             [this, node, done](quint64) { (this->*done)(node, std::move(node->pending)); });
     connect(node->listing, &core::Listing::failed, this,
-            [this, node, done](quint64, const QString&) { (this->*done)(node, {}); });
+            [this, node, done](quint64, const QString&, bool) { (this->*done)(node, {}); });
     node->listing->start(node->location, 0);
 }
 
@@ -239,11 +323,65 @@ QVariant TreeModel::data(const QModelIndex& index, int role) const
     switch (role) {
     case Qt::DisplayRole:
         return nodeAt(index)->display;
-    case Qt::DecorationRole:
-        return folderIcon_;
+    case Qt::DecorationRole: {
+        const Node* node = nodeAt(index);
+        return node->root && !node->root->iconNames.isEmpty() ? iconFor(node->root->iconNames) : folderIcon_;
+    }
     default:
         return {};
     }
+}
+
+QIcon TreeModel::iconFor(const QStringList& names) const
+{
+    const QString key = names.join(QLatin1Char(','));
+    auto it = icons_.constFind(key);
+    if (it != icons_.cend())
+        return it.value();
+    QIcon icon;
+    for (const QString& n : names)
+        if (QIcon::hasThemeIcon(n)) {
+            icon = QIcon::fromTheme(n);
+            break;
+        }
+    if (icon.isNull())
+        icon = folderIcon_;
+    icons_.insert(key, icon);
+    return icon;
+}
+
+Qt::ItemFlags TreeModel::flags(const QModelIndex& index) const
+{
+    if (!index.isValid())
+        return Qt::NoItemFlags;
+    Qt::ItemFlags f = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
+    if (nodeAt(index)->location.isValid())
+        f |= Qt::ItemIsDropEnabled;
+    return f;
+}
+
+QStringList TreeModel::mimeTypes() const
+{
+    return {QStringLiteral("text/uri-list"), QStringLiteral("x-special/gnome-copied-files")};
+}
+
+bool TreeModel::canDropMimeData(const QMimeData* data, Qt::DropAction, int, int, const QModelIndex& parent) const
+{
+    return parent.isValid() && nodeAt(parent)->location.isValid() && uris::holdsFiles(data);
+}
+
+bool TreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int, int, const QModelIndex& parent)
+{
+    std::vector<core::Location> sources;
+    bool cut = false;
+    if (!parent.isValid() || !uris::read(data, &sources, &cut))
+        return false;
+    const core::Location target = nodeAt(parent)->location;
+    for (const core::Location& s : sources)
+        if (s == target || s.parent() == target)
+            return false;
+    Q_EMIT dropRequested(sources, target, action == Qt::MoveAction);
+    return true;
 }
 
 bool TreeModel::hasChildren(const QModelIndex& parent) const
@@ -276,6 +414,11 @@ Tree::Tree(QWidget* parent)
     header()->setStretchLastSection(false);
     header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    setAcceptDrops(true);
+    setDropIndicatorShown(true);
+    setDragDropMode(DropOnly);
+    setAutoExpandDelay(600);
+    connect(model_, &TreeModel::dropRequested, this, &Tree::dropRequested);
 
     connect(model_, &TreeModel::loaded, this, [this](const QModelIndex&) {
         if (pending_.isValid())
@@ -283,8 +426,13 @@ Tree::Tree(QWidget* parent)
     });
     connect(selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex& current, const QModelIndex&) {
-                if (!guard_ && current.isValid())
-                    Q_EMIT folderChosen(model_->locationAt(current));
+                if (guard_ || !current.isValid())
+                    return;
+                const core::Location loc = model_->locationAt(current);
+                if (loc.isValid())
+                    Q_EMIT folderChosen(loc);
+                else if (const TreeModel::Root* r = model_->rootAt(current))
+                    Q_EMIT placeChosen(r->placeId);
             });
 }
 
@@ -308,6 +456,12 @@ void Tree::keyPressEvent(QKeyEvent* event)
     }
 }
 
+const TreeModel::Root* Tree::currentPlace() const
+{
+    const TreeModel::Root* r = model_->rootAt(currentIndex());
+    return r && !r->placeId.isEmpty() ? r : nullptr;
+}
+
 void Tree::reveal(const core::Location& dir)
 {
     pending_ = dir;
@@ -325,12 +479,12 @@ void Tree::continueReveal()
 {
     if (!pending_.isValid())
         return;
-    QModelIndex idx = model_->rootIndex();
-    const QByteArray rel = pending_.relativePathFrom(model_->locationAt(idx));
-    if (rel.isNull()) {
+    QModelIndex idx = model_->rootFor(pending_);
+    if (!idx.isValid()) {
         pending_ = {};
         return;
     }
+    const QByteArray rel = pending_.relativePathFrom(model_->locationAt(idx));
     for (const QByteArray& part : rel.split('/')) {
         if (part.isEmpty())
             continue;

@@ -7,7 +7,10 @@
 #include <QFontMetrics>
 #include <QLocale>
 #include <QHeaderView>
+#include <QApplication>
+#include <QDrag>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPainter>
 
 ListView::ListView(QWidget* parent)
@@ -27,6 +30,45 @@ ListView::ListView(QWidget* parent)
     header()->setStretchLastSection(false);
     header()->setSectionsMovable(false);
     setItemDelegate(new RowDelegate(this));
+    setDragEnabled(true);
+    setAcceptDrops(true);
+    setDropIndicatorShown(true);
+    setDragDropMode(DragDrop);
+    setDefaultDropAction(Qt::MoveAction);
+}
+
+void ListView::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        pressPos_ = event->pos();
+        pressRow_ = indexAt(event->pos()).row();
+    }
+    QTreeView::mousePressEvent(event);
+}
+
+void ListView::mouseMoveEvent(QMouseEvent* event)
+{
+    if ((event->buttons() & Qt::LeftButton) && pressRow_ >= 0
+        && (event->pos() - pressPos_).manhattanLength() >= QApplication::startDragDistance()) {
+        startDrag(Qt::CopyAction | Qt::MoveAction);
+        pressRow_ = -1;
+        return;
+    }
+    QTreeView::mouseMoveEvent(event);
+}
+
+void ListView::startDrag(Qt::DropActions supportedActions)
+{
+    auto* m = qobject_cast<ListModel*>(model());
+    if (!m || pressRow_ < 0)
+        return;
+    const auto files = m->dragLocations(pressRow_);
+    if (files.empty())
+        return;
+    auto* drag = new QDrag(this);
+    drag->setMimeData(m->mimeData({m->index(pressRow_, 0)}));
+    drag->setPixmap(m->index(pressRow_, 0).data(Qt::DecorationRole).value<QIcon>().pixmap(32));
+    drag->exec(supportedActions, Qt::MoveAction);
 }
 
 void ListView::sizeColumns()

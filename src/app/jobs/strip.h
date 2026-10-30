@@ -14,6 +14,7 @@
 #include <vector>
 
 class JobPanel;
+class AuthBar;
 class ChoiceBar;
 class PromptBar;
 class QLabel;
@@ -63,6 +64,8 @@ public:
     // removes the bar afterwards and gives focus back.
     PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input);
     ChoiceBar* choose(const QString& message, const QStringList& items);
+    AuthBar* auth(const QString& message, const QString& user, const QString& domain, bool needUser,
+                  bool needDomain, bool needPassword, bool anonymousOk);
 
 Q_SIGNALS:
     void jobFinished(core::Job* job);

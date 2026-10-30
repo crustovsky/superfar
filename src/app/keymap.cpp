@@ -54,6 +54,10 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_Return), Command::OpenWith},
         {QKeySequence(Qt::SHIFT | Qt::Key_Enter), Command::OpenWith},
         {QKeySequence(Qt::CTRL | Qt::Key_Space), Command::FocusCommandLine},
+        {QKeySequence(Qt::CTRL | Qt::Key_C), Command::CopyClip},
+        {QKeySequence(Qt::CTRL | Qt::Key_X), Command::CutClip},
+        {QKeySequence(Qt::CTRL | Qt::Key_V), Command::Paste},
+        {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
     };
     return t;
 }
@@ -132,6 +136,10 @@ QString label(Command command)
     case Command::UnmarkGlob: return QStringLiteral("Deselect by pattern");
     case Command::OpenWith: return QStringLiteral("Open with");
     case Command::FocusCommandLine: return QStringLiteral("Command line");
+    case Command::CopyClip: return QStringLiteral("Copy to clipboard");
+    case Command::CutClip: return QStringLiteral("Cut to clipboard");
+    case Command::Paste: return QStringLiteral("Paste");
+    case Command::EditPath: return QStringLiteral("Path");
     case Command::None: return {};
     }
     return {};

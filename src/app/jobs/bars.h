@@ -8,6 +8,7 @@
 #include <QFrame>
 #include <optional>
 
+class QCheckBox;
 class QLineEdit;
 class QListWidget;
 
@@ -43,6 +44,29 @@ protected:
 
 private:
     QListWidget* list_;
+};
+
+// A mount asking for credentials.
+class AuthBar : public QFrame {
+    Q_OBJECT
+public:
+    AuthBar(const QString& message, const QString& user, const QString& domain, bool needUser,
+            bool needDomain, bool needPassword, bool anonymousOk, QWidget* parent = nullptr);
+
+Q_SIGNALS:
+    void answered(const QString& user, const QString& domain, const QString& password, bool anonymous);
+    void rejected();
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
+private:
+    void submit();
+
+    QLineEdit* user_ = nullptr;
+    QLineEdit* domain_ = nullptr;
+    QLineEdit* password_ = nullptr;
+    QCheckBox* anonymous_ = nullptr;
 };
 
 class ConflictBar : public QFrame {

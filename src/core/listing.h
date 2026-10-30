@@ -26,7 +26,8 @@ public:
 Q_SIGNALS:
     void batch(quint64 generation, std::vector<core::Entry> entries);
     void finished(quint64 generation);
-    void failed(quint64 generation, const QString& message);
+    // notMounted: the location needs its volume mounted first.
+    void failed(quint64 generation, const QString& message, bool notMounted);
 
 private:
     struct Job;

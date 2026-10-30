@@ -6,6 +6,8 @@ qt_add_executable(superfar
   keymap.cpp
   funcbar.cpp
   cmdline.cpp
+  uris.cpp
+  fm1.cpp
   viewer.cpp
   preview.cpp
   pane/delegate.cpp
@@ -18,7 +20,7 @@ qt_add_executable(superfar
   pane/listmodel.cpp
 )
 target_include_directories(superfar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(superfar PRIVATE superfar_core Qt6::Widgets)
+target_link_libraries(superfar PRIVATE superfar_core Qt6::Widgets Qt6::DBus)
 
 # The desktop entry gives the window its app id for the compositor and the
 # portal; without it installed Qt logs a portal registration failure.

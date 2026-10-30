@@ -234,6 +234,16 @@ ChoiceBar* JobStrip::choose(const QString& message, const QStringList& items)
     return bar;
 }
 
+AuthBar* JobStrip::auth(const QString& message, const QString& user, const QString& domain, bool needUser,
+                        bool needDomain, bool needPassword, bool anonymousOk)
+{
+    auto* bar = new AuthBar(message, user, domain, needUser, needDomain, needPassword, anonymousOk, this);
+    connect(bar, &AuthBar::answered, this, [this, bar] { removeBar(bar); });
+    connect(bar, &AuthBar::rejected, this, [this, bar] { removeBar(bar); });
+    showBar(bar);
+    return bar;
+}
+
 void JobStrip::showBar(QWidget* bar, QWidget* under)
 {
     if (bars_ == 0)

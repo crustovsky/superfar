@@ -68,7 +68,8 @@ struct Listing::Job {
     void fail(GErrorPtr error)
     {
         if (owner && !isCancelled(error.get()))
-            Q_EMIT owner->failed(generation, errorMessage(error.get()));
+            Q_EMIT owner->failed(generation, errorMessage(error.get()),
+                                 g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_MOUNTED));
         detach();
         delete this;
     }
@@ -150,7 +151,7 @@ void Listing::start(const Location& dir, quint64 generation)
 {
     cancel();
     if (!dir.isValid()) {
-        Q_EMIT failed(generation, QStringLiteral("invalid location"));
+        Q_EMIT failed(generation, QStringLiteral("invalid location"), false);
         return;
     }
     auto* job = new Job;

@@ -27,6 +27,8 @@ public:
     void reload();  // same folder again, keeping cursor, marks and scroll
     void reloadWithCursor(const QByteArray& name);
     void goUp();
+    // Where the cursor goes once the running load ends.
+    void setCursorOnLoad(const QByteArray& name) { cursorName_ = name; }
 
     // The marked entries, or the cursor entry when nothing is marked.
     std::vector<core::Location> selectedLocations() const;
@@ -58,13 +60,15 @@ Q_SIGNALS:
     void loaded();
     void folderChanged();  // the monitor saw something; a reload follows
     void cursorChanged(const core::Location& item);  // invalid when none
+    void mountNeeded(const core::Location& dir);     // the load failed for want of a mount
+    void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
     void message(const QString& text);  // an error worth a moment in the status line
 
 private:
     void load(const core::Location& dir);
     void onBatch(quint64 generation, std::vector<core::Entry> entries);
     void onFinished(quint64 generation);
-    void onFailed(quint64 generation, const QString& message);
+    void onFailed(quint64 generation, const QString& message, bool notMounted);
     void onSpace(quint64 generation, bool ok, quint64 freeBytes);
     void onMonitor();
     void activate(const QModelIndex& index);

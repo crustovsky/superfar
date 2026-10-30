@@ -31,6 +31,10 @@ Q_SIGNALS:
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    // Marks are not Qt's selection, so the drag start is ours too.
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void startDrag(Qt::DropActions supportedActions) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
     void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint) override;
 
@@ -40,4 +44,6 @@ private:
     bool active_ = false;
     bool paintedRows_ = false;
     bool benchReporter_ = false;
+    QPoint pressPos_;
+    int pressRow_ = -1;
 };

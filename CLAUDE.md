@@ -103,8 +103,11 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
 - Backspace and Left go up; Right and Enter open the cursor folder
-- Ctrl+L edits the path (accepts remote URIs); Ctrl+G go to folder, fuzzy
-  over history by frecency; Ctrl+H toggles hidden files
+- Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
+  with credentials asked in the window); Ctrl+G go to folder, fuzzy over
+  history by frecency; Ctrl+H toggles hidden files
+- Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
+  Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
   directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
   the window until Enter; Ctrl+Enter inserts the cursor's name

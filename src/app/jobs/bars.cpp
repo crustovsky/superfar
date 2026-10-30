@@ -100,6 +100,63 @@ void ChoiceBar::keyPressEvent(QKeyEvent* event)
     QFrame::keyPressEvent(event);
 }
 
+AuthBar::AuthBar(const QString& message, const QString& user, const QString& domain, bool needUser,
+                 bool needDomain, bool needPassword, bool anonymousOk, QWidget* parent)
+    : QFrame(parent)
+{
+    frame(this);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(6, 4, 6, 4);
+    layout->setSpacing(2);
+    layout->addWidget(new QLabel(message, this));
+    auto* row = new QHBoxLayout;
+    auto field = [&](const QString& label, const QString& value, bool password) {
+        row->addWidget(new QLabel(label, this));
+        auto* e = new QLineEdit(value, this);
+        if (password)
+            e->setEchoMode(QLineEdit::Password);
+        connect(e, &QLineEdit::returnPressed, this, &AuthBar::submit);
+        row->addWidget(e, 1);
+        return e;
+    };
+    if (needUser)
+        user_ = field(tr("User"), user, false);
+    if (needDomain)
+        domain_ = field(tr("Domain"), domain, false);
+    if (needPassword)
+        password_ = field(tr("Password"), QString(), true);
+    if (anonymousOk) {
+        anonymous_ = new QCheckBox(tr("&Anonymous"), this);
+        row->addWidget(anonymous_);
+    }
+    auto* ok = button(tr("&Connect"), this);
+    auto* cancel = button(tr("&Cancel"), this);
+    row->addWidget(ok);
+    row->addWidget(cancel);
+    layout->addLayout(row);
+    connect(ok, &QPushButton::clicked, this, &AuthBar::submit);
+    connect(cancel, &QPushButton::clicked, this, &AuthBar::rejected);
+    QWidget* first = password_;
+    if (needUser && user.isEmpty())
+        first = user_;
+    setFocusProxy(first ? first : static_cast<QWidget*>(ok));
+}
+
+void AuthBar::submit()
+{
+    Q_EMIT answered(user_ ? user_->text() : QString(), domain_ ? domain_->text() : QString(),
+                    password_ ? password_->text() : QString(), anonymous_ && anonymous_->isChecked());
+}
+
+void AuthBar::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        Q_EMIT rejected();
+        return;
+    }
+    QFrame::keyPressEvent(event);
+}
+
 ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     : QFrame(parent)
 {
