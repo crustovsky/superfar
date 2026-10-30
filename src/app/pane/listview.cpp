@@ -62,6 +62,13 @@ void ListView::keyPressEvent(QKeyEvent* event)
         Q_EMIT commandRequested(cmd);
         return;
     }
+    const QString text = event->text();
+    if (!text.isEmpty() && text.at(0).isPrint()
+        && !(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+        event->accept();
+        Q_EMIT textTyped(text);
+        return;
+    }
     QTreeView::keyPressEvent(event);
 }
 
@@ -92,4 +99,5 @@ void ListView::currentChanged(const QModelIndex& current, const QModelIndex& pre
         viewport()->update(rowRect(previous));
     if (current.isValid())
         viewport()->update(rowRect(current));
+    Q_EMIT cursorMoved();
 }

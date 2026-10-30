@@ -4,12 +4,25 @@
 #include "pane/listview.h"
 
 #include <QApplication>
+#include <QLineEdit>
 #include <QPainter>
 
 RowDelegate::RowDelegate(ListView* view)
     : QStyledItemDelegate(view)
     , view_(view)
 {
+}
+
+void RowDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
+{
+    QStyledItemDelegate::setEditorData(editor, index);
+    auto* edit = qobject_cast<QLineEdit*>(editor);
+    if (!edit)
+        return;
+    const QString name = edit->text();
+    const qsizetype dot = name.lastIndexOf(QLatin1Char('.'));
+    const bool isDir = index.data(ListModel::IsDirRole).toBool();
+    edit->setSelection(0, static_cast<int>(dot > 0 && !isDir ? dot : name.size()));
 }
 
 void RowDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,

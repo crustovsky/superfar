@@ -4,6 +4,8 @@
 
 #include <QDateTime>
 #include <QLocale>
+#include <QRegularExpression>
+#include <algorithm>
 
 #include <malloc.h>
 
@@ -182,16 +184,99 @@ void ListModel::pauseWork()
     }
 }
 
+namespace {
+
+// 0 prefix, 1 substring, 2 subsequence, -1 no match. Both already folded.
+int matchRank(const QString& name, const QString& filter)
+{
+    if (name.startsWith(filter))
+        return 0;
+    if (name.contains(filter))
+        return 1;
+    qsizetype at = 0;
+    for (const QChar c : filter) {
+        at = name.indexOf(c, at);
+        if (at < 0)
+            return -1;
+        ++at;
+    }
+    return 2;
+}
+
+} // namespace
+
 void ListModel::rebuildRows()
 {
     rows_.clear();
     rowOfName_.clear();
+    const QString filter = filter_.toCaseFolded();
+    std::vector<quint32> later[2];
     for (quint32 i = 0; i < entries_.size(); ++i) {
-        if (showHidden_ || !entries_[i].hidden) {
-            rowOfName_.insert(entries_[i].name, static_cast<int>(rows_.size()));
+        if (!showHidden_ && entries_[i].hidden)
+            continue;
+        if (filter.isEmpty()) {
             rows_.push_back(i);
+            continue;
+        }
+        const int rank = matchRank(entries_[i].display.toCaseFolded(), filter);
+        if (rank == 0)
+            rows_.push_back(i);
+        else if (rank > 0)
+            later[rank - 1].push_back(i);
+    }
+    for (const auto& group : later)
+        rows_.insert(rows_.end(), group.begin(), group.end());
+    for (quint32 row = 0; row < rows_.size(); ++row)
+        rowOfName_.insert(entries_[rows_[row]].name, static_cast<int>(row));
+}
+
+void ListModel::setFilter(const QString& text)
+{
+    if (text == filter_)
+        return;
+    filter_ = text;
+    beginResetModel();
+    rebuildRows();
+    endResetModel();
+    // Marks on rows the filter hides still count; the status says so.
+    Q_EMIT marksChanged();
+}
+
+void ListModel::markGlob(const QString& pattern, bool on)
+{
+    const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(pattern),
+                                QRegularExpression::CaseInsensitiveOption);
+    if (!re.isValid())
+        return;
+    for (quint32 idx : rows_) {
+        if (!re.match(entries_[idx].display).hasMatch())
+            continue;
+        if ((marked_[idx] != 0) != on) {
+            marked_[idx] = on ? 1 : 0;
+            markedCount_ += on ? 1 : -1;
         }
     }
+    rowsRepaint();
+}
+
+Qt::ItemFlags ListModel::flags(const QModelIndex& index) const
+{
+    Qt::ItemFlags f = QAbstractTableModel::flags(index);
+    if (index.isValid() && index.column() == NameColumn)
+        f |= Qt::ItemIsEditable;
+    return f;
+}
+
+bool ListModel::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+    if (role != Qt::EditRole || !index.isValid() || index.column() != NameColumn)
+        return false;
+    const core::Entry& e = entryAt(index.row());
+    const QString newName = value.toString();
+    if (newName.isEmpty() || newName == e.display || newName.contains(QLatin1Char('/')))
+        return false;
+    Q_EMIT renameRequested(e.name, newName);
+    return true;
 }
 
 int ListModel::rowOf(const QByteArray& name) const
@@ -259,6 +344,8 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
         default:
             return {};
         }
+    case Qt::EditRole:
+        return index.column() == NameColumn ? QVariant(e.display) : QVariant();
     case Qt::DecorationRole:
         if (index.column() == NameColumn)
             return icon(e);
@@ -267,6 +354,8 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
         if (index.column() == SizeColumn || index.column() == ItemsColumn)
             return static_cast<int>(Qt::AlignRight | Qt::AlignVCenter);
         return {};
+    case IsDirRole:
+        return e.isDir();
     case PartialRole: {
         if (!e.isDir() || (index.column() != SizeColumn && index.column() != ItemsColumn))
             return false;

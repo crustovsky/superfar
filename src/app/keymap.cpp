@@ -43,6 +43,14 @@ const std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Left), Command::GoUp},
         {QKeySequence(Qt::Key_Right), Command::Activate},
         {QKeySequence(Qt::CTRL | Qt::Key_Q), Command::Preview},
+        {QKeySequence(Qt::Key_Return), Command::Activate},
+        {QKeySequence(Qt::Key_Enter), Command::Activate},
+        {QKeySequence(Qt::Key_Escape), Command::Cancel},
+        {QKeySequence(Qt::KeypadModifier | Qt::Key_Plus), Command::MarkGlob},
+        {QKeySequence(Qt::KeypadModifier | Qt::Key_Minus), Command::UnmarkGlob},
+        {QKeySequence(Qt::SHIFT | Qt::Key_Return), Command::OpenWith},
+        {QKeySequence(Qt::SHIFT | Qt::Key_Enter), Command::OpenWith},
+        {QKeySequence(Qt::CTRL | Qt::Key_Space), Command::FocusCommandLine},
     };
     return t;
 }
@@ -60,10 +68,18 @@ Command lookup(const QKeySequence& key)
 Command lookup(const QKeyEvent* event)
 {
     int key = event->key();
-    Qt::KeyboardModifiers mods = event->modifiers() & ~Qt::KeypadModifier;
+    Qt::KeyboardModifiers mods = event->modifiers();
     if (key == Qt::Key_Backtab) {
         key = Qt::Key_Tab;
         mods |= Qt::ShiftModifier;
+    }
+    // Keypad keys match their own entries first (Gray + and Gray -), then
+    // the plain ones, so keypad arrows still navigate.
+    if (mods & Qt::KeypadModifier) {
+        const Command keypad = lookup(QKeySequence(QKeyCombination(mods, Qt::Key(key)).toCombined()));
+        if (keypad != Command::None)
+            return keypad;
+        mods &= ~Qt::KeypadModifier;
     }
     const Command direct = lookup(QKeySequence(QKeyCombination(mods, Qt::Key(key)).toCombined()));
     if (direct != Command::None)
@@ -108,6 +124,11 @@ QString label(Command command)
     case Command::Activate: return QStringLiteral("Enter");
     case Command::Preview: return QStringLiteral("Preview");
     case Command::ToggleSizes: return QStringLiteral("Sizes");
+    case Command::Cancel: return QStringLiteral("Cancel");
+    case Command::MarkGlob: return QStringLiteral("Select by pattern");
+    case Command::UnmarkGlob: return QStringLiteral("Deselect by pattern");
+    case Command::OpenWith: return QStringLiteral("Open with");
+    case Command::FocusCommandLine: return QStringLiteral("Command line");
     case Command::None: return {};
     }
     return {};

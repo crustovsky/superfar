@@ -1,6 +1,8 @@
 #include "pane/pane.h"
 
+#include "elidedlabel.h"
 #include "pane/tab.h"
+#include "viewer.h"
 
 #include <QApplication>
 #include <QHBoxLayout>
@@ -14,29 +16,13 @@
 namespace {
 constexpr int kBorder = 2;
 
-// A label that elides from the left so the end of a path stays visible
-// and never forces its pane wider.
-class PathLabel : public QLabel {
-public:
-    using QLabel::QLabel;
-    QSize minimumSizeHint() const override { return {0, QLabel::minimumSizeHint().height()}; }
-
-protected:
-    void paintEvent(QPaintEvent*) override
-    {
-        QPainter p(this);
-        const QRect r = contentsRect();
-        p.setPen(palette().color(foregroundRole()));
-        p.drawText(r, Qt::AlignLeft | Qt::AlignVCenter,
-                   fontMetrics().elidedText(text(), Qt::ElideLeft, r.width()));
-    }
-};
 } // namespace
 
 Pane::Pane(core::DirSizePool* sizes, QWidget* parent)
     : QWidget(parent)
     , tabBar_(new QTabBar(this))
-    , path_(new PathLabel(this))
+    , path_(new ElidedLabel(this))
+    , content_(new QStackedWidget(this))
     , stack_(new QStackedWidget(this))
     , status_(new QLabel(this))
     , space_(new QLabel(this))
@@ -47,7 +33,8 @@ Pane::Pane(core::DirSizePool* sizes, QWidget* parent)
     layout->setContentsMargins(kBorder, kBorder, kBorder, kBorder);
     layout->setSpacing(0);
     layout->addWidget(path_);
-    layout->addWidget(stack_, 1);
+    content_->addWidget(stack_);
+    layout->addWidget(content_, 1);
     layout->addWidget(tabBar_);
 
     auto* statusRow = new QHBoxLayout;
@@ -126,6 +113,11 @@ Tab* Pane::newTab(const core::Location& dir)
             showStatus(items, space);
     });
     connect(tab, &Tab::commandRequested, this, &Pane::commandRequested);
+    connect(tab, &Tab::cursorChanged, this, [this, tab](const core::Location& item) {
+        if (stack_->indexOf(tab) == stack_->currentIndex())
+            Q_EMIT cursorChanged(item);
+    });
+    connect(tab, &Tab::message, this, &Pane::showMessage);
 
     tab->navigate(dir);
     tabBar_->setCurrentIndex(index);
@@ -168,7 +160,29 @@ void Pane::onCurrentTab(int index)
     if (hasFocusInside())
         tab->setFocus();
     Q_EMIT locationChanged(tab->location());
+    Q_EMIT cursorChanged(tab->cursorLocation());
     tab->refreshStatus();
+}
+
+void Pane::setOverlay(QWidget* widget)
+{
+    if (overlay_ == widget)
+        return;
+    if (overlay_) {
+        content_->removeWidget(overlay_);
+        if (overlay_ == viewer_)
+            viewer_->clear();
+        else
+            overlay_->setParent(nullptr);
+        overlay_ = nullptr;
+    }
+    if (widget) {
+        overlay_ = widget;
+        content_->addWidget(widget);
+        content_->setCurrentWidget(widget);
+    } else {
+        content_->setCurrentWidget(stack_);
+    }
 }
 
 void Pane::setActive(bool active)
@@ -201,6 +215,32 @@ bool Pane::execute(keymap::Command command)
     case Command::PrevTab:
         tabBar_->setCurrentIndex((cur + n - 1) % n);
         return true;
+    case Command::Cancel:
+        if (overlay_ == viewer_ && viewer_) {
+            setOverlay(nullptr);
+            activeTab()->setFocus();
+            return true;
+        }
+        return activeTab() && activeTab()->execute(command);
+    case Command::View: {
+        Tab* tab = activeTab();
+        if (!tab || tab->execute(command))
+            return true;  // folders: sizes
+        const core::Location file = tab->cursorLocation();
+        if (!file.isValid())
+            return true;
+        if (!viewer_) {
+            viewer_ = new Viewer(this);
+            connect(viewer_, &Viewer::closed, this, [this] {
+                setOverlay(nullptr);
+                activeTab()->setFocus();
+            });
+        }
+        viewer_->open(file);
+        setOverlay(viewer_);
+        viewer_->setFocus();
+        return true;
+    }
     default:
         return activeTab() && activeTab()->execute(command);
     }

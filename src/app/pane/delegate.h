@@ -15,6 +15,9 @@ public:
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;
+    // The rename editor: a line edit with the stem selected, so typing
+    // replaces the name and keeps the extension.
+    void setEditorData(QWidget* editor, const QModelIndex& index) const override;
 
 private:
     ListView* view_;

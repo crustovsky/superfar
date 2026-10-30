@@ -225,6 +225,15 @@ PromptBar* JobStrip::prompt(const QString& message, const QString& okLabel, std:
     return bar;
 }
 
+ChoiceBar* JobStrip::choose(const QString& message, const QStringList& items)
+{
+    auto* bar = new ChoiceBar(message, items, this);
+    connect(bar, &ChoiceBar::chosen, this, [this, bar] { removeBar(bar); });
+    connect(bar, &ChoiceBar::rejected, this, [this, bar] { removeBar(bar); });
+    showBar(bar);
+    return bar;
+}
+
 void JobStrip::showBar(QWidget* bar, QWidget* under)
 {
     if (bars_ == 0)

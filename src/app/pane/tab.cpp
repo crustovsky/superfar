@@ -1,10 +1,13 @@
 #include "pane/tab.h"
 
 #include "bench.h"
+#include "core/apps.h"
+#include "core/fileops.h"
 #include "pane/listmodel.h"
 #include "pane/listview.h"
 
 #include <QLocale>
+#include <QPointer>
 #include <QScrollBar>
 #include <QVBoxLayout>
 
@@ -40,6 +43,9 @@ Tab::Tab(core::DirSizePool* sizes, QWidget* parent)
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
     connect(view_, &QAbstractItemView::activated, this, &Tab::activate);
     connect(view_, &ListView::commandRequested, this, &Tab::commandRequested);
+    connect(view_, &ListView::textTyped, this, &Tab::typed);
+    connect(view_, &ListView::cursorMoved, this, [this] { Q_EMIT cursorChanged(cursorLocation()); });
+    connect(model_, &ListModel::renameRequested, this, &Tab::rename);
 }
 
 void Tab::navigate(const core::Location& dir)
@@ -94,6 +100,52 @@ bool Tab::monitoring() const
     return monitor_->active();
 }
 
+core::Location Tab::cursorLocation() const
+{
+    const QByteArray name = currentName();
+    return name.isEmpty() ? core::Location() : location_.child(name);
+}
+
+bool Tab::cursorIsDir() const
+{
+    const QModelIndex idx = view_->currentIndex();
+    return idx.isValid() && model_->entryAt(idx.row()).isDir();
+}
+
+void Tab::markGlob(const QString& pattern, bool on)
+{
+    model_->markGlob(pattern, on);
+}
+
+void Tab::typed(const QString& text)
+{
+    setFilter(model_->filter() + text);
+}
+
+void Tab::setFilter(const QString& text)
+{
+    cursorName_ = currentName();
+    model_->setFilter(text);
+    placeCursor();
+    updateStatus();
+}
+
+void Tab::rename(const QByteArray& name, const QString& newName)
+{
+    const core::Location dir = location_;
+    QPointer<Tab> guard(this);
+    core::renameEntry(dir.child(name), newName, [guard, dir](const QString& error, const QByteArray& actual) {
+        if (!guard)
+            return;
+        if (!error.isEmpty()) {
+            Q_EMIT guard->message(error);
+            return;
+        }
+        if (guard->location_ == dir)
+            guard->reloadWithCursor(actual);
+    });
+}
+
 void Tab::setCurrent(bool current)
 {
     current_ = current;
@@ -123,6 +175,7 @@ void Tab::load(const core::Location& dir)
     monitor_->stop();
     location_ = dir;
     spaceText_.clear();
+    model_->setFilter(QString());
     model_->reset(dir);
     listing_->start(dir, generation_);
     Q_EMIT locationChanged(location_);
@@ -171,9 +224,30 @@ bool Tab::execute(keymap::Command command)
         }
         return true;
     case Command::MarkToggle:
-        if (cur.isValid())
+        if (!model_->filter().isEmpty())
+            typed(QStringLiteral(" "));  // Space selects only while no filter is set
+        else if (cur.isValid())
             model_->toggleMarked(cur.row());
         return true;
+    case Command::Cancel:
+        if (model_->filter().isEmpty())
+            return false;
+        setFilter(QString());
+        return true;
+    case Command::Rename:
+        if (cur.isValid())
+            view_->edit(cur.siblingAtColumn(ListModel::NameColumn));
+        return true;
+    case Command::Edit: {
+        const QByteArray name = currentName();
+        if (name.isEmpty() || cursorIsDir())
+            return true;
+        QString error;
+        if (!core::runInTerminal(location_, core::editorCommand() + QLatin1Char(' ')
+                                     + QString::fromUtf8(core::shellQuote(name)), false, &error))
+            Q_EMIT message(error);
+        return true;
+    }
     case Command::MarkAll:
         model_->markAll(true);
         return true;
@@ -181,7 +255,10 @@ bool Tab::execute(keymap::Command command)
         model_->invertMarks();
         return true;
     case Command::GoUp:
-        goUp();
+        if (!model_->filter().isEmpty())
+            setFilter(model_->filter().chopped(1));  // Backspace edits the filter first
+        else
+            goUp();
         return true;
     case Command::Activate:
         activate(cur);
@@ -268,8 +345,13 @@ void Tab::activate(const QModelIndex& index)
     if (e.isDir()) {
         cursorName_.clear();
         navigate(location_.child(e.name));
+        return;
     }
-    // Files open with their default app in milestone 5.
+    QPointer<Tab> guard(this);
+    core::openDefault(location_.child(e.name), [guard](const QString& error) {
+        if (guard && !error.isEmpty())
+            Q_EMIT guard->message(error);
+    });
 }
 
 void Tab::placeCursor()
@@ -300,7 +382,9 @@ void Tab::updateStatus()
     const int shown = model_->rowCount();
     const int hidden = model_->hiddenCount();
     const int marked = model_->markedCount();
-    QString text = tr("%n items", nullptr, shown);
+    QString text = model_->filter().isEmpty()
+        ? tr("%n items", nullptr, shown)
+        : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
     if (marked > 0)
         text += tr(", %n selected", nullptr, marked);
     if (hidden > 0 && !model_->showHidden())

@@ -56,6 +56,7 @@ void makeTree(const QString& root)
 class JobsTest : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void createAndRename();
     void copyTree();
     void moveSameFilesystem();
     void conflictAnswers();
@@ -243,6 +244,38 @@ void JobsTest::mkdir()
     while (error == QStringLiteral("pending"))
         QTest::qWait(5);
     QVERIFY(!error.isEmpty());  // exists already
+}
+
+void JobsTest::createAndRename()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const core::Location dir = loc(tmp.path());
+
+    QString error = QStringLiteral("pending");
+    core::createFile(dir.child("new.txt"), [&](const QString& e) { error = e; });
+    while (error == QStringLiteral("pending"))
+        QTest::qWait(5);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(QFile::exists(tmp.path() + "/new.txt"));
+
+    // Creating again fails rather than truncating.
+    error = QStringLiteral("pending");
+    core::createFile(dir.child("new.txt"), [&](const QString& e) { error = e; });
+    while (error == QStringLiteral("pending"))
+        QTest::qWait(5);
+    QVERIFY(!error.isEmpty());
+
+    error = QStringLiteral("pending");
+    QByteArray actual;
+    core::renameEntry(dir.child("new.txt"), QStringLiteral("renamed.txt"),
+                      [&](const QString& e, const QByteArray& name) { error = e; actual = name; });
+    while (error == QStringLiteral("pending"))
+        QTest::qWait(5);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(actual, QByteArray("renamed.txt"));
+    QVERIFY(!QFile::exists(tmp.path() + "/new.txt"));
+    QVERIFY(QFile::exists(tmp.path() + "/renamed.txt"));
 }
 
 QTEST_GUILESS_MAIN(JobsTest)

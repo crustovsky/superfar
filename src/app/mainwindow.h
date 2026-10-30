@@ -9,8 +9,10 @@
 namespace core {
 class DirSizePool;
 }
+class CommandLine;
 class FuncBar;
 class JobStrip;
+class Preview;
 class Pane;
 class Tab;
 class QSplitter;
@@ -35,6 +37,12 @@ private:
     void confirmRemove(bool permanent);
     void runJob(core::Job* job, Tab* sourceTab, const core::Location& destination);
     void refreshAt(const core::Location& dir);
+    void promptNewFile();
+    void promptGlob(bool on);
+    void openWith();
+    void togglePreview();
+    void placePreview();
+    void runCommand(const QString& command);
 
     core::DirSizePool* sizes_;  // one worker pool for every tab (rule 9)
     Tree* tree_;
@@ -44,5 +52,7 @@ private:
     Pane* active_;
     FuncBar* funcbar_;
     JobStrip* strip_;
+    CommandLine* cmdline_;
+    Preview* preview_ = nullptr;  // exists while Ctrl+Q is on
     bool painted_ = false;
 };

@@ -73,6 +73,33 @@ void PromptBar::keyPressEvent(QKeyEvent* event)
     QFrame::keyPressEvent(event);
 }
 
+ChoiceBar::ChoiceBar(const QString& message, const QStringList& items, QWidget* parent)
+    : QFrame(parent)
+    , list_(new QListWidget(this))
+{
+    frame(this);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(6, 4, 6, 4);
+    layout->setSpacing(2);
+    layout->addWidget(new QLabel(message, this));
+    list_->addItems(items);
+    list_->setCurrentRow(0);
+    const int rows = std::min(static_cast<int>(items.size()), 8);
+    list_->setFixedHeight(list_->sizeHintForRow(0) * rows + 2 * list_->frameWidth());
+    layout->addWidget(list_);
+    connect(list_, &QListWidget::itemActivated, this, [this] { Q_EMIT chosen(list_->currentRow()); });
+    setFocusProxy(list_);
+}
+
+void ChoiceBar::keyPressEvent(QKeyEvent* event)
+{
+    if (event->key() == Qt::Key_Escape) {
+        Q_EMIT rejected();
+        return;
+    }
+    QFrame::keyPressEvent(event);
+}
+
 ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     : QFrame(parent)
 {

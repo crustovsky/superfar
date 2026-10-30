@@ -22,6 +22,9 @@ public:
 
 Q_SIGNALS:
     void commandRequested(keymap::Command command);
+    // A printable key with no command bound: the quick filter takes it.
+    void textTyped(const QString& text);
+    void cursorMoved();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

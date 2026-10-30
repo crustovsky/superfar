@@ -97,13 +97,17 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Insert selects and moves down; Space selects when the filter is empty;
   Gray + / Gray - select and deselect by glob; Ctrl+A all; * invert.
   Selection is marks, separate from the cursor
+- Enter opens a file with its default app; Shift+Enter shows the
+  in-window open-with list; Esc clears the filter, closes the viewer,
+  then the preview
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
 - Backspace and Left go up; Right and Enter open the cursor folder
 - Ctrl+L edits the path (accepts remote URIs); Ctrl+G go to folder, fuzzy
   over history by frecency; Ctrl+H toggles hidden files
 - Ctrl+Space focuses the command line, which runs in the active tab's
-  directory in a terminal; Ctrl+Enter inserts the cursor's name
+  directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
+  the window until Enter; Ctrl+Enter inserts the cursor's name
 - Ctrl+Q preview; Ctrl+C / Ctrl+X / Ctrl+V interoperate with other file
   managers
 

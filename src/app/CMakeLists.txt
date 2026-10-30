@@ -5,6 +5,9 @@ qt_add_executable(superfar
   tree.cpp
   keymap.cpp
   funcbar.cpp
+  cmdline.cpp
+  viewer.cpp
+  preview.cpp
   pane/delegate.cpp
   jobs/bars.cpp
   jobs/panel.cpp

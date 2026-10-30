@@ -7,6 +7,7 @@
 
 #include <QObject>
 #include <QStringList>
+#include <functional>
 
 typedef struct _GCancellable GCancellable;
 
@@ -19,6 +20,26 @@ struct Metadata {
     QString contentType;    // fast content type, from the name only
     QStringList iconNames;  // theme icon names, best first
 };
+
+// Everything the preview shows for a file that is neither text, image
+// nor folder.
+struct Details {
+    bool ok = false;
+    bool isDir = false;
+    bool symlink = false;
+    QString symlinkTarget;
+    QString contentType;      // full content type, sniffed
+    QString typeDescription;  // for people
+    quint64 size = 0;
+    qint64 modified = 0;
+    qint64 accessed = 0;
+    qint64 changed = 0;
+    quint32 mode = 0;  // unix permission bits, 0 when unknown
+    QString owner;
+    QString group;
+};
+
+void queryDetails(const Location& file, std::function<void(const Details&)> done);
 
 class MetadataQuery : public QObject {
     Q_OBJECT

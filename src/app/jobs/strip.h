@@ -14,6 +14,7 @@
 #include <vector>
 
 class JobPanel;
+class ChoiceBar;
 class PromptBar;
 class QLabel;
 class QProgressBar;
@@ -61,6 +62,7 @@ public:
     // A prompt; the caller connects accepted() / rejected(), the strip
     // removes the bar afterwards and gives focus back.
     PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input);
+    ChoiceBar* choose(const QString& message, const QStringList& items);
 
 Q_SIGNALS:
     void jobFinished(core::Job* job);

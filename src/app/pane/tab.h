@@ -33,6 +33,10 @@ public:
     QString selectionText() const;  // "3 items" or the one name
     void clearMarks();
     bool monitoring() const;
+    // The cursor entry; invalid when the list is empty.
+    core::Location cursorLocation() const;
+    bool cursorIsDir() const;
+    void markGlob(const QString& pattern, bool on);
 
     // Whether this tab is the one its pane shows (rule 13).
     void setCurrent(bool current);
@@ -53,6 +57,8 @@ Q_SIGNALS:
     void commandRequested(keymap::Command command);
     void loaded();
     void folderChanged();  // the monitor saw something; a reload follows
+    void cursorChanged(const core::Location& item);  // invalid when none
+    void message(const QString& text);  // an error worth a moment in the status line
 
 private:
     void load(const core::Location& dir);
@@ -62,6 +68,9 @@ private:
     void onSpace(quint64 generation, bool ok, quint64 freeBytes);
     void onMonitor();
     void activate(const QModelIndex& index);
+    void typed(const QString& text);
+    void setFilter(const QString& text);
+    void rename(const QByteArray& name, const QString& newName);
     void placeCursor();
     void updateStatus();
     QByteArray currentName() const;

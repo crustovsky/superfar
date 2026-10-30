@@ -1,6 +1,9 @@
 // Headless tests for core against a real temp directory (never a mock).
+#include "core/apps.h"
 #include "core/dirsize.h"
+#include "core/image.h"
 #include "core/listing.h"
+#include "core/reader.h"
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/sort.h"
@@ -51,6 +54,10 @@ private Q_SLOTS:
     void dirSizeCount();
     void dirSizeWalk();
     void dirSizeCancel();
+    void readerWindows();
+    void details();
+    void shellQuoting();
+    void imageDecode();
 };
 
 namespace {
@@ -317,6 +324,115 @@ void CoreTest::dirSizeCancel()
         QTest::qWait(5);
     QCOMPARE(results.last().at(0).toULongLong(), 2u);
     QCOMPARE(results.last().at(2).value<core::DirSize>().files, 2000u);
+}
+
+void CoreTest::readerWindows()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QByteArray content;
+    for (int i = 0; i < 5000; ++i)
+        content += QByteArray::number(i) + '\n';
+    touch(tmp.path() + "/big.txt", content);
+    const core::Location file = core::Location::fromPath(QFile::encodeName(tmp.path() + "/big.txt"));
+
+    core::Reader reader;
+    quint64 size = 0;
+    std::vector<std::pair<quint64, QByteArray>> got;
+    connect(&reader, &core::Reader::opened, [&](quint64 s) { size = s; });
+    connect(&reader, &core::Reader::data, [&](quint64 off, const QByteArray& b) { got.emplace_back(off, b); });
+    QSignalSpy failed(&reader, &core::Reader::failed);
+    reader.open(file);
+    reader.read(0, 1000);
+    while (got.empty())
+        QTest::qWait(5);
+    QCOMPARE(size, static_cast<quint64>(content.size()));
+    QCOMPARE(got[0].first, 0u);
+    QCOMPARE(got[0].second, content.left(1000));
+
+    // A window in the middle, and one that runs past the end.
+    reader.read(20000, 500);
+    while (got.size() < 2)
+        QTest::qWait(5);
+    QCOMPARE(got[1].second, content.mid(20000, 500));
+    reader.read(size - 10, 1000);
+    while (got.size() < 3)
+        QTest::qWait(5);
+    QCOMPARE(got[2].second, content.right(10));
+    QVERIFY(failed.isEmpty());
+
+    reader.open(core::Location::fromPath(QFile::encodeName(tmp.path() + "/missing")));
+    while (failed.isEmpty())
+        QTest::qWait(5);
+}
+
+void CoreTest::details()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    touch(tmp.path() + "/notes.txt", "hello\n");
+    QVERIFY(QFile::setPermissions(tmp.path() + "/notes.txt",
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup));
+    QVERIFY(QFile::link("notes.txt", tmp.path() + "/link"));
+    const core::Location dir = core::Location::fromPath(QFile::encodeName(tmp.path()));
+
+    core::Details file, link, folder;
+    int done = 0;
+    core::queryDetails(dir.child("notes.txt"), [&](const core::Details& d) { file = d; ++done; });
+    core::queryDetails(dir.child("link"), [&](const core::Details& d) { link = d; ++done; });
+    core::queryDetails(dir, [&](const core::Details& d) { folder = d; ++done; });
+    while (done < 3)
+        QTest::qWait(5);
+    QVERIFY(file.ok);
+    QCOMPARE(file.size, 6u);
+    QCOMPARE(file.contentType, QStringLiteral("text/plain"));
+    QVERIFY(!file.typeDescription.isEmpty());
+    QCOMPARE(file.mode & 0777, 0640u);
+    QVERIFY(file.modified > 0);
+    QVERIFY(!file.owner.isEmpty());
+    QVERIFY(link.symlink);
+    QCOMPARE(link.symlinkTarget, QStringLiteral("notes.txt"));
+    QVERIFY(folder.isDir);
+}
+
+void CoreTest::shellQuoting()
+{
+    QCOMPARE(core::shellQuote("plain"), QByteArray("'plain'"));
+    QCOMPARE(core::shellQuote("it's a file"), QByteArray("'it'\\''s a file'"));
+    QVERIFY(!core::editorCommand().isEmpty());
+}
+
+void CoreTest::imageDecode()
+{
+    // A 2x2 PNG written byte by byte: red, green / blue, white.
+    static const unsigned char png[] = {
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x08, 0x02, 0x00, 0x00, 0x00, 0xfd, 0xd4, 0x9a,
+        0x73, 0x00, 0x00, 0x00, 0x12, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xc0,
+        0x00, 0xc2, 0x0c, 0xff, 0x81, 0x00, 0x00, 0x1f, 0xee, 0x05, 0xfb, 0x0b, 0xd9, 0x68, 0x8b, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    touch(tmp.path() + "/tiny.png", QByteArray(reinterpret_cast<const char*>(png), sizeof png));
+
+    core::ImageLoader loader;
+    core::ImageFrame frame;
+    QString error;
+    bool done = false;
+    connect(&loader, &core::ImageLoader::decoded, [&](const core::ImageFrame& f) { frame = f; done = true; });
+    connect(&loader, &core::ImageLoader::failed, [&](const QString& e) { error = e; done = true; });
+    loader.load(core::Location::fromPath(QFile::encodeName(tmp.path() + "/tiny.png")), 64, 64);
+    while (!done)
+        QTest::qWait(10);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(frame.width, 2u);
+    QCOMPARE(frame.height, 2u);
+    QVERIFY(frame.stride >= 8);
+    QCOMPARE(static_cast<quint64>(frame.bgra.size()), static_cast<quint64>(frame.stride) * frame.height);
+    const auto* px = reinterpret_cast<const unsigned char*>(frame.bgra.constData());
+    QCOMPARE(int(px[2]), 255);  // first pixel red, in BGRA
+    QCOMPARE(int(px[1]), 0);
+    QCOMPARE(int(px[3]), 255);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

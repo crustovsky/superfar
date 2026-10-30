@@ -20,7 +20,7 @@ class ListModel : public QAbstractTableModel {
     Q_OBJECT
 public:
     enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
-    enum Role { PartialRole = Qt::UserRole + 1 };  // a total still being walked
+    enum Role { PartialRole = Qt::UserRole + 1, IsDirRole };  // PartialRole: a total still being walked
 
     explicit ListModel(core::DirSizePool* sizes, QObject* parent = nullptr);
 
@@ -33,6 +33,14 @@ public:
 
     void setShowHidden(bool on);
     bool showHidden() const { return showHidden_; }
+
+    // Quick filter: a row stays when the text matches its name as a
+    // subsequence, case-insensitive; prefix matches sort first, then
+    // substrings, then the rest, each group in name order.
+    void setFilter(const QString& text);
+    const QString& filter() const { return filter_; }
+    // Marks every visible row whose name matches the glob.
+    void markGlob(const QString& pattern, bool on);
 
     // Recursive sizes and counts for every folder row as it is painted.
     // Off, folders show their direct item count and only an explicit
@@ -64,9 +72,13 @@ public:
     int columnCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+    Qt::ItemFlags flags(const QModelIndex& index) const override;
+    // Editing the name column asks for a rename; the tab performs it.
+    bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
 Q_SIGNALS:
     void marksChanged();
+    void renameRequested(const QByteArray& name, const QString& newName);
 
 private:
     void rebuildRows();
@@ -85,6 +97,7 @@ private:
     int markedCount_ = 0;
     QHash<QByteArray, int> rowOfName_;
     bool showHidden_ = false;
+    QString filter_;
 
     core::MetadataQuery* meta_;
     quint64 metaGeneration_ = 0;

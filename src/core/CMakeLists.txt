@@ -8,6 +8,9 @@ qt_add_library(superfar_core STATIC
   space.cpp
   monitor.cpp
   dirsize.cpp
+  apps.cpp
+  reader.cpp
+  image.cpp
   fileops.cpp
   jobs/job.cpp
   jobs/transfer.cpp
@@ -16,5 +19,5 @@ qt_add_library(superfar_core STATIC
 target_include_directories(superfar_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(superfar_core
   PUBLIC Qt6::Core
-  PRIVATE PkgConfig::GIO
+  PRIVATE PkgConfig::GIO PkgConfig::GLYCIN
 )

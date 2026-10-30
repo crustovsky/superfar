@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 
 #include "bench.h"
+#include "cmdline.h"
+#include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
 #include "core/jobs/remove.h"
@@ -10,6 +12,7 @@
 #include "jobs/strip.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
+#include "preview.h"
 #include "tree.h"
 
 #include <QApplication>
@@ -30,6 +33,7 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     , active_(left_)
     , funcbar_(new FuncBar(this))
     , strip_(new JobStrip(this))
+    , cmdline_(new CommandLine(this))
 {
     setWindowTitle(QStringLiteral("superfar"));
     resize(1100, 700);
@@ -62,13 +66,28 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(vsplit, 1);
+    layout->addWidget(cmdline_);
     layout->addWidget(funcbar_);
     setCentralWidget(central);
 
+    connect(cmdline_, &CommandLine::run, this, &MainWindow::runCommand);
+    connect(cmdline_, &CommandLine::dismissed, this, [this] { active_->activeTab()->setFocus(); });
+    connect(cmdline_, &CommandLine::insertNameRequested, this, [this] {
+        const core::Location item = active_->activeTab()->cursorLocation();
+        if (item.isValid())
+            cmdline_->insert(QString::fromUtf8(core::shellQuote(item.basename())) + QLatin1Char(' '));
+    });
+
     for (Pane* pane : {left_, right_}) {
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
-            if (pane == active_)
+            if (pane == active_) {
                 tree_->reveal(dir);
+                cmdline_->setFolder(dir.displayPath());
+            }
+        });
+        connect(pane, &Pane::cursorChanged, this, [this, pane](const core::Location& item) {
+            if (pane == active_ && preview_)
+                preview_->show(item);
         });
         connect(pane, &Pane::commandRequested, this, &MainWindow::execute);
     }
@@ -95,6 +114,7 @@ MainWindow::MainWindow(const core::Location& left, const core::Location& right, 
         connect(pane, &Pane::tabOpened, this, watchTab);
     left_->setActive(true);
     left_->activeTab()->setFocus();
+    cmdline_->setFolder(left.displayPath());
 
     // Bench aid: SUPERFAR_BENCH_THEN=<folder> navigates there once the
     // first folder has loaded, so memory after leaving a big folder can
@@ -160,6 +180,11 @@ void MainWindow::setActivePane(Pane* pane)
     left_->setActive(pane == left_);
     right_->setActive(pane == right_);
     tree_->reveal(pane->activeTab()->location());
+    cmdline_->setFolder(pane->activeTab()->location().displayPath());
+    if (preview_) {
+        placePreview();
+        preview_->show(pane->activeTab()->cursorLocation());
+    }
 }
 
 void MainWindow::togglePane(Pane* pane)
@@ -215,6 +240,32 @@ void MainWindow::execute(keymap::Command command)
     case Command::DeletePermanent:
         confirmRemove(true);
         return;
+    case Command::NewFile:
+        promptNewFile();
+        return;
+    case Command::MarkGlob:
+        promptGlob(true);
+        return;
+    case Command::UnmarkGlob:
+        promptGlob(false);
+        return;
+    case Command::OpenWith:
+        openWith();
+        return;
+    case Command::Preview:
+        togglePreview();
+        return;
+    case Command::FocusCommandLine:
+        cmdline_->setFocus();
+        return;
+    case Command::Cancel:
+        if (active_->execute(command))
+            return;
+        if (preview_) {
+            togglePreview();
+            return;
+        }
+        return;
     default:
         break;
     }
@@ -259,6 +310,99 @@ void MainWindow::promptMkdir()
             tree_->refresh(dir);
         });
     });
+}
+
+void MainWindow::promptNewFile()
+{
+    Tab* tab = active_->activeTab();
+    PromptBar* bar = strip_->prompt(tr("New file"), tr("Create"), QString());
+    connect(bar, &PromptBar::accepted, this, [this, tab](const QString& text) {
+        const QByteArray name = QFile::encodeName(text.trimmed());
+        if (name.isEmpty())
+            return;
+        const core::Location dir = tab->location();
+        QPointer<Tab> guard(tab);
+        core::createFile(dir.child(name), [this, guard, dir, name](const QString& error) {
+            if (!error.isEmpty()) {
+                active_->showMessage(error);
+                return;
+            }
+            if (guard && guard->location() == dir)
+                guard->reloadWithCursor(name);
+        });
+    });
+}
+
+void MainWindow::promptGlob(bool on)
+{
+    Tab* tab = active_->activeTab();
+    PromptBar* bar = strip_->prompt(on ? tr("Select") : tr("Deselect"), on ? tr("Select") : tr("Deselect"),
+                                    QStringLiteral("*"));
+    QPointer<Tab> guard(tab);
+    connect(bar, &PromptBar::accepted, this, [guard, on](const QString& text) {
+        if (guard && !text.trimmed().isEmpty())
+            guard->markGlob(text.trimmed(), on);
+    });
+}
+
+void MainWindow::openWith()
+{
+    Tab* tab = active_->activeTab();
+    const core::Location file = tab->cursorLocation();
+    if (!file.isValid() || tab->cursorIsDir())
+        return;
+    QPointer<MainWindow> guard(this);
+    core::appsFor(file, [guard, file](std::vector<core::AppChoice> apps) {
+        if (!guard)
+            return;
+        if (apps.empty()) {
+            guard->active_->showMessage(tr("No application registered for this type"));
+            return;
+        }
+        QStringList names;
+        for (const core::AppChoice& a : apps)
+            names << a.name;
+        ChoiceBar* bar = guard->strip_->choose(tr("Open %1 with").arg(file.displayName()), names);
+        connect(bar, &ChoiceBar::chosen, guard, [guard, apps, file](int index) {
+            QString error;
+            if (index >= 0 && index < static_cast<int>(apps.size())
+                && !core::launchWith(apps[static_cast<size_t>(index)].id, {file}, &error))
+                guard->active_->showMessage(error);
+        });
+    });
+}
+
+void MainWindow::togglePreview()
+{
+    if (preview_) {
+        Pane* host = otherPane();
+        host->setOverlay(nullptr);
+        preview_->deleteLater();
+        preview_ = nullptr;
+        return;
+    }
+    preview_ = new Preview(sizes_);
+    placePreview();
+    preview_->show(active_->activeTab()->cursorLocation());
+}
+
+void MainWindow::placePreview()
+{
+    // The preview borrows the pane opposite the active one; a hidden pane
+    // comes back for it.
+    Pane* host = otherPane();
+    Pane* other = host == left_ ? right_ : left_;
+    if (other->hasOverlay())
+        other->setOverlay(nullptr);
+    host->show();
+    host->setOverlay(preview_);
+}
+
+void MainWindow::runCommand(const QString& command)
+{
+    QString error;
+    if (!core::runInTerminal(active_->activeTab()->location(), command, true, &error))
+        active_->showMessage(error);
 }
 
 void MainWindow::confirmRemove(bool permanent)

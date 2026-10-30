@@ -48,6 +48,61 @@ struct MetadataQuery::Request {
     }
 };
 
+namespace {
+
+const char* const kDetailAttributes =
+    "standard::type,standard::size,standard::content-type,standard::is-symlink,"
+    "standard::symlink-target,time::modified,time::access,time::changed,"
+    "owner::user,owner::group,unix::mode";
+
+struct DetailsRequest {
+    std::function<void(const Details&)> done;
+
+    static void onInfo(GObject* source, GAsyncResult* result, gpointer data)
+    {
+        std::unique_ptr<DetailsRequest> req(static_cast<DetailsRequest*>(data));
+        GError* error = nullptr;
+        GPtr<GFileInfo> info(g_file_query_info_finish(G_FILE(source), result, &error));
+        GErrorPtr err(error);
+        Details d;
+        if (info) {
+            GFileInfo* i = info.get();
+            d.ok = true;
+            d.isDir = g_file_info_get_file_type(i) == G_FILE_TYPE_DIRECTORY;
+            d.symlink = g_file_info_get_is_symlink(i);
+            if (d.symlink && g_file_info_has_attribute(i, G_FILE_ATTRIBUTE_STANDARD_SYMLINK_TARGET))
+                d.symlinkTarget = QString::fromUtf8(g_file_info_get_symlink_target(i));
+            if (const char* t = g_file_info_has_attribute(i, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE)
+                    ? g_file_info_get_content_type(i) : nullptr) {
+                d.contentType = QString::fromUtf8(t);
+                GStr desc(g_content_type_get_description(t));
+                d.typeDescription = QString::fromUtf8(desc.get());
+            }
+            d.size = static_cast<quint64>(g_file_info_get_size(i));
+            d.modified = static_cast<qint64>(g_file_info_get_attribute_uint64(i, G_FILE_ATTRIBUTE_TIME_MODIFIED));
+            d.accessed = static_cast<qint64>(g_file_info_get_attribute_uint64(i, G_FILE_ATTRIBUTE_TIME_ACCESS));
+            d.changed = static_cast<qint64>(g_file_info_get_attribute_uint64(i, G_FILE_ATTRIBUTE_TIME_CHANGED));
+            d.mode = g_file_info_get_attribute_uint32(i, G_FILE_ATTRIBUTE_UNIX_MODE);
+            d.owner = QString::fromUtf8(g_file_info_get_attribute_string(i, G_FILE_ATTRIBUTE_OWNER_USER));
+            d.group = QString::fromUtf8(g_file_info_get_attribute_string(i, G_FILE_ATTRIBUTE_OWNER_GROUP));
+        }
+        req->done(d);
+    }
+};
+
+} // namespace
+
+void queryDetails(const Location& file, std::function<void(const Details&)> done)
+{
+    if (!file.isValid()) {
+        done(Details{});
+        return;
+    }
+    auto* req = new DetailsRequest{std::move(done)};
+    g_file_query_info_async(file.gfile(), kDetailAttributes, G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                            G_PRIORITY_DEFAULT, nullptr, &DetailsRequest::onInfo, req);
+}
+
 MetadataQuery::MetadataQuery(QObject* parent)
     : QObject(parent)
     , cancellable_(g_cancellable_new())

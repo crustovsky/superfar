@@ -9,6 +9,7 @@
 #include <optional>
 
 class QLineEdit;
+class QListWidget;
 
 class PromptBar : public QFrame {
     Q_OBJECT
@@ -25,6 +26,23 @@ protected:
 
 private:
     QLineEdit* edit_ = nullptr;
+};
+
+// A short list to pick from, Enter chooses, Esc cancels.
+class ChoiceBar : public QFrame {
+    Q_OBJECT
+public:
+    ChoiceBar(const QString& message, const QStringList& items, QWidget* parent = nullptr);
+
+Q_SIGNALS:
+    void chosen(int index);
+    void rejected();
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
+private:
+    QListWidget* list_;
 };
 
 class ConflictBar : public QFrame {

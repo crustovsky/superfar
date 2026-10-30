@@ -43,6 +43,11 @@ enum class Command {
     Activate,  // enter the cursor folder
     Preview,
     ToggleSizes,  // per tab: recursive folder sizes and counts
+    Cancel,       // Esc: clear the filter, close what is open
+    MarkGlob,     // select by pattern
+    UnmarkGlob,
+    OpenWith,     // choose an app for the cursor file
+    FocusCommandLine,
 };
 
 Command lookup(const QKeySequence& key);
