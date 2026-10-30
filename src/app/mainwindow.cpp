@@ -108,7 +108,7 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
             config_->setColumnWidth(side, column, width);
         });
         connect(pane, &Pane::sessionChanged, this, [this] { sessionTimer_->start(); });
-        connect(pane, &Pane::runJobs, this, [this, pane](std::vector<core::Job*> jobs) {
+        connect(pane, &Pane::runJobs, this, [this, pane](const std::vector<core::Job*>& jobs) {
             // Sync jobs: each refreshes both folders when done; the panel
             // compares again after the last one.
             auto remaining = std::make_shared<int>(static_cast<int>(jobs.size()));
@@ -444,7 +444,7 @@ void MainWindow::openWith()
     if (!file.isValid() || tab->cursorIsDir())
         return;
     QPointer<MainWindow> guard(this);
-    core::appsFor(file, [guard, file](std::vector<core::AppChoice> apps) {
+    core::appsFor(file, [guard, file](const std::vector<core::AppChoice>& apps) {
         if (!guard)
             return;
         if (apps.empty()) {

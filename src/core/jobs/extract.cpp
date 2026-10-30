@@ -44,7 +44,7 @@ void ExtractJob::run()
     argv.push_back(nullptr);
 
     GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(G_SUBPROCESS_FLAGS_STDERR_PIPE));
-    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C", TRUE);
+    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C.UTF-8", TRUE);
     GError* error = nullptr;
     GPtr<GSubprocess> proc(g_subprocess_launcher_spawnv(launcher.get(), argv.data(), &error));
     if (!proc) {

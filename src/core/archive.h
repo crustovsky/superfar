@@ -1,6 +1,6 @@
 // Archives as folders without a decoder in the process (rule 8): bsdtar
 // lists and extracts in a child. The listing is the parsed output of
-// "bsdtar -tvf" run under LC_ALL=C; a tab turns it into a folder view.
+// "bsdtar -tvf" run under LC_ALL=C.UTF-8; a tab turns it into a folder view.
 #pragma once
 
 #include "core/location.h"
@@ -27,7 +27,7 @@ struct ArchiveEntry {
 // deb, jar and friends.
 bool isArchiveName(const QByteArray& name);
 
-// Parses "bsdtar -tvf" output (C locale). Lines that do not fit are
+// Parses "bsdtar -tvf" output (C.UTF-8 locale). Lines that do not fit are
 // skipped. Exposed for tests.
 std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int currentYear);
 

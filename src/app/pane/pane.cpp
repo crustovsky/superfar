@@ -336,7 +336,9 @@ bool Pane::execute(keymap::Command command)
         return activeTab() && activeTab()->execute(command);
     case Command::MultiRename: {
         Tab* tab = activeTab();
-        const auto items = tab ? tab->selectedLocations() : std::vector<core::Location>();
+        if (!tab)
+            return true;
+        const auto items = tab->selectedLocations();
         if (items.empty())
             return true;
         if (!rename_) {

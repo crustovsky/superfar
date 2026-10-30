@@ -57,6 +57,47 @@ int monthIndex(const QByteArray& m)
 
 } // namespace
 
+// bsdtar prints names through safe_fprintf: bytes that are not printable
+// in its locale come out as \ooo, backslash and the C escapes as \\ \a
+// \b \f \n \r \t \v. It runs under C.UTF-8 here (a plain C locale refuses
+// UTF-8 member names outright), so UTF-8 passes through and only control
+// characters and bytes from another encoding are escaped. This turns
+// them back into bytes.
+QByteArray unescapeName(const QByteArray& text)
+{
+    QByteArray out;
+    out.reserve(text.size());
+    for (int i = 0; i < text.size(); ++i) {
+        if (text[i] != '\\' || i + 1 >= text.size()) {
+            out += text[i];
+            continue;
+        }
+        const char next = text[++i];
+        if (next >= '0' && next <= '7') {
+            int value = 0, digits = 0;
+            while (digits < 3 && i < text.size() && text[i] >= '0' && text[i] <= '7') {
+                value = value * 8 + (text[i] - '0');
+                ++i;
+                ++digits;
+            }
+            --i;
+            out += static_cast<char>(value);
+            continue;
+        }
+        switch (next) {
+        case 'a': out += '\a'; break;
+        case 'b': out += '\b'; break;
+        case 'f': out += '\f'; break;
+        case 'n': out += '\n'; break;
+        case 'r': out += '\r'; break;
+        case 't': out += '\t'; break;
+        case 'v': out += '\v'; break;
+        default: out += next; break;  // \\ and anything unknown
+        }
+    }
+    return out;
+}
+
 std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int currentYear)
 {
     std::vector<ArchiveEntry> out;
@@ -93,12 +134,20 @@ std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int curr
             if (arrow >= 0)
                 path = path.left(arrow);
         }
+        path = unescapeName(path);
         while (path.endsWith('/'))
             path.chop(1);
+        // What bsdtar does on extraction, so the listing shows what would
+        // land: leading slashes go, "./" goes, and a member that climbs
+        // out with ".." is refused, so it is not shown either.
+        while (path.startsWith('/'))
+            path = path.mid(1);
+        while (path.startsWith("./"))
+            path = path.mid(2);
         if (path.isEmpty() || path == ".")
             continue;
-        if (path.startsWith("./"))
-            path = path.mid(2);
+        if (path == ".." || path.startsWith("../") || path.contains("/../") || path.endsWith("/.."))
+            continue;
         e.path = path;
         out.push_back(std::move(e));
     }
@@ -158,7 +207,7 @@ void ArchiveLister::start(const Location& archive, quint64 generation)
     }
     GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(
         static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE)));
-    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C", TRUE);
+    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C.UTF-8", TRUE);
     const char* argv[] = {"bsdtar", "-tvf", path.constData(), nullptr};
     GError* error = nullptr;
     GPtr<GSubprocess> proc(g_subprocess_launcher_spawnv(launcher.get(), argv, &error));

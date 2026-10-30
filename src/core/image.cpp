@@ -69,22 +69,25 @@ struct ImageLoader::Call {
         out.stride = out.width * 4;
         out.bgra.resize(static_cast<qsizetype>(out.stride) * out.height);
         auto* dst = reinterpret_cast<unsigned char*>(out.bgra.data());
+        // Offsets in size_t: a frame past 64k on a side overflows 32 bits.
+        const size_t srcStride = stride;
+        const size_t dstStride = out.stride;
         if (factor == 1) {
-            for (quint32 y = 0; y < out.height; ++y)
-                memcpy(dst + y * out.stride, p + y * stride, out.stride);
+            for (size_t y = 0; y < out.height; ++y)
+                memcpy(dst + y * dstStride, p + y * srcStride, dstStride);
         } else {
             const quint32 n = factor * factor;
-            for (quint32 y = 0; y < out.height; ++y)
-                for (quint32 x = 0; x < out.width; ++x) {
+            for (size_t y = 0; y < out.height; ++y)
+                for (size_t x = 0; x < out.width; ++x) {
                     quint32 sum[4] = {0, 0, 0, 0};
-                    for (quint32 sy = 0; sy < factor; ++sy) {
-                        const unsigned char* row = p + (y * factor + sy) * stride + x * factor * 4;
-                        for (quint32 sx = 0; sx < factor; ++sx)
+                    for (size_t sy = 0; sy < factor; ++sy) {
+                        const unsigned char* row = p + (y * factor + sy) * srcStride + x * factor * 4;
+                        for (size_t sx = 0; sx < factor; ++sx)
                             for (int c = 0; c < 4; ++c)
                                 sum[c] += row[sx * 4 + c];
                     }
                     for (int c = 0; c < 4; ++c)
-                        dst[y * out.stride + x * 4 + c] = static_cast<unsigned char>(sum[c] / n);
+                        dst[y * dstStride + x * 4 + c] = static_cast<unsigned char>(sum[c] / n);
                 }
         }
         Q_EMIT call->owner->decoded(out);
