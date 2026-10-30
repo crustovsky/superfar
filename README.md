@@ -130,9 +130,12 @@ desktop entry and the icon. To make it the default for folders:
 xdg-mime default superfar.desktop inode/directory
 ```
 
-On Arch, `tools/mkpkg.sh` builds a pacman package from the checkout
-(the PKGBUILD lives in `packaging/aur`); install it with `pacman -U`.
-Tagged releases carry the package as an asset.
+Each [release](https://github.com/crustovsky/superfar/releases) carries
+a pacman package (`pacman -U superfar-*.pkg.tar.zst`) and a binary
+tarball whose `install.sh` copies it under `~/.local` or a prefix you
+name. Both are built on Arch and need its library generation: Qt 6.12,
+glib 2.90 and glycin 2 or newer. From a checkout, `tools/mkpkg.sh` and
+`tools/mktarball.sh` build the same two files.
 
 ## Config
 

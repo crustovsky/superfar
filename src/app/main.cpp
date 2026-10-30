@@ -21,7 +21,7 @@ int main(int argc, char** argv)
     QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.wayland.textinput.warning=false"));
     QApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("superfar"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(SUPERFAR_VERSION));
     QGuiApplication::setDesktopFileName(QStringLiteral("superfar"));
     // Installed: the hicolor set. Run from the build tree: the embedded copies.
     QIcon icon = QIcon::fromTheme(QStringLiteral("superfar"));

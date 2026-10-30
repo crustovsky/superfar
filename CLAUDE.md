@@ -327,6 +327,16 @@ one folder per line, and a/b/c creates the whole path, every folder made
 in one go with the cursor on the first); inline folder expanders;
 translations after 1.0.
 
+## Release
+
+`tools/release.sh X.Y.Z` bumps the version in CMakeLists.txt (the one
+source: the binary and the tarball read it) and the PKGBUILD, commits
+and tags vX.Y.Z. `git push --follow-tags` runs release.yml, which
+refuses a tag that disagrees with CMakeLists.txt, builds the pacman
+package and the binary tarball on Arch and attaches both to a GitHub
+release with generated notes. CI builds the same two files on every
+push. Fill the PKGBUILD's sha256sums once the repo is public.
+
 ## Non-goals
 
 Plugins, theming beyond the platform theme, an embedded terminal, a

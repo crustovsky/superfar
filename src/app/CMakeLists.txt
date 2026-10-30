@@ -39,6 +39,7 @@ foreach(size IN LISTS ICON_SIZES)
 endforeach()
 qt_add_resources(superfar "icons" PREFIX "/icons" BASE ${ICON_DIR} FILES ${ICON_FILES})
 target_link_libraries(superfar PRIVATE superfar_core Qt6::Widgets Qt6::DBus)
+target_compile_definitions(superfar PRIVATE SUPERFAR_VERSION="${PROJECT_VERSION}")
 
 # The desktop entry gives the window its app id for the compositor and the
 # portal; without it installed Qt logs a portal registration failure.

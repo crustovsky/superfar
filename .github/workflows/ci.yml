@@ -32,7 +32,7 @@ jobs:
         # where the container has neither.
         run: ctest --test-dir build --output-on-failure
 
-  arch-package:
+  packages:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
@@ -47,8 +47,10 @@ jobs:
         run: |
           useradd -m builder
           chown -R builder .
-          su builder -c "git config --global safe.directory '*' && tools/mkpkg.sh"
+          su builder -c "git config --global safe.directory '*' && tools/mkpkg.sh && tools/mktarball.sh"
       - uses: actions/upload-artifact@v4
         with:
-          name: superfar-arch-package
-          path: packaging/aur/superfar-*.pkg.tar.zst
+          name: superfar-packages
+          path: |
+            packaging/aur/superfar-*.pkg.tar.zst
+            dist/superfar-*.tar.gz
