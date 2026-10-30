@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build the pacman package for"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  arch-package:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel git github-cli cmake ninja pkgconf qt6-base glib2 glycin hicolor-icon-theme
+          sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Point PKGBUILD at the tag
+        run: sed -i "s/^pkgver=.*/pkgver=${TAG#v}/; s/^pkgrel=.*/pkgrel=1/" packaging/aur/PKGBUILD
+      - name: Build package
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c "git config --global safe.directory '*' && tools/mkpkg.sh"
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" --generate-notes || true
+          gh release upload "$TAG" packaging/aur/superfar-*.pkg.tar.zst --clobber

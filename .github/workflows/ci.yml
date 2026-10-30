@@ -31,3 +31,24 @@ jobs:
         # that need a gvfs daemon or a decoder sandbox skip themselves
         # where the container has neither.
         run: ctest --test-dir build --output-on-failure
+
+  arch-package:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm base-devel git cmake ninja pkgconf qt6-base glib2 glycin hicolor-icon-theme
+          sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
+      - uses: actions/checkout@v4
+      # makepkg refuses to run as root; the package is built from this
+      # checkout, not from a release tarball, so it works without a tag.
+      - name: Build package
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c "git config --global safe.directory '*' && tools/mkpkg.sh"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: superfar-arch-package
+          path: packaging/aur/superfar-*.pkg.tar.zst

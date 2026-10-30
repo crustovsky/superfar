@@ -3,3 +3,7 @@ build-*/
 .cache/
 compile_commands.json
 *.swp
+packaging/aur/*.tar.gz
+packaging/aur/*.pkg.tar.*
+packaging/aur/src/
+packaging/aur/pkg/

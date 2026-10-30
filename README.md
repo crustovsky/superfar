@@ -130,6 +130,10 @@ desktop entry and the icon. To make it the default for folders:
 xdg-mime default superfar.desktop inode/directory
 ```
 
+On Arch, `tools/mkpkg.sh` builds a pacman package from the checkout
+(the PKGBUILD lives in `packaging/aur`); install it with `pacman -U`.
+Tagged releases carry the package as an asset.
+
 ## Config
 
 `~/.config/superfar/superfar.ini` is written with the default keys on
