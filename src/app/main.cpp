@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFile>
+#include <QIcon>
 #include <QLoggingCategory>
 #include <cstdio>
 
@@ -22,6 +23,12 @@ int main(int argc, char** argv)
     QCoreApplication::setApplicationName(QStringLiteral("superfar"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QGuiApplication::setDesktopFileName(QStringLiteral("superfar"));
+    // Installed: the hicolor set. Run from the build tree: the embedded copies.
+    QIcon icon = QIcon::fromTheme(QStringLiteral("superfar"));
+    if (icon.isNull())
+        for (int size : {16, 22, 24, 32, 48, 64, 128, 256})
+            icon.addFile(QStringLiteral(":/icons/%1x%1/apps/superfar.png").arg(size));
+    QGuiApplication::setWindowIcon(icon);
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Dual-pane file manager"));

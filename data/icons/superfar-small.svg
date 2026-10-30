@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- superfar at 16 to 24 px: the two panes and the cursor, nothing finer. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <rect x="0.5" y="0.5" width="15" height="15" rx="3.5" fill="#2e3440"/>
+  <rect x="2" y="2" width="5" height="12" rx="1" fill="#e5e9f0"/>
+  <rect x="9" y="2" width="5" height="12" rx="1" fill="#cfd5df"/>
+  <rect x="2" y="5" width="5" height="3" fill="#5e81f4"/>
+  <rect x="10" y="4" width="3" height="1" fill="#8c95a6"/>
+  <rect x="10" y="7" width="3" height="1" fill="#8c95a6"/>
+  <rect x="10" y="10" width="3" height="1" fill="#8c95a6"/>
+</svg>

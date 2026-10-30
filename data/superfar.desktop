@@ -6,6 +6,6 @@ Comment=Dual-pane file manager
 Exec=superfar %U
 Icon=superfar
 Terminal=false
-Categories=System;FileTools;FileManager;Utility;
+Categories=System;FileTools;FileManager;
 MimeType=inode/directory;
 StartupNotify=true

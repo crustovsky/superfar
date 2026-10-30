@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- superfar: two panes, a cursor in the active one, a function key bar below. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b4252"/>
+      <stop offset="1" stop-color="#242933"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="url(#bg)"/>
+  <!-- left pane, active -->
+  <rect x="8" y="9" width="22" height="38" rx="3" fill="#e5e9f0"/>
+  <rect x="11" y="14" width="16" height="3" rx="1.5" fill="#8c95a6"/>
+  <rect x="10" y="20" width="18" height="7" rx="2" fill="#5e81f4"/>
+  <rect x="12" y="22" width="12" height="3" rx="1.5" fill="#ffffff"/>
+  <rect x="11" y="31" width="16" height="3" rx="1.5" fill="#8c95a6"/>
+  <rect x="11" y="38" width="12" height="3" rx="1.5" fill="#8c95a6"/>
+  <!-- right pane -->
+  <rect x="34" y="9" width="22" height="38" rx="3" fill="#cfd5df"/>
+  <rect x="37" y="14" width="16" height="3" rx="1.5" fill="#8c95a6"/>
+  <rect x="37" y="22" width="12" height="3" rx="1.5" fill="#8c95a6"/>
+  <rect x="37" y="31" width="16" height="3" rx="1.5" fill="#8c95a6"/>
+  <rect x="37" y="38" width="10" height="3" rx="1.5" fill="#8c95a6"/>
+  <!-- function key bar -->
+  <rect x="8" y="50" width="48" height="6" rx="2" fill="#4c566a"/>
+  <rect x="10" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+  <rect x="17" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+  <rect x="24" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+  <rect x="31" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+  <rect x="38" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+  <rect x="45" y="51.5" width="5" height="3" rx="1" fill="#d8dee9"/>
+</svg>
