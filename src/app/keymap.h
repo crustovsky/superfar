@@ -62,6 +62,7 @@ enum class Command {
     Bookmark,     // Ctrl+D: bookmark the current folder, or remove it
     ToggleThumbnails,  // per tab: thumbnails in taller rows
     MultiRename,       // Shift+F2: the multi-rename panel
+    Sync,              // Shift+F5: folder sync between the two active tabs
 };
 
 Command lookup(const QKeySequence& key);

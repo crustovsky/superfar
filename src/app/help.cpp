@@ -59,6 +59,7 @@ QString describe(keymap::Command c)
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
     case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
+    case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
     case Command::None: return {};
     }
     return {};

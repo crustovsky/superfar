@@ -4,6 +4,7 @@
 #pragma once
 
 #include "config.h"
+#include "core/jobs/job.h"
 #include "core/location.h"
 #include "keymap.h"
 #include "pane/tab.h"
@@ -14,6 +15,7 @@ class QLabel;
 class QStackedWidget;
 class QTabBar;
 class MultiRenamePanel;
+class SyncPanel;
 class PropertiesPanel;
 class QTimer;
 class Viewer;
@@ -46,6 +48,8 @@ public:
     // Something shown in place of the tabs: the viewer, or the preview
     // borrowed by the other pane. Null clears it.
     void setOverlay(QWidget* widget);
+    // Shift+F5: compare the active tab's folder with another.
+    void openSync(const core::Location& other);
     bool hasOverlay() const { return overlay_ != nullptr; }
 
 Q_SIGNALS:
@@ -53,6 +57,7 @@ Q_SIGNALS:
     void cursorChanged(const core::Location& item);   // of the active tab
     void commandRequested(keymap::Command command);
     void tabOpened(Tab* tab);
+    void runJobs(std::vector<core::Job*> jobs);  // from the sync panel
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
 
@@ -79,6 +84,7 @@ private:
     Viewer* viewer_ = nullptr;
     PropertiesPanel* props_ = nullptr;
     MultiRenamePanel* rename_ = nullptr;
+    SyncPanel* sync_ = nullptr;
     QWidget* overlay_ = nullptr;
     QLabel* status_;
     QLabel* space_;

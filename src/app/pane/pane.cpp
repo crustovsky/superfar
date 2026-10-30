@@ -5,6 +5,7 @@
 #include "help.h"
 #include "multirename.h"
 #include "properties.h"
+#include "syncpanel.h"
 #include "pane/tab.h"
 #include "services.h"
 #include "viewer.h"
@@ -235,6 +236,22 @@ void Pane::onCurrentTab(int index)
     Q_EMIT sessionChanged();
 }
 
+void Pane::openSync(const core::Location& other)
+{
+    Tab* tab = activeTab();
+    if (!tab || !other.isValid())
+        return;
+    if (!sync_) {
+        sync_ = new SyncPanel(this);
+        connect(sync_, &SyncPanel::closed, this, &Pane::closeOwnOverlay);
+        connect(sync_, &SyncPanel::message, this, &Pane::showMessage);
+        connect(sync_, &SyncPanel::runJobs, this, &Pane::runJobs);
+    }
+    sync_->show(tab->location(), other);
+    setOverlay(sync_);
+    sync_->setFocus();
+}
+
 void Pane::closeOwnOverlay()
 {
     setOverlay(nullptr);
@@ -262,7 +279,7 @@ void Pane::setOverlay(QWidget* widget)
         content_->removeWidget(overlay_);
         if (overlay_ == viewer_)
             viewer_->clear();
-        else if (overlay_ != props_ && overlay_ != rename_)
+        else if (overlay_ != props_ && overlay_ != rename_ && overlay_ != sync_)
             overlay_->setParent(nullptr);  // the preview belongs to the window
         overlay_ = nullptr;
     }
@@ -312,7 +329,7 @@ bool Pane::execute(keymap::Command command)
         Q_EMIT sessionChanged();
         return true;
     case Command::Cancel:
-        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_ || overlay_ == rename_)) {
+        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_ || overlay_ == rename_ || overlay_ == sync_)) {
             closeOwnOverlay();
             return true;
         }

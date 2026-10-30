@@ -16,6 +16,7 @@ qt_add_library(superfar_core STATIC
   finder.cpp
   thumbnails.cpp
   rename.cpp
+  compare.cpp
   fileops.cpp
   jobs/job.cpp
   jobs/transfer.cpp

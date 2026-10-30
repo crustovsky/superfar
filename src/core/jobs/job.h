@@ -80,6 +80,8 @@ public:
     void abort();
     void setUnattended(bool on) { unattended_ = on; }
     bool unattended() const { return unattended_; }
+    // A policy chosen before the start, so no conflict is asked about.
+    void setConflictPolicy(ConflictAction action) { conflictPolicy_ = action; }
     void answerConflict(ConflictAction action, bool applyToAll);
     void answerError(ErrorAction action, bool applyToAll);
 

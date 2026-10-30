@@ -17,6 +17,7 @@
 #include "pane/tab.h"
 #include "places.h"
 #include "preview.h"
+#include "syncpanel.h"
 #include "tree.h"
 #include "uris.h"
 
@@ -106,6 +107,23 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
             config_->setColumnWidth(side, column, width);
         });
         connect(pane, &Pane::sessionChanged, this, [this] { sessionTimer_->start(); });
+        connect(pane, &Pane::runJobs, this, [this, pane](std::vector<core::Job*> jobs) {
+            // Sync jobs: each refreshes both folders when done; the panel
+            // compares again after the last one.
+            auto remaining = std::make_shared<int>(static_cast<int>(jobs.size()));
+            for (core::Job* job : jobs) {
+                connect(job, &core::Job::finished, this, [this, pane, remaining] {
+                    for (Pane* p : {left_, right_})
+                        if (Tab* t = p->activeTab())
+                            if (!t->monitoring())
+                                t->reload();
+                    if (--*remaining == 0)
+                        if (auto* sync = pane->findChild<SyncPanel*>())
+                            sync->compare();
+                });
+                strip_->addJob(job);
+            }
+        });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {
                 tree_->reveal(dir);
@@ -296,6 +314,9 @@ void MainWindow::execute(keymap::Command command)
     }
     case Command::Bookmark:
         places_->toggleBookmark(active_->activeTab()->location());
+        return;
+    case Command::Sync:
+        active_->openSync(otherPane()->activeTab()->location());
         return;
     case Command::Trash:
         if (tree_->hasFocus() && tree_->currentPlace()) {

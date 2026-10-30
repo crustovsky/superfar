@@ -12,6 +12,7 @@ qt_add_executable(superfar
   help.cpp
   properties.cpp
   multirename.cpp
+  syncpanel.cpp
   uris.cpp
   fm1.cpp
   viewer.cpp

@@ -93,6 +93,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
+- Shift+F5 folder sync panel: compares the active tab with the other
+  pane's by size, time and optional SHA-256; copies or trashes the
+  checked differences through the job engine
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
   shows the direct count otherwise); Ctrl+F4 toggles thumbnails in the
   tab (tumbler over D-Bus, taller rows)

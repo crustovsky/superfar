@@ -1,6 +1,7 @@
 // Headless tests for core against a real temp directory (never a mock).
 #include "core/apps.h"
 #include "core/bookmarks.h"
+#include "core/compare.h"
 #include "core/dirsize.h"
 #include "core/finder.h"
 #include "core/mounts.h"
@@ -22,6 +23,7 @@
 #include <QTest>
 
 #include <unistd.h>
+#include <utime.h>
 
 namespace {
 
@@ -71,6 +73,7 @@ private Q_SLOTS:
     void bookmarkToggle();
     void thumbnails();
     void renameRules();
+    void compareTrees();
 };
 
 namespace {
@@ -1157,6 +1160,72 @@ void CoreTest::renameRules()
     QCOMPARE(back.mode, RenameRule::Mode::Regex);
     QCOMPARE(back.pattern, re.pattern);
     QCOMPARE(back.replacement, re.replacement);
+}
+
+void CoreTest::compareTrees()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString L = tmp.path() + "/left";
+    const QString R = tmp.path() + "/right";
+    QVERIFY(QDir().mkpath(L + "/both/deep"));
+    QVERIFY(QDir().mkpath(R + "/both/deep"));
+    QVERIFY(QDir().mkpath(L + "/only-left"));
+    QVERIFY(QDir().mkpath(R + "/only-right"));
+    touch(L + "/same.txt", "same");
+    touch(R + "/same.txt", "same");
+    touch(L + "/bigger.txt", "123456");
+    touch(R + "/bigger.txt", "12");
+    touch(L + "/both/deep/a.txt", "a");
+    touch(L + "/left-file.txt", "x");
+    touch(R + "/both/deep/b.txt", "b");
+    touch(L + "/content.txt", "aaaa");
+    touch(R + "/content.txt", "bbbb");
+    // Same size, same content, but an old timestamp on the right.
+    touch(L + "/older-right.txt", "zz");
+    touch(R + "/older-right.txt", "zz");
+    struct utimbuf old = {1000000000, 1000000000};
+    QVERIFY(::utime(QFile::encodeName(R + "/older-right.txt").constData(), &old) == 0);
+    // Equal mtimes for the content pair, so only a hash tells them apart.
+    struct utimbuf fixed = {1500000000, 1500000000};
+    QVERIFY(::utime(QFile::encodeName(L + "/content.txt").constData(), &fixed) == 0);
+    QVERIFY(::utime(QFile::encodeName(R + "/content.txt").constData(), &fixed) == 0);
+    QVERIFY(::utime(QFile::encodeName(L + "/same.txt").constData(), &fixed) == 0);
+    QVERIFY(::utime(QFile::encodeName(R + "/same.txt").constData(), &fixed) == 0);
+
+    auto compare = [&](bool hash) {
+        core::Comparer comparer;
+        std::vector<core::CompareEntry> got;
+        bool done = false;
+        connect(&comparer, &core::Comparer::finished, [&](quint64 gen, std::vector<core::CompareEntry> e) {
+            QCOMPARE(gen, 4u);
+            got = std::move(e);
+            done = true;
+        });
+        core::CompareOptions o;
+        o.hash = hash;
+        comparer.start(core::Location::fromPath(QFile::encodeName(L)), core::Location::fromPath(QFile::encodeName(R)), o, 4);
+        while (!done)
+            QTest::qWait(5);
+        QHash<QString, core::Difference> byName;
+        for (const auto& e : got)
+            byName.insert(e.display, e.difference);
+        return byName;
+    };
+    const auto plain = compare(false);
+    QCOMPARE(plain.value("same.txt"), core::Difference::Same);
+    QCOMPARE(plain.value("bigger.txt"), core::Difference::SizeDiffers);
+    QCOMPARE(plain.value("only-left"), core::Difference::LeftOnly);
+    QCOMPARE(plain.value("only-right"), core::Difference::RightOnly);
+    QCOMPARE(plain.value("left-file.txt"), core::Difference::LeftOnly);
+    QCOMPARE(plain.value("both/deep/a.txt"), core::Difference::LeftOnly);
+    QCOMPARE(plain.value("both/deep/b.txt"), core::Difference::RightOnly);
+    QCOMPARE(plain.value("older-right.txt"), core::Difference::LeftNewer);
+    QCOMPARE(plain.value("content.txt"), core::Difference::Same);  // same size and time
+    QVERIFY(!plain.contains("both"));  // descended, not listed
+    const auto hashed = compare(true);
+    QCOMPARE(hashed.value("content.txt"), core::Difference::ContentDiffers);
+    QCOMPARE(hashed.value("same.txt"), core::Difference::Same);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)
