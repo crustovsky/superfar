@@ -1,6 +1,6 @@
 # Maintainer: Michal Skorupka <michal@skorupka.me>
 pkgname=superfar
-pkgver=0.1.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc="Dual-pane file manager: Directory Opus workflow, Thunar weight, FAR-style function keys"
 arch=('x86_64' 'aarch64')
