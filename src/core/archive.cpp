@@ -98,6 +98,13 @@ QByteArray unescapeName(const QByteArray& text)
     return out;
 }
 
+QString bsdtarError(const GError* error)
+{
+    if (g_error_matches(error, G_SPAWN_ERROR, G_SPAWN_ERROR_NOENT))
+        return QStringLiteral("bsdtar is not installed (package libarchive); archives cannot be opened");
+    return errorMessage(error);
+}
+
 std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int currentYear)
 {
     std::vector<ArchiveEntry> out;
@@ -213,7 +220,7 @@ void ArchiveLister::start(const Location& archive, quint64 generation)
     GPtr<GSubprocess> proc(g_subprocess_launcher_spawnv(launcher.get(), argv, &error));
     if (!proc) {
         GErrorPtr err(error);
-        Q_EMIT failed(generation, errorMessage(err.get()));
+        Q_EMIT failed(generation, bsdtarError(err.get()));
         return;
     }
     cancellable_ = g_cancellable_new();

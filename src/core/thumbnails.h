@@ -27,6 +27,8 @@ public:
 
     // Known only after the daemon answered; false until then.
     bool available() const { return proxy_ != nullptr && !supported_.isEmpty(); }
+    // True once the bus said there is no thumbnailer service.
+    bool unavailable() const { return unavailable_; }
     bool supports(const QString& mime) const;
 
     // The cached PNG for the uri, or empty when none exists yet.
@@ -48,6 +50,7 @@ private:
     void onSignal(const char* name, const QStringList& uris, quint32 handle);
 
     GDBusProxy* proxy_ = nullptr;
+    bool unavailable_ = false;
     QSet<QString> supported_;
     QTimer* timer_;
     struct Pending {

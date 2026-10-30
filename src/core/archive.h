@@ -12,6 +12,7 @@
 #include <vector>
 
 typedef struct _GCancellable GCancellable;
+typedef struct _GError GError;
 
 namespace core {
 
@@ -26,6 +27,10 @@ struct ArchiveEntry {
 // By extension: zip, tar and its compressions, 7z, rar, iso, cpio, ar,
 // deb, jar and friends.
 bool isArchiveName(const QByteArray& name);
+
+// The message for a failed bsdtar spawn: names the package when the
+// program is missing, which is the common case.
+QString bsdtarError(const GError* error);
 
 // Parses "bsdtar -tvf" output (C.UTF-8 locale). Lines that do not fit are
 // skipped. Exposed for tests.

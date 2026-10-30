@@ -39,8 +39,10 @@ struct Thumbnailer::Hook {
                 g_object_unref(proxy);
             return;
         }
-        if (!proxy)
+        if (!proxy) {
+            self->unavailable_ = true;
             return;
+        }
         self->proxy_ = proxy;
         g_signal_connect(proxy, "g-signal", G_CALLBACK(&Hook::onGSignal), self);
         g_dbus_proxy_call(proxy, "GetSupported", nullptr, G_DBUS_CALL_FLAGS_NONE, 5000, nullptr,
@@ -54,6 +56,8 @@ struct Thumbnailer::Hook {
         GError* error = nullptr;
         GVariant* reply = g_dbus_proxy_call_finish(G_DBUS_PROXY(source), result, &error);
         GErrorPtr err(error);
+        if (self && !reply)
+            self->unavailable_ = true;  // no thumbnailer on this bus
         if (!self || !reply) {
             if (reply)
                 g_variant_unref(reply);

@@ -1,4 +1,5 @@
 #include "core/jobs/extract.h"
+#include "core/archive.h"
 
 #include "core/gobject.h"
 
@@ -49,7 +50,7 @@ void ExtractJob::run()
     GPtr<GSubprocess> proc(g_subprocess_launcher_spawnv(launcher.get(), argv.data(), &error));
     if (!proc) {
         GErrorPtr err(error);
-        logFail(archive_.displayPath(), errorMessage(err.get()));
+        logFail(archive_.displayPath(), bsdtarError(err.get()));
     } else {
         GCancellable* cancel = beginItem();
         GBytes* errOut = nullptr;

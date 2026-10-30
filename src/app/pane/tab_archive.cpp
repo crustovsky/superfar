@@ -13,8 +13,8 @@ void Tab::enterArchive(const core::Location& file)
     archive_ = file;
     archiveDir_.clear();
     archiveEntries_.clear();
-    lister_->start(file, generation_);
     Q_EMIT statusChanged(tr("Reading archive"), QString());
+    lister_->start(file, generation_);  // may fail synchronously, and that message must win
 }
 
 void Tab::onArchiveListed(quint64 generation, std::vector<core::ArchiveEntry> entries)

@@ -113,8 +113,10 @@ set, Space appends to it.
 
 Dependencies: Qt 6 (Core, Gui, Widgets, DBus), GLib and GIO 2.74 or
 newer, libglycin 2, CMake 3.28, Ninja, a C++23 compiler. At run time,
-bsdtar (libarchive) for archives and tumbler for thumbnails, both
-optional.
+optional: bsdtar (libarchive) for archives, tumbler for thumbnails,
+gvfs for the trash, mounts and network shares, xdg-terminal-exec or
+$TERMINAL for F4 and the command line. Without one of them the window
+says so when you reach the feature; nothing else changes.
 
 ```sh
 cmake -S . -B build -G Ninja

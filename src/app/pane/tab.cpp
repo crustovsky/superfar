@@ -320,6 +320,10 @@ void Tab::setThumbnails(bool on)
 {
     if (on == model_->thumbnails())
         return;
+    if (on && model_->thumbnailer()->unavailable()) {
+        Q_EMIT message(tr("No thumbnailer on the session bus: install tumbler"));
+        return;
+    }
     cursorName_ = currentName();
     model_->setThumbnails(on);
     view_->setThumbnailRows(on);
@@ -453,6 +457,12 @@ void Tab::onFailed(quint64 generation, const QString& message, core::ListFailure
         return;
     if (why == core::ListFailure::NotDirectory && core::isArchiveName(location_.basename())) {
         enterArchive(location_);
+        return;
+    }
+    if (why == core::ListFailure::NotSupported && !location_.isNative()) {
+        // trash://, network://, smb:// and friends are gvfs backends.
+        Q_EMIT statusChanged(tr("%1 locations need gvfs, which is not installed")
+                                 .arg(location_.uri().section(QLatin1Char(':'), 0, 0)), QString());
         return;
     }
     Q_EMIT statusChanged(message, QString());

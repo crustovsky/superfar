@@ -54,6 +54,7 @@ public:
     // Thumbnails from tumbler for rows whose type it supports; the view
     // grows its rows to show them.
     void setThumbnails(bool on);
+    core::Thumbnailer* thumbnailer() const { return thumbs_; }
     bool thumbnails() const { return thumbnails_; }
     void requestSize(int row);
     // Stops walks and counts in flight; rows ask again when painted.

@@ -317,7 +317,8 @@ fuzz: hostile names, loops, an unreadable folder, a sparse file past
 bugprone, cert, performance and clang-analyzer checks over
 compile_commands.json, render once with a light theme and once with
 plain Fusion, and soak tabs open and close while memory is sampled:
-it must plateau, not climb.
+it must plateau, not climb. `unshare -Urm tools/screenshots.sh`
+re-renders the README screenshots from a generic demo tree.
 
 ## Non-goals
 

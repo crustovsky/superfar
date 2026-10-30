@@ -73,6 +73,8 @@ struct Listing::Job {
                 why = ListFailure::NotMounted;
             else if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_DIRECTORY))
                 why = ListFailure::NotDirectory;
+            else if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+                why = ListFailure::NotSupported;
             Q_EMIT owner->failed(generation, errorMessage(error.get()), why);
         }
         detach();
