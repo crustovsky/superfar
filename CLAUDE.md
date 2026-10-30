@@ -286,41 +286,14 @@ a gate.
 
 ## Milestones
 
-1. Skeleton: window, tree plus one pane with one tab, GIO listing into the
-   model, Enter / Backspace, natural sort, hidden toggle. bench.sh measures
-   the baseline and fixes the budget numbers.
-2. Dual pane, tabs (pane and tab split, Ctrl+T / Ctrl+W / Ctrl+Tab),
-   per-pane path bar and status line, active-pane styling, Tab switch,
-   tree follows the active tab, selection marks, function key bar.
-3. Jobs: F5 / F6 / F7 / F8 with the job strip and expanded panel, conflicts
-   in the window; directory monitor keeps tabs and tree current.
-4. Folder item counts; opt-in recursive size and count; F3 on a folder.
-5. Quick filter, select by glob, command line, F3 viewer, Ctrl+Q preview
-   in the borrowed slot, F4 edit ($VISUAL in terminal), F2 inline rename,
-   open with default app and in-window open-with list.
-6. Desktop integration: DnD in, out and between panes, clipboard interop
-   (text/uri-list and x-special/gnome-copied-files), mounts and Trash as
-   tree roots, in-window mount auth, typed remote URIs, GTK bookmarks
-   file, org.freedesktop.FileManager1 (launcher "show in folder"), default
-   file manager .desktop entry.
-7. Config: keymap, columns, split orientation, preview slot, session
-   restore of tabs; Ctrl+G go to folder with frecency.
-
-8. Find in tree (Alt+F7: fuzzy over names from a walker, results in a
-   tab that behaves like any folder), properties and permissions panel
-   (Alt+Enter), bookmark the current folder (Ctrl+D, the GTK file), a
-   Network root in the tree (GVfs: smb, sftp, dav, ftp; mounted with the
-   in-window auth).
-9. Thumbnails through the freedesktop cache and tumbler over D-Bus, in
-   the list and as the preview for video, PDF and anything else tumbler
-   knows; still no decoder in-process.
-10. Multi-rename as an in-window panel: wildcard and regex patterns,
-    numbering, case changes, ignore extension, live old / new preview
-    with per-row checkboxes, clash detection, presets, batch undo.
-11. Folder sync: compare the two tabs by name, size, mtime, optional
-    hash; results list with per-row actions, copy-left, copy-right,
-    delete orphans; built on the walker and the job engine.
-12. Archives as folders (GVfs archive:// first).
+All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30):
+skeleton and bench; dual pane, tabs, marks, function bar; jobs and
+monitor; counts and recursive sizes; filter, glob, command line,
+viewer, preview, edit, rename, open-with; desktop integration (DnD,
+clipboard, mounts, Trash, auth, remote URIs, bookmarks, FileManager1);
+config and session; find, properties, Ctrl+D, Network root;
+thumbnails; multi-rename; folder sync; archives. The commit on each tag
+carries the rationale.
 
 Later: multi-folder create, Opus style (F7 grows into a multi-line field:
 one folder per line, and a/b/c creates the whole path, every folder made

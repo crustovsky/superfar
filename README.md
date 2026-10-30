@@ -148,7 +148,8 @@ session and the Ctrl+G history live there too.
 
 ## Status
 
-All twelve milestones of the plan in [CLAUDE.md](CLAUDE.md) are done.
+All twelve milestones of the plan are done; [CLAUDE.md](CLAUDE.md)
+holds the rules the code follows.
 Non-goals: plugins, theming beyond the platform theme, an embedded
 terminal, a search index, translations before 1.0. Media and PDF show
 as tumbler thumbnails, never through a decoder in the process.
