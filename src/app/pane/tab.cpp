@@ -55,7 +55,10 @@ Tab::Tab(const Services& services, QWidget* parent)
     connect(view_, &QAbstractItemView::activated, this, &Tab::activate);
     connect(view_, &ListView::commandRequested, this, &Tab::commandRequested);
     connect(view_, &ListView::textTyped, this, &Tab::typed);
-    connect(view_, &ListView::cursorMoved, this, [this] { Q_EMIT cursorChanged(cursorLocation()); });
+    connect(view_, &ListView::cursorMoved, this, [this] {
+        Q_EMIT cursorChanged(cursorLocation());
+        updateStatus();  // the status line names the cursor item in full
+    });
     connect(model_, &ListModel::renameRequested, this, &Tab::rename);
     connect(model_, &ListModel::dropRequested, this, &Tab::dropRequested);
     connect(view_, &ListView::editingFinished, this, [this] {
@@ -528,6 +531,9 @@ void Tab::updateStatus()
         : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
     if (isArchive())
         text += tr(", in archive");
+    // The Name column may be too narrow for it; the status line is not.
+    if (const QModelIndex cur = view_->currentIndex(); cur.isValid())
+        text += QStringLiteral("  \u00b7  ") + model_->entryAt(cur.row()).display;
     if (marked > 0)
         text += tr(", %n selected", nullptr, marked);
     if (hidden > 0 && !model_->showHidden())
