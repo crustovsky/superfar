@@ -154,6 +154,10 @@ Non-goals: plugins, theming beyond the platform theme, an embedded
 terminal, a search index, translations before 1.0. Media and PDF show
 as tumbler thumbnails, never through a decoder in the process.
 
+Known limits: copies go through GIO, which writes the holes of a sparse
+file out as zeros (Nautilus and Thunar do the same). Drag and drop,
+mounting with credentials and remote shares have had the least testing.
+
 ## Licence
 
 MIT.

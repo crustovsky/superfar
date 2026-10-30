@@ -310,6 +310,15 @@ package and the binary tarball on Arch and attaches both to a GitHub
 release with generated notes. CI builds the same two files on every
 push. Fill the PKGBUILD's sha256sums once the repo is public.
 
+Before a release: build with `-fsanitize=address,undefined` into
+build-asan and run ctest there (tests/test_hostile.cpp is the input
+fuzz: hostile names, loops, an unreadable folder, a sparse file past
+4 GiB, archives whose members climb out), run clang-tidy with the
+bugprone, cert, performance and clang-analyzer checks over
+compile_commands.json, render once with a light theme and once with
+plain Fusion, and soak tabs open and close while memory is sampled:
+it must plateau, not climb.
+
 ## Non-goals
 
 Plugins, theming beyond the platform theme, an embedded terminal, a
