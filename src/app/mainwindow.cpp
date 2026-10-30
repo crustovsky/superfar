@@ -14,6 +14,7 @@
 #include "funcbar.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
+#include "menu.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
 #include "places.h"
@@ -29,6 +30,8 @@
 #include <QMimeData>
 #include <QFile>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QMenuBar>
 #include <QPointer>
 #include <QSplitter>
 #include <QTimer>
@@ -151,6 +154,19 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                     tab->navigate(core::Location::home());
     });
     connect(funcbar_, &FuncBar::commandRequested, this, &MainWindow::execute);
+    menu::build(menuBar(), [this](keymap::Command c) { execute(c); });
+    menuBar()->hide();
+    for (QMenu* m : menuBar()->findChildren<QMenu*>())
+        connect(m, &QMenu::aboutToHide, this, [this] {
+            // The bar leaves with the last open menu, after a choice or Esc.
+            QTimer::singleShot(0, this, [this] {
+                for (QMenu* open : menuBar()->findChildren<QMenu*>())
+                    if (open->isVisible())
+                        return;
+                menuBar()->hide();
+                active_->activeTab()->setFocus();
+            });
+        });
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget*, QWidget* now) {
         if (!now)
             return;
@@ -251,6 +267,18 @@ void MainWindow::execute(keymap::Command command)
         return;
     case Command::FocusTree:
         tree_->setFocus();
+        return;
+    case Command::Menu:
+        if (menuBar()->isVisible()) {
+            menuBar()->hide();
+            active_->activeTab()->setFocus();
+        } else {
+            menuBar()->show();
+            if (QMenu* first = menuBar()->findChild<QMenu*>()) {
+                menuBar()->setActiveAction(first->menuAction());
+                first->popup(menuBar()->mapToGlobal(menuBar()->actionGeometry(first->menuAction()).bottomLeft()));
+            }
+        }
         return;
     case Command::HideLeft:
         togglePane(left_);

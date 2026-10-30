@@ -5,6 +5,7 @@ qt_add_executable(superfar
   tree.cpp
   keymap.cpp
   funcbar.cpp
+  menu.cpp
   cmdline.cpp
   config.cpp
   places.cpp

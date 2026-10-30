@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QToolButton>
 
 FuncBar::FuncBar(QWidget* parent)
@@ -11,6 +12,14 @@ FuncBar::FuncBar(QWidget* parent)
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    held_ = new QLabel(this);
+    held_->setContentsMargins(6, 0, 6, 0);
+    QFont bold = held_->font();
+    bold.setBold(true);
+    held_->setFont(bold);
+    // Reserve the widest name so the buttons do not shift.
+    held_->setFixedWidth(held_->fontMetrics().horizontalAdvance(QStringLiteral("Ctrl+Shift")) + 12);
+    layout->addWidget(held_);
     for (int i = 1; i <= 10; ++i) {
         auto* b = new QToolButton(this);
         b->setAutoRaise(true);
@@ -48,10 +57,12 @@ bool FuncBar::eventFilter(QObject* watched, QEvent* event)
     case QEvent::KeyRelease: {
         const auto* k = static_cast<QKeyEvent*>(event);
         const Qt::KeyboardModifier m = modifierOf(k->key());
-        if (m == Qt::NoModifier)
-            break;
-        Qt::KeyboardModifiers next = mods_;
-        next.setFlag(m, event->type() == QEvent::KeyPress);
+        // A modifier's own press and release are the primary source; any
+        // other key brings the state it was pressed with.
+        Qt::KeyboardModifiers next = m != Qt::NoModifier
+            ? mods_ : k->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
+        if (m != Qt::NoModifier)
+            next.setFlag(m, event->type() == QEvent::KeyPress);
         if (next != mods_) {
             mods_ = next;
             relabel();
@@ -73,6 +84,14 @@ bool FuncBar::eventFilter(QObject* watched, QEvent* event)
 
 void FuncBar::relabel()
 {
+    QStringList held;
+    if (mods_ & Qt::ControlModifier)
+        held << QStringLiteral("Ctrl");
+    if (mods_ & Qt::AltModifier)
+        held << QStringLiteral("Alt");
+    if (mods_ & Qt::ShiftModifier)
+        held << QStringLiteral("Shift");
+    held_->setText(held.join(QLatin1Char('+')));
     for (int i = 0; i < buttons_.size(); ++i) {
         const auto key = Qt::Key(Qt::Key_F1 + i);
         const keymap::Command cmd = keymap::lookup(QKeySequence(QKeyCombination(mods_, key).toCombined()));

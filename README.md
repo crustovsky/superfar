@@ -5,6 +5,11 @@ Thunar's weight, with FAR-style function keys. Keyboard first, one
 window, and it never defines a colour: whatever your platform theme
 says is what it looks like.
 
+> This is my file manager. There are many like it, but this one is mine.
+>
+> My file manager is my best friend. Without me, my file manager is
+> useless. Without my file manager, I am `ls`.
+
 ![Dual pane with folder counts](docs/screenshots/dual-pane.png)
 
 ## Why

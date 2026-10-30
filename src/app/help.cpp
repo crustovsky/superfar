@@ -21,7 +21,7 @@ QString describe(keymap::Command c)
     case Command::Move: return QStringLiteral("move the marked items (or the cursor) to the other pane");
     case Command::Mkdir: return QStringLiteral("new folder");
     case Command::Trash: return QStringLiteral("move to trash; on a mount in the tree: unmount");
-    case Command::Menu: return QStringLiteral("menu (not yet)");
+    case Command::Menu: return QStringLiteral("show the menu bar; Esc or a choice hides it again");
     case Command::Quit: return QStringLiteral("quit, keeping the session");
     case Command::NewFile: return QStringLiteral("new empty file");
     case Command::DeletePermanent: return QStringLiteral("delete permanently");
