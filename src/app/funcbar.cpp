@@ -77,7 +77,7 @@ void FuncBar::relabel()
         const auto key = Qt::Key(Qt::Key_F1 + i);
         const keymap::Command cmd = keymap::lookup(QKeySequence(QKeyCombination(mods_, key).toCombined()));
         const QString text = keymap::label(cmd);
-        buttons_[i]->setText(QStringLiteral("%1 %2").arg(i + 1).arg(text));
+        buttons_[i]->setText(QStringLiteral("F%1 %2").arg(i + 1).arg(text));
         buttons_[i]->setEnabled(cmd != keymap::Command::None);
     }
 }

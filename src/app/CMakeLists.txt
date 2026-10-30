@@ -16,3 +16,8 @@ qt_add_executable(superfar
 )
 target_include_directories(superfar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(superfar PRIVATE superfar_core Qt6::Widgets)
+
+# The desktop entry gives the window its app id for the compositor and the
+# portal; without it installed Qt logs a portal registration failure.
+install(TARGETS superfar RUNTIME DESTINATION bin)
+install(FILES ${CMAKE_SOURCE_DIR}/data/superfar.desktop DESTINATION share/applications)

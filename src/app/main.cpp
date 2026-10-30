@@ -5,10 +5,15 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFile>
+#include <QLoggingCategory>
 
 int main(int argc, char** argv)
 {
     bench::init();
+    // Qt's text-input-v3 client logs "Trying to disable ... but 0x0 is
+    // focused" on every focus change under wlroots compositors; it is
+    // Qt's own bookkeeping, nothing the app can act on.
+    QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.wayland.textinput.warning=false"));
     QApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("superfar"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
