@@ -11,7 +11,11 @@ cd "$(dirname "$0")/.."
 [ -z "$(git tag -l "v$ver")" ] || { echo "v$ver already exists" >&2; exit 1; }
 sed -i "s/^project(superfar VERSION [0-9.]*/project(superfar VERSION $ver/" CMakeLists.txt
 sed -i "s/^pkgver=.*/pkgver=$ver/; s/^pkgrel=.*/pkgrel=1/" packaging/aur/PKGBUILD
-git add CMakeLists.txt packaging/aur/PKGBUILD
-git commit -q -m "Release v$ver"
+# The first release of a version already in the files has nothing to
+# commit; the tag still goes on HEAD.
+if ! git diff --quiet; then
+    git add CMakeLists.txt packaging/aur/PKGBUILD
+    git commit -q -m "Release v$ver"
+fi
 git tag -a "v$ver" -m "superfar v$ver"
 echo "tagged v$ver; now: git push --follow-tags"
