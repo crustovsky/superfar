@@ -269,6 +269,7 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
                     self->undo_ = st->undo;
                     self->undoBtn_->setEnabled(!self->undo_.empty());
                 }
+                self->adoptLocations(st->undo);
                 Q_EMIT self->message(st->failures > 0
                                          ? tr("%n renames failed", nullptr, st->failures)
                                          : tr("%n items renamed", nullptr, static_cast<int>(st->moves.size())));
@@ -299,6 +300,23 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
                           });
     };
     (*step)();
+}
+
+void MultiRenamePanel::adoptLocations(const std::vector<std::pair<core::Location, QString>>& finals)
+{
+    // finals pairs each item's current location with the name it had
+    // before the batch; match on that name to update items_ in place.
+    for (const auto& [now, before] : finals)
+        for (core::Location& item : items_)
+            if (item.displayName() == before && item.parent() == now.parent()) {
+                item = now;
+                break;
+            }
+    existing_.clear();
+    const QSignalBlocker block(table_);
+    for (int i = 0; i < table_->topLevelItemCount() && i < static_cast<int>(items_.size()); ++i)
+        table_->topLevelItem(i)->setText(0, items_[static_cast<size_t>(i)].displayName());
+    refresh();
 }
 
 void MultiRenamePanel::loadPresets()

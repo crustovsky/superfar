@@ -42,6 +42,8 @@ private:
     void apply();
     void undo();
     void runBatch(std::vector<std::pair<core::Location, QString>> moves, bool recordUndo);
+    // After a batch: the items are where the batch left them.
+    void adoptLocations(const std::vector<std::pair<core::Location, QString>>& finals);
     void loadPresets();
     void savePreset();
     void deletePreset();
