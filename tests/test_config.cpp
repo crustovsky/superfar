@@ -79,6 +79,18 @@ void ConfigTest::keysWrittenOnce()
     keys = again.keyBindings();
     QCOMPARE(keys.value(QStringLiteral("Copy")), QStringList({QStringLiteral("Ctrl+F5")}));
     QCOMPARE(keys.value(QStringLiteral("MarkUp")), QStringList({QStringLiteral("Shift+Up")}));  // new command, new line
+
+    // A line still at an older default takes the new one; an edited line stays.
+    edit.setValue(QStringLiteral("keys/Mark"), QStringLiteral("Insert"));
+    edit.setValue(QStringLiteral("keys/Rename"), QStringLiteral("Ctrl+R"));
+    edit.sync();
+    Config third(path);
+    third.writeDefaultKeys({{QStringLiteral("Mark"), {QStringLiteral("Insert"), QStringLiteral("Shift+Down")}},
+                            {QStringLiteral("Rename"), {QStringLiteral("F2")}}},
+                           {{QStringLiteral("Mark"), QStringLiteral("Insert")}, {QStringLiteral("Rename"), QStringLiteral("F2")}});
+    keys = third.keyBindings();
+    QCOMPARE(keys.value(QStringLiteral("Mark")), QStringList({QStringLiteral("Insert"), QStringLiteral("Shift+Down")}));
+    QCOMPARE(keys.value(QStringLiteral("Rename")), QStringList({QStringLiteral("Ctrl+R")}));
     QVERIFY(keys.contains(QStringLiteral("Move")));
     QVERIFY(keys.value(QStringLiteral("Move")).isEmpty());  // unbound
 }

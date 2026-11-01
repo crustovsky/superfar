@@ -50,7 +50,7 @@ int main(int argc, char** argv)
     }
 
     Config config;
-    config.writeDefaultKeys(keymap::defaults());
+    config.writeDefaultKeys(keymap::defaults(), keymap::retiredDefaults());
     for (const QString& problem : keymap::applyBindings(config.keyBindings()))
         fprintf(stderr, "superfar: config [keys]: %s\n", qPrintable(problem));
 

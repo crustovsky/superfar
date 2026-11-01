@@ -76,6 +76,9 @@ QString name(Command command);
 Command fromName(const QString& name);
 // The default table as (name, portable key strings), in command order.
 QList<QPair<QString, QStringList>> defaults();
+// Defaults of earlier versions, as written to their configs: a line still
+// holding one of these was never edited and may take the new default.
+QList<QPair<QString, QString>> retiredDefaults();
 // Current keys of a command, for the help and the function bar.
 QList<QKeySequence> keysOf(Command command);
 // Every command in table order, for the help.

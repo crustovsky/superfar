@@ -26,9 +26,11 @@ public:
 
     // [keys] command=Seq;Seq. Absent entries keep the default; an empty
     // value unbinds. The defaults are written out once per command so
-    // the file shows what can be changed.
+    // the file shows what can be changed; a line still holding a retired
+    // default (name, old value) was never edited and takes the new one.
     QHash<QString, QStringList> keyBindings() const;
-    void writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults);
+    void writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults,
+                          const QList<QPair<QString, QString>>& retired = {});
 
     // [columns/left] and [columns/right]: the hidden set from the config;
     // widths by column name from the state, else from the config.

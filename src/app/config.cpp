@@ -129,14 +129,23 @@ QHash<QString, QStringList> Config::keyBindings() const
     return out;
 }
 
-void Config::writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults)
+void Config::writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults,
+                              const QList<QPair<QString, QString>>& retired)
 {
     // Once per command: a command added in a later version gets its line
-    // too, and nothing the user wrote is touched.
+    // too, and nothing the user wrote is touched. A line that still reads
+    // as an older default was not written by the user either.
     settings_.beginGroup(QStringLiteral("keys"));
-    for (const auto& [name, seqs] : defaults)
-        if (!settings_.contains(name))
-            settings_.setValue(name, seqs.join(QLatin1Char(';')));
+    for (const auto& [name, seqs] : defaults) {
+        const QString value = seqs.join(QLatin1Char(';'));
+        if (!settings_.contains(name)) {
+            settings_.setValue(name, value);
+            continue;
+        }
+        for (const auto& [retiredName, old] : retired)
+            if (retiredName == name && settings_.value(name).toString() == old && old != value)
+                settings_.setValue(name, value);
+    }
     settings_.endGroup();
 }
 
