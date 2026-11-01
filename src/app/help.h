@@ -7,7 +7,7 @@
 
 namespace help {
 
-QString text();
+QString text();   // the about header, then the key table
 QString about();  // name, version, build date, what it is
 
 } // namespace help

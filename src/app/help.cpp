@@ -87,15 +87,19 @@ QString about()
     lines << QStringLiteral("my file manager is useless. Without my file manager,");
     lines << QStringLiteral("I am ls.");
     lines << QString();
+    lines << QStringLiteral("https://github.com/crustovsky/superfar");
+    lines << QString();
     lines << QCoreApplication::translate("help", "F1 lists the keys; the bar at the bottom shows the");
     lines << QCoreApplication::translate("help", "function keys. Esc closes this.");
-    lines << QStringLiteral("https://github.com/crustovsky/superfar");
     return lines.join(QLatin1Char('\n'));
 }
 
 QString text()
 {
+    // The same header as the first start, then the keys.
     QStringList lines;
+    lines << about();
+    lines << QString();
     lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys])");
     lines << QString();
     int width = 0;
