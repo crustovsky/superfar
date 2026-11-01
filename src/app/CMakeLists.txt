@@ -56,10 +56,6 @@ install(CODE "
   string(REPLACE \"Exec=superfar %U\" \"Exec=\${CMAKE_INSTALL_PREFIX}/bin/superfar %U\" text \"\${text}\")
   file(WRITE \"\${entry}\" \"\${text}\")
 ")
-  file(READ \"\${entry}\" text)
-  string(REGEX REPLACE \"\nExec=[^\n]*\" \"\nExec=\${CMAKE_INSTALL_PREFIX}/bin/superfar %U\" text \"\${text}\")
-  file(WRITE \"\${entry}\" \"\${text}\")
-")
 foreach(size IN LISTS ICON_SIZES)
   install(FILES ${ICON_DIR}/${size}x${size}/apps/superfar.png
           DESTINATION share/icons/hicolor/${size}x${size}/apps)
