@@ -315,8 +315,9 @@ package and the binary tarball on Arch and attaches both to a GitHub
 release with generated notes. CI builds the same two files on every
 push, runs ctest and `tools/smoke.sh`: scripted offscreen sessions
 (start, mkdir, rename, copy, every overlay, bad arguments) that must
-exit cleanly and leave the right files. Fill the PKGBUILD's
-sha256sums once the repo is public.
+exit cleanly and leave the right files. After the tag is pushed,
+hash GitHub's archive tarball for it into the PKGBUILD's sha256sums
+(the AUR copy must match) and commit that without a tag.
 
 Before a release: build with `-fsanitize=address,undefined` into
 build-asan and run ctest there (tests/test_hostile.cpp is the input
