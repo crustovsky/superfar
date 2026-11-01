@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Install toolchain and dependencies
         run: |
-          pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin
+          pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin ttf-dejavu
           sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
       - uses: actions/checkout@v4
       - name: Configure
@@ -31,6 +31,11 @@ jobs:
         # that need a gvfs daemon or a decoder sandbox skip themselves
         # where the container has neither.
         run: ctest --test-dir build --output-on-failure
+      - name: Smoke runs
+        # Scripted sessions on the offscreen platform: start, mkdir,
+        # rename, copy, every overlay, bad arguments; each must exit
+        # cleanly and leave the right files behind.
+        run: tools/smoke.sh build/src/app/superfar
 
   packages:
     runs-on: ubuntu-latest

@@ -313,7 +313,10 @@ and tags vX.Y.Z. `git push --follow-tags` runs release.yml, which
 refuses a tag that disagrees with CMakeLists.txt, builds the pacman
 package and the binary tarball on Arch and attaches both to a GitHub
 release with generated notes. CI builds the same two files on every
-push. Fill the PKGBUILD's sha256sums once the repo is public.
+push, runs ctest and `tools/smoke.sh`: scripted offscreen sessions
+(start, mkdir, rename, copy, every overlay, bad arguments) that must
+exit cleanly and leave the right files. Fill the PKGBUILD's
+sha256sums once the repo is public.
 
 Before a release: build with `-fsanitize=address,undefined` into
 build-asan and run ctest there (tests/test_hostile.cpp is the input
