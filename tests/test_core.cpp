@@ -419,7 +419,18 @@ void CoreTest::shellQuoting()
 {
     QCOMPARE(core::shellQuote("plain"), QByteArray("'plain'"));
     QCOMPARE(core::shellQuote("it's a file"), QByteArray("'it'\\''s a file'"));
-    QVERIFY(!core::editorCommand().isEmpty());
+    // The editor comes from the environment, with a fallback chain; a
+    // bare CI container has none of them, so pin it here.
+    const QByteArray visual = qgetenv("VISUAL"), editor = qgetenv("EDITOR");
+    qputenv("VISUAL", "");
+    qputenv("EDITOR", "sh -c");
+    QCOMPARE(core::editorCommand(), QStringLiteral("sh -c"));
+    QString error;
+    qputenv("EDITOR", "no-such-editor-zzqx");
+    QVERIFY(core::editorCommand(&error).isEmpty());
+    QVERIFY(error.contains(QStringLiteral("no-such-editor-zzqx")));
+    qputenv("VISUAL", visual);
+    qputenv("EDITOR", editor);
 }
 
 void CoreTest::imageDecode()
