@@ -190,7 +190,9 @@ void ConfigTest::stateSeparate()
         c.recordVisit(QStringLiteral("file:///tmp"), 200);
         c.setColumnWidth(QStringLiteral("left"), QStringLiteral("size"), 100);
         c.setWindowSize(QSize(1000, 700));
+        c.setLastVersion(QStringLiteral("0.6.0"));
         c.sync();
+        QCOMPARE(c.lastVersion(), QStringLiteral("0.6.0"));
         QCOMPARE(c.session().left[0].cursor, QStringLiteral("bin"));
     }
     QCOMPARE(slurp(ini), before);

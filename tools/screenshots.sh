@@ -29,7 +29,10 @@ printf 'old notes\n' > $D/Backup/site/TODO.txt
 touch -d '2026-06-01 10:00' $D/Backup/site/style.css $D/Backup/site/TODO.txt
 printf 'Welcome to the demo folder.\n' > $D/README.txt
 touch -d '2026-10-12 09:30' $D/Documents/* $D/Pictures/* $D/Music/* $D/Downloads/* $D/Projects/site/* $D/README.txt
-export XDG_CONFIG_HOME=$PWD/build/shotcfg QT_QPA_PLATFORM=offscreen
+export XDG_CONFIG_HOME=$PWD/build/shotcfg XDG_STATE_HOME=$PWD/build/shotstate QT_QPA_PLATFORM=offscreen
+# A state that knows the version, so the about note stays out of the shots.
+mkdir -p build/shotstate/superfar
+printf '[about]\nlastVersion=%s\n' "$(build/src/app/superfar --version | cut -d' ' -f2)" > build/shotstate/superfar/state.ini
 shot() { name=$1; keys=$2; ms=$3; shift 3; [ -z "$ONLY" ] || [ "$ONLY" = "$name" ] || return 0; [ -z "$ONLY" ] || [ "$ONLY" = "$name" ] || return 0; cp build/shots/pristine.ini build/shotcfg/superfar/superfar.ini; SUPERFAR_GRAB=docs/screenshots/$name.png SUPERFAR_GRAB_MS=$ms SUPERFAR_DEV_KEYS="$keys" build/src/app/superfar "$@" > build/shots/$name.log 2>&1 || echo "$name failed"; echo "$name: $(grep -v '^bench' build/shots/$name.log | head -1)"; }
 shot dual-pane "Down;Down" 3500 /usr/share $D
 shot folder-sizes "Ctrl+F3" 7000 /usr/share $D

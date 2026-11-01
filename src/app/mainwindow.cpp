@@ -218,6 +218,12 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     cmdline_->setFolder(start->activeTab()->location().displayPath());
     tree_->reveal(start->activeTab()->location());
 
+    // The first start of a new version says what it is.
+    if (config_->lastVersion() != QLatin1String(SUPERFAR_VERSION)) {
+        config_->setLastVersion(QStringLiteral(SUPERFAR_VERSION));
+        active_->execute(keymap::Command::About);
+    }
+
     installDevAids(this);
 }
 

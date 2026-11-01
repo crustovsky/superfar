@@ -45,6 +45,8 @@ public:
     bool execute(keymap::Command command);
     // Shows text in the status line for a moment.
     void showMessage(const QString& text);
+    // Shows text in the viewer overlay (help, about); Esc closes it.
+    void showText(const QString& title, const QString& text);
     // Something shown in place of the tabs: the viewer, or the preview
     // borrowed by the other pane. Null clears it.
     void setOverlay(QWidget* widget);

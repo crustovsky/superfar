@@ -101,6 +101,16 @@ void Config::migrateState()
         sync();
 }
 
+QString Config::lastVersion() const
+{
+    return state_.value(QStringLiteral("about/lastVersion")).toString();
+}
+
+void Config::setLastVersion(const QString& version)
+{
+    state_.setValue(QStringLiteral("about/lastVersion"), version);
+}
+
 void Config::sync()
 {
     settings_.sync();

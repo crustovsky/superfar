@@ -14,11 +14,15 @@
 # Data lives in $BENCH_DIR (default /tmp/superfar-bench) and is reused.
 set -euo pipefail
 
-# A throwaway config so bench folders never enter the real session.
+# A throwaway config and state so bench folders never enter the real
+# session; the state knows the version so no about note skews timing.
 export XDG_CONFIG_HOME=$(mktemp -d)
+export XDG_STATE_HOME=$XDG_CONFIG_HOME
 trap 'rm -rf "$XDG_CONFIG_HOME"' EXIT
 
 BIN=${SUPERFAR_BIN:-build/src/app/superfar}
+mkdir -p "$XDG_STATE_HOME/superfar"
+printf '[about]\nlastVersion=%s\n' "$("$BIN" --version | cut -d' ' -f2)" > "$XDG_STATE_HOME/superfar/state.ini"
 DATA=${BENCH_DIR:-/tmp/superfar-bench}
 SETTLE=${SETTLE:-3}
 COLD=0

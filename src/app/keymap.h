@@ -64,6 +64,7 @@ enum class Command {
     ToggleThumbnails,  // per tab: thumbnails in taller rows
     MultiRename,       // Shift+F2: the multi-rename panel
     Sync,              // Shift+F5: folder sync between the two active tabs
+    About,             // unbound: the Help menu, and once per new version
 };
 
 Command lookup(const QKeySequence& key);

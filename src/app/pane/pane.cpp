@@ -398,9 +398,10 @@ bool Pane::execute(keymap::Command command)
         return true;
     }
     case Command::Help:
-        ensureViewer()->showText(tr("Help"), help::text());
-        setOverlay(viewer_);
-        viewer_->setFocus();
+        showText(tr("Help"), help::text());
+        return true;
+    case Command::About:
+        showText(tr("About"), help::about());
         return true;
     case Command::View: {
         Tab* tab = activeTab();
@@ -421,6 +422,13 @@ bool Pane::execute(keymap::Command command)
     default:
         return activeTab() && activeTab()->execute(command);
     }
+}
+
+void Pane::showText(const QString& title, const QString& text)
+{
+    ensureViewer()->showText(title, text);
+    setOverlay(viewer_);
+    viewer_->setFocus();
 }
 
 void Pane::showMessage(const QString& text)

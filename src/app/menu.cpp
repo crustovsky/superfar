@@ -59,7 +59,7 @@ const std::vector<Group>& groups()
             {Command::NextTab, "Ne&xt tab"}, {Command::PrevTab, "&Previous tab"}, {Command::LockTab, "&Lock tab"},
         }},
         {"&Help", {
-            {Command::Help, "&Keys"},
+            {Command::Help, "&Keys"}, {Command::About, "&About"},
         }},
     };
     return g;

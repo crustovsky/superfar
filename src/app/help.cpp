@@ -61,12 +61,37 @@ QString describe(keymap::Command c)
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
     case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
     case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
+    case Command::About: return QStringLiteral("name, version and build date");
     case Command::None: return {};
     }
     return {};
 }
 
 } // namespace
+
+QString about()
+{
+    QStringList lines;
+    lines << QStringLiteral("superfar %1, built %2").arg(QStringLiteral(SUPERFAR_VERSION), QStringLiteral(SUPERFAR_BUILD_DATE));
+    lines << QString();
+    // Short lines: the viewer does not wrap and the pane is half a window.
+    lines << QCoreApplication::translate("help", "A dual-pane file manager for Linux in the Directory Opus");
+    lines << QCoreApplication::translate("help", "mould, at Thunar's weight, with FAR-style function keys.");
+    lines << QCoreApplication::translate("help", "Keyboard first, one window, and it never defines a colour:");
+    lines << QCoreApplication::translate("help", "whatever your platform theme says is what it looks like.");
+    lines << QString();
+    lines << QStringLiteral("This is my file manager. There are many like it,");
+    lines << QStringLiteral("but this one is mine.");
+    lines << QString();
+    lines << QStringLiteral("My file manager is my best friend. Without me,");
+    lines << QStringLiteral("my file manager is useless. Without my file manager,");
+    lines << QStringLiteral("I am ls.");
+    lines << QString();
+    lines << QCoreApplication::translate("help", "F1 lists the keys; the bar at the bottom shows the");
+    lines << QCoreApplication::translate("help", "function keys. Esc closes this.");
+    lines << QStringLiteral("https://github.com/crustovsky/superfar");
+    return lines.join(QLatin1Char('\n'));
+}
 
 QString text()
 {

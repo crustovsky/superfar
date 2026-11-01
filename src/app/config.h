@@ -80,6 +80,11 @@ public:
     static QList<Visit> rank(const QList<Visit>& visits, const QString& text, qint64 now);
     static double frecency(const Visit& v, qint64 now);
 
+    // [about] in the state: the version that last ran, for a note on the
+    // first start of a new one.
+    QString lastVersion() const;
+    void setLastVersion(const QString& version);
+
     void sync();
     // The config file itself, for the rename presets.
     QSettings& settings() { return settings_; }

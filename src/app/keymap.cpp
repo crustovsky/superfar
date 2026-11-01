@@ -158,6 +158,7 @@ QString label(Command command)
     case Command::ToggleThumbnails: return QStringLiteral("Thumbs");
     case Command::MultiRename: return QStringLiteral("Multi-rename");
     case Command::Sync: return QStringLiteral("Sync");
+    case Command::About: return QStringLiteral("About");
     case Command::None: return {};
     }
     return {};
@@ -182,7 +183,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::CutClip, "CutClip"}, {Command::Paste, "Paste"}, {Command::EditPath, "EditPath"},
         {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"}, {Command::Properties, "Properties"},
         {Command::Bookmark, "Bookmark"}, {Command::ToggleThumbnails, "ToggleThumbnails"},
-        {Command::MultiRename, "MultiRename"}, {Command::Sync, "Sync"},
+        {Command::MultiRename, "MultiRename"}, {Command::Sync, "Sync"}, {Command::About, "About"},
     };
     return n;
 }
