@@ -23,7 +23,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm base-devel git github-cli cmake ninja pkgconf qt6-base glib2 glycin hicolor-icon-theme
           sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           ref: ${{ env.TAG }}
       - name: Check the tag against CMakeLists.txt

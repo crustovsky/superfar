@@ -21,7 +21,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm gcc cmake ninja pkgconf qt6-base glib2 glycin ttf-dejavu
           sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
       - name: Build
@@ -45,7 +45,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm base-devel git cmake ninja pkgconf qt6-base glib2 glycin hicolor-icon-theme
           sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       # makepkg refuses to run as root; the package is built from this
       # checkout, not from a release tarball, so it works without a tag.
       - name: Build package
@@ -53,7 +53,7 @@ jobs:
           useradd -m builder
           chown -R builder .
           su builder -c "git config --global safe.directory '*' && tools/mkpkg.sh && tools/mktarball.sh"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: superfar-packages
           path: |
