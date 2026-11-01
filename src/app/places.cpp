@@ -54,7 +54,7 @@ void Places::rebuildRoots()
         roots.push_back({QStringLiteral("bookmark:") + b.location.uri(), b.name,
                          {QStringLiteral("folder-symbolic"), QStringLiteral("folder")}, b.location, QString(), false});
     for (const core::Place& p : mounts_->places())
-        roots.push_back({p.id, p.name, p.iconNames, p.location, p.id, p.canUnmount});
+        roots.push_back({p.id, p.name, p.iconNames, p.location, p.id, p.canUnmount, p.canEject});
     roots.push_back({QStringLiteral("network"), tr("Network"),
                      {QStringLiteral("network-workgroup-symbolic"), QStringLiteral("network-workgroup")},
                      core::Location::fromUri(QStringLiteral("network:///")), QString(), false});
@@ -91,7 +91,8 @@ void Places::unmountCurrent()
         return;
     const QString id = place->placeId;
     const core::Location root = place->location;
-    PromptBar* bar = strip_->prompt(tr("Unmount %1?").arg(place->name), tr("Unmount"), std::nullopt);
+    const QString verb = place->canEject ? tr("Eject") : tr("Unmount");
+    PromptBar* bar = strip_->prompt(tr("%1 %2?").arg(verb, place->name), verb, std::nullopt);
     connect(bar, &PromptBar::accepted, this, [this, id, root] {
         Q_EMIT leavingMount(root);  // tabs inside it move out first
         QPointer<Places> guard(this);

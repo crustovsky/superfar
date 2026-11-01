@@ -188,12 +188,29 @@ QByteArray shellQuote(const QByteArray& arg)
     return QByteArray(quoted.get());
 }
 
-QString editorCommand()
+QString editorCommand(QString* error)
 {
-    for (const char* var : {"VISUAL", "EDITOR"})
-        if (const QByteArray v = qgetenv(var); !v.isEmpty())
+    // $VISUAL, then $EDITOR, then the usual suspects. A launcher started
+    // by the compositor rarely carries the shell's exports, so the
+    // fallback matters, and a terminal that opens on "vi: not found"
+    // closes before anyone reads it.
+    for (const char* var : {"VISUAL", "EDITOR"}) {
+        const QByteArray v = qgetenv(var);
+        if (v.isEmpty())
+            continue;
+        const QByteArray program = v.trimmed().split(' ').first();
+        if (GStr found(g_find_program_in_path(program.constData())); found)
             return QString::fromLocal8Bit(v);
-    return QStringLiteral("vi");
+        if (error)
+            *error = QStringLiteral("$%1 names %2, which is not on PATH").arg(QLatin1String(var), QString::fromLocal8Bit(program));
+        return {};
+    }
+    for (const char* e : {"nvim", "vim", "nano", "vi"})
+        if (GStr found(g_find_program_in_path(e)); found)
+            return QString::fromLatin1(e);
+    if (error)
+        *error = QStringLiteral("No editor found: set $VISUAL or $EDITOR in the session environment");
+    return {};
 }
 
 } // namespace core

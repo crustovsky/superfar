@@ -191,6 +191,12 @@ void ListView::setActivePane(bool active)
 
 void ListView::keyPressEvent(QKeyEvent* event)
 {
+    if (isEditing()) {
+        // Enter in the inline editor commits the name and the line edit
+        // passes the key on; it must not open the file as well.
+        QTreeView::keyPressEvent(event);
+        return;
+    }
     const keymap::Command cmd = keymap::lookup(event);
     if (cmd != keymap::Command::None) {
         event->accept();

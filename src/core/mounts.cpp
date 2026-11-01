@@ -97,6 +97,14 @@ struct Mounts::Op {
         op->finish(error);
     }
 
+    static void onEjected(GObject* source, GAsyncResult* result, gpointer data)
+    {
+        std::unique_ptr<Op> op(static_cast<Op*>(data));
+        GError* error = nullptr;
+        g_mount_eject_with_operation_finish(G_MOUNT(source), result, &error);
+        op->finish(error);
+    }
+
     static void onEnclosingMounted(GObject* source, GAsyncResult* result, gpointer data)
     {
         std::unique_ptr<Op> op(static_cast<Op*>(data));
@@ -277,8 +285,13 @@ void Mounts::unmountPlace(const QString& id, Done done)
         return;
     }
     auto* op = new Op{this, std::move(done), newOperation()};
-    g_mount_unmount_with_operation(mount.get(), G_MOUNT_UNMOUNT_NONE, op->operation, nullptr,
-                                   &Op::onUnmounted, op);
+    // Removable media are ejected (unmount, then power down), so the
+    // stick can be pulled; everything else is unmounted.
+    if (g_mount_can_eject(mount.get()))
+        g_mount_eject_with_operation(mount.get(), G_MOUNT_UNMOUNT_NONE, op->operation, nullptr, &Op::onEjected, op);
+    else
+        g_mount_unmount_with_operation(mount.get(), G_MOUNT_UNMOUNT_NONE, op->operation, nullptr,
+                                       &Op::onUnmounted, op);
 }
 
 void Mounts::mountLocation(const Location& location, Done done)

@@ -1,12 +1,28 @@
 #include "pane/tabbar.h"
 
 #include <QFontMetrics>
+#include <QMouseEvent>
 #include <QStyleOptionTab>
 #include <QStylePainter>
 
 TabBar::TabBar(QWidget* parent)
     : QTabBar(parent)
 {
+    connect(this, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
+        if (index < 0)
+            Q_EMIT newTabRequested();
+    });
+}
+
+void TabBar::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::MiddleButton) {
+        if (const int index = tabAt(event->pos()); index >= 0) {
+            Q_EMIT closeRequested(index);
+            return;
+        }
+    }
+    QTabBar::mouseReleaseEvent(event);
 }
 
 QSize TabBar::tabSizeHint(int index) const

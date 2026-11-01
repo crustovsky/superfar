@@ -73,6 +73,25 @@ Pane::Pane(const Services& services, QWidget* parent)
     connect(messageTimer_, &QTimer::timeout, this, [this] { status_->setText(statusText_); });
 
     connect(tabBar_, &QTabBar::currentChanged, this, &Pane::onCurrentTab);
+    connect(tabBar_, &TabBar::closeRequested, this, &Pane::closeTab);
+    connect(tabBar_, &TabBar::newTabRequested, this, [this] { newTab(core::Location::home()); });
+    path_->installEventFilter(this);
+}
+
+bool Pane::eventFilter(QObject* watched, QEvent* event)
+{
+    // The path bar: a click brings the pane to the front, a double click
+    // edits the path (Ctrl+L), for typing a remote location.
+    if (watched == path_) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            if (Tab* tab = activeTab())
+                tab->setFocus();
+        } else if (event->type() == QEvent::MouseButtonDblClick) {
+            Q_EMIT commandRequested(keymap::Command::EditPath);
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 QString Pane::title(const core::Location& dir)

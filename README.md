@@ -88,11 +88,11 @@ remapped. The defaults:
 
 | Key | Action |
 |-----|--------|
-| F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal |
+| F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
 | Alt+F7, Alt+Enter | find in tree, properties and permissions |
-| F10 | quit, keeping the session |
+| F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
 | Ctrl+T, Ctrl+W, Ctrl+Tab | new tab, close tab, next tab |
@@ -113,7 +113,15 @@ remapped. The defaults:
 | Esc | clear the filter, close the viewer, close the preview |
 
 Typing filters the current tab. Backspace edits the filter while one is
-set, Space appends to it.
+set, Space appends to it. The bar at the bottom shows what each
+function key does; hold Shift, Ctrl or Alt and it relabels, naming the
+modifier at its left end. F8 on a mount in the tree unmounts it, or
+ejects it when it is removable.
+
+With the mouse: middle click closes a tab, a double click on the empty
+tab strip opens one at home, a double click on the path bar edits the
+path (the same as Ctrl+L, for a remote location), header edges drag,
+and files drag between panes, onto tree folders and to other apps.
 
 ## Build
 

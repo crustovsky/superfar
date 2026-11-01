@@ -35,7 +35,7 @@ bool launchWith(const QString& appId, const std::vector<Location>& files, QStrin
 bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOpen, QString* error);
 
 // What F4 edits with: $VISUAL, else $EDITOR, else vi.
-QString editorCommand();
+QString editorCommand(QString* error = nullptr);
 
 // Quotes raw name bytes for a POSIX shell.
 QByteArray shellQuote(const QByteArray& arg);

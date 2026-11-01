@@ -459,7 +459,11 @@ void Tree::keyPressEvent(QKeyEvent* event)
 
 const TreeModel::Root* Tree::currentPlace() const
 {
-    const TreeModel::Root* r = model_->rootAt(currentIndex());
+    // The mount holding the cursor, however deep the cursor sits in it.
+    QModelIndex idx = currentIndex();
+    while (idx.parent().isValid())
+        idx = idx.parent();
+    const TreeModel::Root* r = model_->rootAt(idx);
     return r && !r->placeId.isEmpty() ? r : nullptr;
 }
 

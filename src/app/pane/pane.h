@@ -13,7 +13,7 @@
 
 class QLabel;
 class QStackedWidget;
-class QTabBar;
+class TabBar;
 class MultiRenamePanel;
 class SyncPanel;
 class PropertiesPanel;
@@ -63,6 +63,7 @@ Q_SIGNALS:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     bool hasFocusInside() const;
@@ -77,7 +78,7 @@ private:
 
     Config::Columns columns_;
 
-    QTabBar* tabBar_;
+    TabBar* tabBar_;
     QLabel* path_;
     QStackedWidget* content_;  // the tab stack, or an overlay
     QStackedWidget* stack_;

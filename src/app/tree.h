@@ -34,6 +34,7 @@ public:
         core::Location location;
         QString placeId;  // set for mounts and volumes
         bool canUnmount = false;
+        bool canEject = false;
     };
     // Replaces the roots, keeping nodes whose key stays so expansion survives.
     void setRoots(const std::vector<Root>& roots);
@@ -98,7 +99,7 @@ public:
     // Re-lists dir if the tree shows it.
     void refresh(const core::Location& dir);
     void setRoots(const std::vector<TreeModel::Root>& roots) { model_->setRoots(roots); }
-    // The mount or volume under the cursor, else null.
+    // The mount or volume holding the cursor, else null.
     const TreeModel::Root* currentPlace() const;
 
 Q_SIGNALS:

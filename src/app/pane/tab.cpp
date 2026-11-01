@@ -379,8 +379,10 @@ bool Tab::execute(keymap::Command command)
         if (name.isEmpty() || cursorIsDir() || isArchive())
             return true;
         QString error;
-        if (!core::runInTerminal(location_, core::editorCommand() + QLatin1Char(' ')
-                                     + QString::fromUtf8(core::shellQuote(name)), false, &error))
+        const QString editor = core::editorCommand(&error);
+        if (editor.isEmpty()
+            || !core::runInTerminal(location_, editor + QLatin1Char(' ') + QString::fromUtf8(core::shellQuote(name)),
+                                    false, &error))
             Q_EMIT message(error);
         return true;
     }
