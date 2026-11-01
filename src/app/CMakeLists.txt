@@ -47,6 +47,19 @@ target_compile_definitions(superfar PRIVATE SUPERFAR_VERSION="${PROJECT_VERSION}
 # portal; without it installed Qt logs a portal registration failure.
 install(TARGETS superfar RUNTIME DESTINATION bin)
 install(FILES ${CMAKE_SOURCE_DIR}/data/superfar.desktop DESTINATION share/applications)
+# Exec is the installed path: a launcher started by the compositor may
+# not have ~/.local/bin on its PATH, and the entry has to work from
+# whatever prefix it lands in.
+install(CODE "
+  set(entry \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/share/applications/superfar.desktop\")
+  file(READ \"\${entry}\" text)
+  string(REPLACE \"Exec=superfar %U\" \"Exec=\${CMAKE_INSTALL_PREFIX}/bin/superfar %U\" text \"\${text}\")
+  file(WRITE \"\${entry}\" \"\${text}\")
+")
+  file(READ \"\${entry}\" text)
+  string(REGEX REPLACE \"\nExec=[^\n]*\" \"\nExec=\${CMAKE_INSTALL_PREFIX}/bin/superfar %U\" text \"\${text}\")
+  file(WRITE \"\${entry}\" \"\${text}\")
+")
 foreach(size IN LISTS ICON_SIZES)
   install(FILES ${ICON_DIR}/${size}x${size}/apps/superfar.png
           DESTINATION share/icons/hicolor/${size}x${size}/apps)
