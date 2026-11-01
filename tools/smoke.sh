@@ -21,7 +21,8 @@ reset() {
     printf '[about]\nlastVersion=%s\n' "$("$BIN" --version | cut -d' ' -f2)" > "$XDG_STATE_HOME/superfar/state.ini"
 }
 # run NAME KEYS MS ARGS...: a session that posts KEYS after the first load
-# and quits MS later.
+# and quits MS later. The file operations get time to land: a
+# sanitizer build runs slowly.
 run() {
     name=$1 keys=$2 ms=$3; shift 3
     if SUPERFAR_DEV_KEYS="$keys" SUPERFAR_GRAB="$T/$name.png" SUPERFAR_GRAB_MS="$ms" \
@@ -49,14 +50,14 @@ before=$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")
 run restart "" 800
 check "second start leaves the config alone" test "$before" = "$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")"
 
-run mkdir "F7;n;Return" 1500 "$T/a" "$T/b"
+run mkdir "F7;n;Return" 2500 "$T/a" "$T/b"
 check "F7 made the folder" test -d "$T/a/N"
 mkdir "$T/r" && printf 'x\n' > "$T/r/a.zzqx"  # alone, so the cursor is on it
-run rename "F2;b;Return" 1500 "$T/r" "$T/b"
+run rename "F2;b;Return" 2500 "$T/r" "$T/b"
 check "F2 renamed the file" sh -c "test -e '$T/r/B.zzqx' && ! test -e '$T/r/a.zzqx'"
 run copy "Ctrl+A;F5;Return" 2500 "$T/a" "$T/b"
 check "F5 copied to the other pane" sh -c "test -e '$T/b/two.txt' && test -d '$T/b/sub'"
-run newfile "Shift+F4;z;Return" 1500 "$T/a" "$T/b"
+run newfile "Shift+F4;z;Return" 2500 "$T/a" "$T/b"
 check "Shift+F4 made the file" test -f "$T/a/Z"
 
 run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F2;Escape;Shift+F5;Escape;Ctrl+G;Escape;Ctrl+L;Escape" 8000 "$T/a" "$T/b"

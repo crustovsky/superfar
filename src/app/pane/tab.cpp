@@ -13,6 +13,7 @@
 #include <QPointer>
 #include <QScrollBar>
 #include <QVBoxLayout>
+#include <utility>
 
 Tab::Tab(const Services& services, QWidget* parent)
     : QWidget(parent)
@@ -512,7 +513,7 @@ void Tab::fallBack(const QString& why)
     if (location_.isNative()) {
         for (core::Location p = location_.parent(); p.isValid(); p = p.parent()) {
             if (QFileInfo(p.displayPath()).isDir()) {
-                target = p;
+                target = std::move(p);
                 break;
             }
         }

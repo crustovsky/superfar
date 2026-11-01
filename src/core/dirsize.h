@@ -14,6 +14,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QPointer>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -85,7 +86,7 @@ private:
     friend class DirSizePool;
     void finished(DirSizePool::Task* task);
 
-    DirSizePool* pool_;
+    QPointer<DirSizePool> pool_;  // the window owns both; at exit the pool may go first
     QHash<DirSizePool::Task*, std::shared_ptr<DirSizePool::Task>> tasks_;
 };
 

@@ -297,6 +297,8 @@ void DirSizer::request(const Location& dir, const QByteArray& name, quint64 gene
     task->dir = dir;
     task->recursive = recursive;
     task->cancellable.reset(g_cancellable_new());
+    if (!pool_)
+        return;
     tasks_.insert(task.get(), task);
     pool_->submit(std::move(task));
 }
@@ -310,7 +312,8 @@ void DirSizer::cancelAll()
         task->client = nullptr;
     }
     tasks_.clear();
-    pool_->purgeCancelled();
+    if (pool_)
+        pool_->purgeCancelled();
 }
 
 void DirSizer::finished(DirSizePool::Task* task)
