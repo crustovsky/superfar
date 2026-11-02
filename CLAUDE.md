@@ -96,10 +96,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Shift+F5 folder sync panel: compares the active tab with the other
   pane's by size, time and optional SHA-256; copies or trashes the
   checked differences through the job engine
-- Ctrl+F3 toggles recursive sizes and counts for the tab (Items column
-  shows the direct count otherwise); Ctrl+F4 toggles thumbnails in the
-  tab (tumbler over D-Bus, taller rows); Ctrl+F5 hides the tree (hidden,
-  it loads nothing; Shift+Tab brings it back)
+- Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
+  the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
+  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
@@ -136,12 +135,10 @@ churn). `[keys]` has one line per command (`Copy=F5`,
 `[columns/right]` hold `hidden=items,modified`. `[layout]` has
 `split=side-by-side|stacked` and `preview=borrow|third`.
 `~/.local/state/superfar/state.ini` holds what the app writes on its
-own: `[session]` the tabs per pane with hidden, locked, sizes, thumbs
-flags and the cursor name, the active tab and pane, the tree shown or
-not; `[history]` the
-folders behind Ctrl+G with visit count and last time; `[window]` the
-size; `[layout]` splitter sizes; `[columns/*]` dragged widths. The
-first start after 0.5 moves these out of the config.
+own: `[session]` tabs per pane (hidden, locked, sizes, thumbs, sort,
+cursor), active tab and pane, tree shown or not; `[history]` the Ctrl+G
+folders by visit count and last time; `[window]` size; `[layout]` splitter
+sizes; `[columns/*]` dragged widths, moved out of the config after 0.5.
 
 ## Layout
 

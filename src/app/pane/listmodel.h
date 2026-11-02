@@ -10,6 +10,7 @@
 #include "core/thumbnails.h"
 #include "core/location.h"
 #include "core/metadata.h"
+#include "core/sort.h"
 
 #include <QAbstractTableModel>
 #include <QHash>
@@ -17,11 +18,15 @@
 #include <QSet>
 #include <vector>
 
+class QTimer;
+
 class ListModel : public QAbstractTableModel {
     Q_OBJECT
 public:
     enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
     enum Role { PartialRole = Qt::UserRole + 1, IsDirRole };  // PartialRole: a total still being walked
+    static Column columnOf(core::SortBy by);
+    static core::SortBy sortOf(int column);
 
     ListModel(core::DirSizePool* sizes, core::Thumbnailer* thumbs, QObject* parent = nullptr);
 
@@ -37,6 +42,15 @@ public:
 
     void setShowHidden(bool on);
     bool showHidden() const { return showHidden_; }
+
+    // The order of the rows: one full sort and reset. Folders always
+    // come first; under Items, and under Size with recursive sizes on,
+    // they take their value from the counts and walks as these complete,
+    // and resortNeeded() asks the tab for another sort (coalesced).
+    void setSort(core::SortBy by, bool ascending);
+    core::SortBy sortBy() const { return sortBy_; }
+    bool sortAscending() const { return sortAscending_; }
+    void resort();  // the same order again with the values known now; marks stay
 
     // Quick filter: a row stays when the text matches its name as a
     // subsequence, case-insensitive; prefix matches sort first, then
@@ -107,12 +121,17 @@ public:
 
 Q_SIGNALS:
     void marksChanged();
+    void resortNeeded();
     void renameRequested(const QByteArray& name, const QString& newName);
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
 
 private:
     void rebuildRows();
     void rowsRepaint();
+    void sortEntries();
+    bool sortNeedsFolders() const;
+    QHash<QByteArray, quint64> folderValues() const;
+    void requestSortValues();
     const core::Metadata* metadata(const core::Entry& entry) const;
     const core::DirSize* dirSize(const core::Entry& entry) const;
     void onDirSize(quint64 generation, const QByteArray& name, const core::DirSize& size);
@@ -130,6 +149,9 @@ private:
     QHash<QByteArray, int> rowOfName_;
     bool showHidden_ = false;
     QString filter_;
+    core::SortBy sortBy_ = core::SortBy::Name;
+    bool sortAscending_ = true;
+    QTimer* resortTimer_;
 
     core::MetadataQuery* meta_;
     quint64 metaGeneration_ = 0;

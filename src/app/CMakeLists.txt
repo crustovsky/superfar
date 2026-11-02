@@ -28,6 +28,7 @@ qt_add_executable(superfar
   pane/tab_archive.cpp
   pane/listview.cpp
   pane/listmodel.cpp
+  pane/listmodel_sort.cpp
 )
 target_include_directories(superfar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

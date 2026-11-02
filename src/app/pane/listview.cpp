@@ -31,6 +31,14 @@ ListView::ListView(QWidget* parent)
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     header()->setStretchLastSection(false);
     header()->setSectionsMovable(false);
+    // Sorting stays ours (the model orders its vector); the header only
+    // keeps the indicator: a click flips it and reports the new order.
+    header()->setSectionsClickable(true);
+    header()->setSortIndicatorShown(true);
+    header()->setSortIndicator(ListModel::NameColumn, Qt::AscendingOrder);
+    connect(header(), &QHeaderView::sortIndicatorChanged, this, [this](int column, Qt::SortOrder order) {
+        Q_EMIT sortChanged(column, order == Qt::AscendingOrder);
+    });
     setItemDelegate(new RowDelegate(this));
     setDragEnabled(true);
     setAcceptDrops(true);
@@ -171,6 +179,11 @@ void ListView::sizeColumns()
                      fm.horizontalAdvance(QStringLiteral("8888-88-88 88:88")) + pad);
     applying_ = false;
     fitName();
+}
+
+void ListView::showSort(int column, bool ascending)
+{
+    header()->setSortIndicator(column, ascending ? Qt::AscendingOrder : Qt::DescendingOrder);
 }
 
 void ListView::setThumbnailRows(bool on)

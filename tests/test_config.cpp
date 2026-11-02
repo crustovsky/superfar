@@ -34,9 +34,9 @@ void ConfigTest::sessionRoundTrip()
         Config c(path);
         QVERIFY(!c.session().valid);
         Config::Session s;
-        s.left = {{QStringLiteral("file:///usr"), false, true, false, false, {}},
-                  {QStringLiteral("file:///etc"), true, false, true, false, {}}};
-        s.right = {{QStringLiteral("file:///tmp"), false, false, false, false, {}}};
+        s.left = {{QStringLiteral("file:///usr"), false, true, false, false, {}, {}, false},
+                  {QStringLiteral("file:///etc"), true, false, true, false, {}, QStringLiteral("modified"), true}};
+        s.right = {{QStringLiteral("file:///tmp"), false, false, false, false, {}, {}, false}};
         s.leftActive = 1;
         s.activePane = QStringLiteral("right");
         s.tree = false;
@@ -52,10 +52,14 @@ void ConfigTest::sessionRoundTrip()
     QVERIFY(s.left[0].locked);
     QVERIFY(s.left[1].hidden);
     QVERIFY(s.left[1].sizes);
+    QVERIFY(s.left[0].sort.isEmpty());
+    QVERIFY(!s.left[0].descending);
+    QCOMPARE(s.left[1].sort, QStringLiteral("modified"));
+    QVERIFY(s.left[1].descending);
+    QVERIFY(!s.tree);
     QCOMPARE(s.right.size(), 1);
     QCOMPARE(s.leftActive, 1);
     QCOMPARE(s.activePane, QStringLiteral("right"));
-    QVERIFY(!s.tree);
     QCOMPARE(c.windowSize(), QSize(1200, 800));
 }
 

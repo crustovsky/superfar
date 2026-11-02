@@ -49,6 +49,10 @@ void Tab::showArchiveDir(const QByteArray& dir)
             e.display = QString::fromUtf8(leaf);
             e.type = isDir ? core::EntryType::Directory : core::EntryType::File;
             e.symlink = slash < 0 && a.symlink;
+            if (!isDir) {
+                e.size = a.size;
+                e.modified = a.modified;
+            }
             core::computeSortKey(e);
             rows.insert(leaf, e);
         }

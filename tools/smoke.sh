@@ -11,6 +11,9 @@ T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 export QT_QPA_PLATFORM=offscreen XDG_CONFIG_HOME=$T/cfg XDG_STATE_HOME=$T/state
 export QT_LOGGING_RULES='*.warning=false'
+# No desktop entries in sight: a scripted session must never open a file
+# with its default app on the developer's desktop (CI has none anyway).
+export XDG_DATA_HOME=$T/data XDG_DATA_DIRS=$T/data
 fail=0
 
 # Each run starts from a fresh config; the state knows the version so the
@@ -61,7 +64,9 @@ run newfile "Shift+F4;z;Return" 2500 "$T/a" "$T/b"
 check "Shift+F4 made the file" test -f "$T/a/Z"
 
 run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F2;Escape;Shift+F5;Escape;Ctrl+G;Escape;Ctrl+L;Escape" 8000 "$T/a" "$T/b"
-run navigation "Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F3;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
+# The session brings the cursor back to the Z file from the newfile run;
+# Home first, so Return enters a folder instead of opening Z.
+run navigation "Home;Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F3;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
 run filter "t;w;Escape;p;Backspace" 3000 "$T/a" "$T/b"
 run badargs "" 1200 /nonexistent/deeper foo://x
 run fileargs "" 1200 /etc/hostname /etc

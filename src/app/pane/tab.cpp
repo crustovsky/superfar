@@ -62,6 +62,8 @@ Tab::Tab(const Services& services, QWidget* parent)
         updateStatus();  // the status line names the cursor item in full
     });
     connect(model_, &ListModel::renameRequested, this, &Tab::rename);
+    connect(view_, &ListView::sortChanged, this, &Tab::applySort);
+    connect(model_, &ListModel::resortNeeded, this, &Tab::resort);
     connect(model_, &ListModel::dropRequested, this, &Tab::dropRequested);
     connect(view_, &ListView::editingFinished, this, [this] {
         if (dirty_ && current_) {
@@ -291,9 +293,12 @@ void Tab::setShowHidden(bool on)
 {
     if (on == model_->showHidden())
         return;
-    cursorName_ = currentName();
+    const bool loaded = model_->rowCount() > 0;  // as in applySort
+    if (loaded)
+        cursorName_ = currentName();
     model_->setShowHidden(on);
-    placeCursor();
+    if (loaded)
+        placeCursor();
     updateStatus();
 }
 
@@ -329,6 +334,54 @@ void Tab::setThumbnails(bool on)
     cursorName_ = currentName();
     model_->setThumbnails(on);
     view_->setThumbnailRows(on);
+    placeCursor();
+}
+
+core::SortBy Tab::sortBy() const
+{
+    return model_->sortBy();
+}
+
+bool Tab::sortAscending() const
+{
+    return model_->sortAscending();
+}
+
+void Tab::setSort(core::SortBy by, bool ascending)
+{
+    view_->showSort(ListModel::columnOf(by), ascending);  // comes back through applySort
+}
+
+void Tab::applySort(int column, bool ascending)
+{
+    const core::SortBy by = ListModel::sortOf(column);
+    if (by == model_->sortBy() && ascending == model_->sortAscending())
+        return;
+    // Before the first load there is no cursor to keep, and the name the
+    // session asked for must survive until it ends.
+    const bool loaded = model_->rowCount() > 0;
+    if (loaded)
+        cursorName_ = currentName();
+    model_->setSort(by, ascending);
+    if (loaded)
+        placeCursor();
+    Q_EMIT sortChanged();
+}
+
+void Tab::resort()
+{
+    // Counts or walks completed under an order that reads them. An
+    // open editor would be closed by the reset: the reload when it
+    // closes sorts instead.
+    if (model_->rowCount() == 0)
+        return;
+    if (view_->isEditing()) {
+        dirty_ = true;
+        return;
+    }
+    cursorName_ = currentName();
+    scrollValue_ = view_->verticalScrollBar()->value();
+    model_->resort();
     placeCursor();
 }
 

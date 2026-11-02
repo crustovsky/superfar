@@ -9,7 +9,7 @@ namespace {
 
 const char* const kAttributes =
     "standard::name,standard::display-name,standard::type,"
-    "standard::is-hidden,standard::is-symlink";
+    "standard::is-hidden,standard::is-symlink,standard::size,time::modified";
 
 // The first batch is small so a screenful paints as soon as possible.
 constexpr int kFirstBatch = 512;
@@ -42,6 +42,8 @@ Entry toEntry(GFileInfo* info)
     e.type = typeOf(g_file_info_get_file_type(info));
     e.hidden = g_file_info_get_is_hidden(info);
     e.symlink = g_file_info_get_is_symlink(info);
+    e.size = static_cast<quint64>(g_file_info_get_size(info));
+    e.modified = static_cast<qint64>(g_file_info_get_attribute_uint64(info, G_FILE_ATTRIBUTE_TIME_MODIFIED));
     computeSortKey(e);
     return e;
 }
