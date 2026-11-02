@@ -29,7 +29,7 @@ QString describe(keymap::Command c)
     case Command::HideLeft: return QStringLiteral("hide or show the left pane");
     case Command::HideRight: return QStringLiteral("hide or show the right pane");
     case Command::SwitchPane: return QStringLiteral("switch panes");
-    case Command::FocusTree: return QStringLiteral("focus the folder tree");
+    case Command::FocusTree: return QStringLiteral("focus the folder tree, showing it first if hidden");
     case Command::NewTab: return QStringLiteral("new tab in the same folder");
     case Command::CloseTab: return QStringLiteral("close the tab");
     case Command::NextTab: return QStringLiteral("next tab");
@@ -62,6 +62,7 @@ QString describe(keymap::Command c)
     case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
     case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
     case Command::About: return QStringLiteral("name, version and build date");
+    case Command::ToggleTree: return QStringLiteral("hide or show the folder tree; hidden, it does no work");
     case Command::None: return {};
     }
     return {};

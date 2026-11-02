@@ -46,6 +46,8 @@ private:
     void setActivePane(Pane* pane);
     Pane* otherPane() const { return active_ == left_ ? right_ : left_; }
     void togglePane(Pane* pane);
+    void toggleTree();
+    void showTree();
     void startTransfer(bool move);
     void promptMkdir();
     void confirmRemove(bool permanent);
@@ -84,5 +86,6 @@ private:
     Places* places_;
     Preview* preview_ = nullptr;  // exists while Ctrl+Q is on
     QTimer* sessionTimer_;
+    QList<int> treeSizes_;  // tree | panes while the tree is shown
     bool painted_ = false;
 };

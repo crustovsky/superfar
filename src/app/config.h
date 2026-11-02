@@ -64,6 +64,7 @@ public:
         int leftActive = 0;
         int rightActive = 0;
         QString activePane = QStringLiteral("left");
+        bool tree = true;  // the folder tree is shown
         bool valid = false;
     };
     Session session() const;

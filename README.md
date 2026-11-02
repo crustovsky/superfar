@@ -98,6 +98,7 @@ remapped. The defaults:
 | Ctrl+T, Ctrl+W, Ctrl+Tab | new tab, close tab, next tab |
 | Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
+| Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
 | Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |

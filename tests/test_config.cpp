@@ -39,6 +39,7 @@ void ConfigTest::sessionRoundTrip()
         s.right = {{QStringLiteral("file:///tmp"), false, false, false, false, {}}};
         s.leftActive = 1;
         s.activePane = QStringLiteral("right");
+        s.tree = false;
         c.saveSession(s);
         c.setWindowSize(QSize(1200, 800));
         c.sync();
@@ -54,6 +55,7 @@ void ConfigTest::sessionRoundTrip()
     QCOMPARE(s.right.size(), 1);
     QCOMPARE(s.leftActive, 1);
     QCOMPARE(s.activePane, QStringLiteral("right"));
+    QVERIFY(!s.tree);
     QCOMPARE(c.windowSize(), QSize(1200, 800));
 }
 

@@ -65,6 +65,7 @@ enum class Command {
     MultiRename,       // Shift+F2: the multi-rename panel
     Sync,              // Shift+F5: folder sync between the two active tabs
     About,             // unbound: the Help menu, and once per new version
+    ToggleTree,        // Ctrl+F5: hide or show the folder tree
 };
 
 Command lookup(const QKeySequence& key);

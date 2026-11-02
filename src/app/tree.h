@@ -14,6 +14,7 @@
 #include <QAbstractItemModel>
 #include <QHash>
 #include <QIcon>
+#include <QSet>
 #include <QTreeView>
 #include <memory>
 #include <vector>
@@ -95,6 +96,8 @@ public:
     explicit Tree(QWidget* parent = nullptr);
 
     // Expands down to dir and puts the cursor on it, loading on the way.
+    // While the tree is hidden nothing loads (rule 16): the reveal waits
+    // for the next show, and so do refreshes.
     void reveal(const core::Location& dir);
     // Re-lists dir if the tree shows it.
     void refresh(const core::Location& dir);
@@ -110,11 +113,14 @@ Q_SIGNALS:
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+    void focusInEvent(QFocusEvent* event) override;
 
 private:
     void continueReveal();
 
     TreeModel* model_;
     core::Location pending_;
+    QSet<QString> stale_;  // uris changed while hidden, refreshed on show
     bool guard_ = false;
 };
