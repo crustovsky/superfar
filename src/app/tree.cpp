@@ -1,5 +1,7 @@
 #include "tree.h"
 
+#include <utility>
+
 #include "core/listing.h"
 #include "core/sort.h"
 #include "uris.h"
@@ -470,14 +472,37 @@ const TreeModel::Root* Tree::currentPlace() const
 void Tree::reveal(const core::Location& dir)
 {
     pending_ = dir;
-    continueReveal();
+    if (isVisible())
+        continueReveal();
 }
 
 void Tree::refresh(const core::Location& dir)
 {
+    if (!isVisible()) {
+        stale_.insert(dir.uri());
+        return;
+    }
     const QModelIndex idx = model_->indexFor(dir);
     if (idx.isValid())
         model_->refresh(idx);
+}
+
+void Tree::focusInEvent(QFocusEvent* event)
+{
+    // A view without a current index makes its first row current on
+    // focus; that is not the user choosing a folder.
+    guard_ = true;
+    QTreeView::focusInEvent(event);
+    guard_ = false;
+}
+
+void Tree::showEvent(QShowEvent* event)
+{
+    QTreeView::showEvent(event);
+    const QSet<QString> stale = std::exchange(stale_, {});
+    for (const QString& uri : stale)
+        refresh(core::Location::fromUri(uri));
+    continueReveal();
 }
 
 void Tree::continueReveal()

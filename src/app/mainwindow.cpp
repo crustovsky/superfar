@@ -76,7 +76,8 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     split_->setStretchFactor(0, 0);
     split_->setStretchFactor(1, 1);
     const QList<int> treeSizes = config->splitterSizes(QStringLiteral("tree"));
-    split_->setSizes(treeSizes.size() == 2 ? treeSizes : QList<int>{220, 880});
+    treeSizes_ = treeSizes.size() == 2 ? treeSizes : QList<int>{220, 880};
+    split_->setSizes(treeSizes_);
 
     // The bar area sits under the panes behind a draggable handle; extra
     // height goes to a job's graph or a log list.
@@ -202,6 +203,8 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     if (session.valid) {
         left_->restore(session.left, session.leftActive);
         right_->restore(session.right, session.rightActive);
+        if (!session.tree)
+            tree_->hide();
     }
     if (left_->tabCount() == 0)
         left_->newTab(left.isValid() ? left : core::Location::home());
@@ -258,6 +261,28 @@ void MainWindow::togglePane(Pane* pane)
     }
 }
 
+void MainWindow::toggleTree()
+{
+    if (tree_->isHidden()) {
+        showTree();
+        return;
+    }
+    treeSizes_ = split_->sizes();
+    if (tree_->hasFocus())
+        active_->activeTab()->setFocus();
+    tree_->hide();  // the splitter gives its width to the panes
+    sessionTimer_->start();
+}
+
+void MainWindow::showTree()
+{
+    if (!tree_->isHidden())
+        return;
+    tree_->show();  // its showEvent reveals the active tab's folder
+    split_->setSizes(treeSizes_);
+    sessionTimer_->start();
+}
+
 void MainWindow::execute(keymap::Command command)
 {
     using keymap::Command;
@@ -272,7 +297,11 @@ void MainWindow::execute(keymap::Command command)
             otherPane()->activeTab()->setFocus();
         return;
     case Command::FocusTree:
+        showTree();
         tree_->setFocus();
+        return;
+    case Command::ToggleTree:
+        toggleTree();
         return;
     case Command::Menu:
         if (menuBar()->isVisible()) {
@@ -572,6 +601,7 @@ void MainWindow::saveSession()
     s.leftActive = left_->activeIndex();
     s.rightActive = right_->activeIndex();
     s.activePane = active_ == left_ ? QStringLiteral("left") : QStringLiteral("right");
+    s.tree = !tree_->isHidden();
     config_->saveSession(s);
     config_->sync();
 }
@@ -579,7 +609,8 @@ void MainWindow::saveSession()
 void MainWindow::saveLayout()
 {
     config_->setWindowSize(size());
-    config_->setSplitterSizes(QStringLiteral("tree"), split_->sizes());
+    if (!tree_->isHidden())  // hidden, the saved width is the one it comes back with
+        config_->setSplitterSizes(QStringLiteral("tree"), split_->sizes());
     QList<int> panes = panes_->sizes();
     if (panes.size() > 2)
         panes.resize(2);  // the preview slot is transient

@@ -51,7 +51,8 @@ const std::vector<Group>& groups()
             {Command::ToggleThumbnails, "&Thumbnails"},
             {Command::None, ""},
             {Command::HideLeft, "&Left pane"}, {Command::HideRight, "&Right pane"},
-            {Command::SwitchPane, "Switch &pane"}, {Command::FocusTree, "Folder &tree"},
+            {Command::SwitchPane, "Switch &pane"}, {Command::ToggleTree, "Folder &tree"},
+            {Command::FocusTree, "&Focus the tree"},
             {Command::FocusCommandLine, "&Command line"},
         }},
         {"&Tabs", {

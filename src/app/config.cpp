@@ -218,6 +218,7 @@ Config::Session Config::session() const
     s.leftActive = state_.value(QStringLiteral("session/leftActive"), 0).toInt();
     s.rightActive = state_.value(QStringLiteral("session/rightActive"), 0).toInt();
     s.activePane = state_.value(QStringLiteral("session/activePane"), QStringLiteral("left")).toString();
+    s.tree = state_.value(QStringLiteral("session/tree"), true).toBool();
     s.valid = !s.left.isEmpty() && !s.right.isEmpty();
     return s;
 }
@@ -229,6 +230,7 @@ void Config::saveSession(const Session& s)
     state_.setValue(QStringLiteral("session/leftActive"), s.leftActive);
     state_.setValue(QStringLiteral("session/rightActive"), s.rightActive);
     state_.setValue(QStringLiteral("session/activePane"), s.activePane);
+    state_.setValue(QStringLiteral("session/tree"), s.tree);
 }
 
 void Config::recordVisit(const QString& uri, qint64 now)
