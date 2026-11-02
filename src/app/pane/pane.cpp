@@ -1,5 +1,7 @@
 #include "pane/pane.h"
 
+#include "core/sort.h"
+
 #include "elidedlabel.h"
 #include "pane/listview.h"
 #include "help.h"
@@ -113,9 +115,18 @@ int Pane::activeIndex() const
 QList<Config::TabState> Pane::tabStates() const
 {
     QList<Config::TabState> out;
-    for (Tab* tab : tabs())
-        out.append({tab->location().uri(), tab->showHidden(), tab->isLocked(), tab->recursiveSizes(), tab->thumbnails(),
-                    QString::fromLatin1(tab->currentName().toPercentEncoding())});
+    for (Tab* tab : tabs()) {
+        Config::TabState t;
+        t.uri = tab->location().uri();
+        t.hidden = tab->showHidden();
+        t.locked = tab->isLocked();
+        t.sizes = tab->recursiveSizes();
+        t.thumbs = tab->thumbnails();
+        t.cursor = QString::fromLatin1(tab->currentName().toPercentEncoding());
+        t.sort = QLatin1String(core::sortName(tab->sortBy()));
+        t.descending = !tab->sortAscending();
+        out.append(t);
+    }
     return out;
 }
 
@@ -131,6 +142,7 @@ void Pane::restore(const QList<Config::TabState>& states, int active)
         tab->setShowHidden(s.hidden);
         tab->setRecursiveSizes(s.sizes);
         tab->setThumbnails(s.thumbs);
+        tab->setSort(core::sortFromName(s.sort), !s.descending);
         tab->setLocked(s.locked);
         retitle(tab);
     }
@@ -184,6 +196,7 @@ Tab* Pane::makeTab(const core::Location& dir)
         Q_EMIT sessionChanged();
     });
     connect(tab, &Tab::openInNewTab, this, [this](const core::Location& dir) { newTab(dir); });
+    connect(tab, &Tab::sortChanged, this, &Pane::sessionChanged);
     connect(tab->view(), &ListView::columnResized, this, &Pane::columnResized);
     tab->view()->applyColumns(columns_.widths, columns_.hidden);
     connect(tab, &Tab::statusChanged, this, [this, tab](const QString& items, const QString& space) {

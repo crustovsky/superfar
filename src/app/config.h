@@ -57,6 +57,8 @@ public:
         bool sizes = false;
         bool thumbs = false;
         QString cursor;  // name under the cursor, percent-encoded bytes
+        QString sort;    // column name; empty or unknown means name
+        bool descending = false;
     };
     struct Session {
         QList<TabState> left;

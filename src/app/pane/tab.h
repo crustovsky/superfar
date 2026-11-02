@@ -7,6 +7,7 @@
 #include "core/listing.h"
 #include "core/location.h"
 #include "core/monitor.h"
+#include "core/sort.h"
 #include "core/space.h"
 #include "keymap.h"
 
@@ -62,6 +63,10 @@ public:
     void setRecursiveSizes(bool on);
     bool thumbnails() const;
     void setThumbnails(bool on);
+    // The column the rows follow; a header click changes it too.
+    core::SortBy sortBy() const;
+    bool sortAscending() const;
+    void setSort(core::SortBy by, bool ascending);
     // A locked tab keeps its folder: navigation opens a new tab instead.
     void setLocked(bool on) { locked_ = on; }
     bool isLocked() const { return locked_; }
@@ -82,6 +87,7 @@ Q_SIGNALS:
     void cursorChanged(const core::Location& item);  // invalid when none
     void navigated(const core::Location& dir);       // a user navigation, for history
     void openInNewTab(const core::Location& dir);    // navigation while locked
+    void sortChanged();                              // for the session
     void mountNeeded(const core::Location& dir);     // the load failed for want of a mount
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
     void message(const QString& text);  // an error worth a moment in the status line
@@ -101,6 +107,8 @@ private:
     void typed(const QString& text);
     void setFilter(const QString& text);
     void rename(const QByteArray& name, const QString& newName);
+    void applySort(int column, bool ascending);
+    void resort();
     void placeCursor();
     void updateStatus();
     void fallBack(const QString& why);

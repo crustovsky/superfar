@@ -117,6 +117,7 @@ QString text()
         lines << key.leftJustified(width + 2) + what;
     lines << QString();
     lines << QCoreApplication::translate("help", "Type to filter the list; Backspace edits the filter, Esc clears it.");
+    lines << QCoreApplication::translate("help", "Click a column header to sort by it; click again to reverse. Folders stay first.");
     lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
     return lines.join(QLatin1Char('\n'));
 }

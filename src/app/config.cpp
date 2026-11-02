@@ -22,6 +22,8 @@ QList<Config::TabState> readTabs(QSettings& s, const QString& side)
         t.sizes = s.value(QStringLiteral("sizes"), false).toBool();
         t.thumbs = s.value(QStringLiteral("thumbs"), false).toBool();
         t.cursor = s.value(QStringLiteral("cursor")).toString();
+        t.sort = s.value(QStringLiteral("sort")).toString();
+        t.descending = s.value(QStringLiteral("descending"), false).toBool();
         if (!t.uri.isEmpty())
             out.append(t);
     }
@@ -42,6 +44,10 @@ void writeTabs(QSettings& s, const QString& side, const QList<Config::TabState>&
         s.setValue(QStringLiteral("thumbs"), tabs[i].thumbs);
         if (!tabs[i].cursor.isEmpty())
             s.setValue(QStringLiteral("cursor"), tabs[i].cursor);
+        if (!tabs[i].sort.isEmpty() && tabs[i].sort != QLatin1String("name"))
+            s.setValue(QStringLiteral("sort"), tabs[i].sort);
+        if (tabs[i].descending)
+            s.setValue(QStringLiteral("descending"), true);
     }
     s.endArray();
 }

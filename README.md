@@ -121,8 +121,9 @@ ejects it when it is removable.
 
 With the mouse: middle click closes a tab, a double click on the empty
 tab strip opens one at home, a double click on the path bar edits the
-path (the same as Ctrl+L, for a remote location), header edges drag,
-and files drag between panes, onto tree folders and to other apps.
+path (the same as Ctrl+L, for a remote location), a click on a column header sorts by it and a second click reverses
+it (folders stay first), header edges drag, and files drag between
+panes, onto tree folders and to other apps.
 
 ## Build
 

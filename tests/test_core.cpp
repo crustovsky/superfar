@@ -62,6 +62,7 @@ private Q_SLOTS:
     void listingEntries();
     void listingCancel();
     void naturalSort();
+    void sortByColumns();
     void metadata();
     void dirSizeCount();
     void dirSizeWalk();
@@ -140,6 +141,11 @@ void CoreTest::listingEntries()
     touch(d + "/file10.txt");
     touch(d + "/file2.txt");
     touch(d + "/.hidden");
+    {
+        QFile f(d + "/file10.txt");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("hello");
+    }
     QVERIFY(QDir(d).mkdir("sub"));
     QVERIFY(QFile::link(d + "/sub", d + "/link-to-dir"));
     QVERIFY(QFile::link(d + "/nowhere", d + "/broken"));
@@ -162,6 +168,10 @@ void CoreTest::listingEntries()
     QCOMPARE(entries[4].name, QByteArray("file2.txt"));
     QCOMPARE(entries[5].name, QByteArray("file10.txt"));
     QVERIFY(!entries[5].hidden);
+    // Size and mtime ride along with the listing: the sort needs them.
+    QCOMPARE(entries[5].size, 5u);
+    QVERIFY(entries[5].modified > 0);
+    QCOMPARE(entries[4].size, 0u);
 }
 
 void CoreTest::listingCancel()
@@ -213,6 +223,57 @@ void CoreTest::naturalSort()
     for (const auto& e : v)
         names << e.display;
     QCOMPARE(names, QStringList({"Z", "c", "b", "a10", "a2", "a1"}));
+}
+
+void CoreTest::sortByColumns()
+{
+    auto make = [](const char* name, bool dir, quint64 size, qint64 mtime) {
+        core::Entry e;
+        e.name = name;
+        e.display = QString::fromUtf8(name);
+        e.type = dir ? core::EntryType::Directory : core::EntryType::File;
+        e.size = size;
+        e.modified = mtime;
+        core::computeSortKey(e);
+        return e;
+    };
+    std::vector<core::Entry> v = {make("b", false, 30, 2), make("a", false, 10, 3), make("c", false, 20, 1),
+                                  make("d2", true, 0, 5), make("d1", true, 0, 4), make("d3", true, 0, 6)};
+    auto names = [&v] {
+        QStringList n;
+        for (const auto& e : v)
+            n << e.display;
+        return n;
+    };
+    // Folders first; without a value of their own they go by name.
+    core::sortEntries(v, core::SortBy::Size, true);
+    QCOMPARE(names(), QStringList({"d1", "d2", "d3", "a", "c", "b"}));
+    core::sortEntries(v, core::SortBy::Size, false);
+    QCOMPARE(names(), QStringList({"d3", "d2", "d1", "b", "c", "a"}));
+    core::sortEntries(v, core::SortBy::Modified, true);
+    QCOMPARE(names(), QStringList({"d1", "d2", "d3", "c", "b", "a"}));
+    core::sortEntries(v, core::SortBy::Modified, false);
+    QCOMPARE(names(), QStringList({"d3", "d2", "d1", "a", "b", "c"}));
+    // Items: the known counts first, the unknown after them by name in
+    // either direction; files have no count and keep name order.
+    const QHash<QByteArray, quint64> counts = {{"d1", 5}, {"d3", 2}};
+    core::sortEntries(v, core::SortBy::Items, true, counts);
+    QCOMPARE(names(), QStringList({"d3", "d1", "d2", "a", "b", "c"}));
+    core::sortEntries(v, core::SortBy::Items, false, counts);
+    QCOMPARE(names(), QStringList({"d1", "d3", "d2", "c", "b", "a"}));
+    // Size with walked totals for some folders.
+    core::sortEntries(v, core::SortBy::Size, true, {{"d1", 100}, {"d2", 50}});
+    QCOMPARE(names(), QStringList({"d2", "d1", "d3", "a", "c", "b"}));
+    // Equal values fall back to the name, so the order is stable.
+    v = {make("y", false, 1, 1), make("x", false, 1, 1)};
+    core::sortEntries(v, core::SortBy::Size, true);
+    QCOMPARE(names(), QStringList({"x", "y"}));
+    core::sortEntries(v, core::SortBy::Modified, false);
+    QCOMPARE(names(), QStringList({"y", "x"}));
+
+    QCOMPARE(core::sortFromName(QStringLiteral("modified")), core::SortBy::Modified);
+    QCOMPARE(core::sortFromName(QStringLiteral("bogus")), core::SortBy::Name);
+    QCOMPARE(QByteArray(core::sortName(core::SortBy::Items)), QByteArray("items"));
 }
 
 void CoreTest::metadata()

@@ -12,7 +12,8 @@ namespace core {
 
 namespace {
 const char* const kAttributes =
-    "standard::name,standard::display-name,standard::type,standard::is-hidden,standard::is-symlink,unix::device";
+    "standard::name,standard::display-name,standard::type,standard::is-hidden,standard::is-symlink,"
+    "standard::size,time::modified,unix::device";
 constexpr size_t kBatch = 200;
 constexpr size_t kLimit = 20000;
 constexpr qint64 kBatchMs = 150;
@@ -110,6 +111,9 @@ struct Finder::Run {
                                                             : EntryType::Special;
                     e.hidden = g_file_info_get_is_hidden(info);
                     e.symlink = g_file_info_get_is_symlink(info);
+                    e.size = static_cast<quint64>(g_file_info_get_size(info));
+                    e.modified = static_cast<qint64>(
+                        g_file_info_get_attribute_uint64(info, G_FILE_ATTRIBUTE_TIME_MODIFIED));
                     computeSortKey(e);
                     batch.push_back(std::move(e));
                     ++found;

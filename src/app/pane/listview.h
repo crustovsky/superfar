@@ -19,6 +19,9 @@ public:
     void applyColumns(const QHash<QString, int>& widths, const QStringList& hidden);
     static QString columnName(int column);
 
+    // The header's sort indicator; the header flips it on a click and
+    // sortChanged() reports both.
+    void showSort(int column, bool ascending);
     void setActivePane(bool active);
     // Thumbnail mode: taller rows with a bigger decoration.
     void setThumbnailRows(bool on);
@@ -34,6 +37,7 @@ Q_SIGNALS:
     void cursorMoved();
     void editingFinished();
     void columnResized(const QString& column, int width);  // by the user
+    void sortChanged(int column, bool ascending);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

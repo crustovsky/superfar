@@ -8,16 +8,21 @@
 #include <QLocale>
 #include <QMimeData>
 #include <QRegularExpression>
+#include <QTimer>
 #include <algorithm>
 
 #include <malloc.h>
 
 ListModel::ListModel(core::DirSizePool* sizes, core::Thumbnailer* thumbs, QObject* parent)
     : QAbstractTableModel(parent)
+    , resortTimer_(new QTimer(this))
     , meta_(new core::MetadataQuery(this))
     , sizer_(new core::DirSizer(sizes, this))
     , thumbs_(thumbs)
 {
+    resortTimer_->setSingleShot(true);
+    resortTimer_->setInterval(300);
+    connect(resortTimer_, &QTimer::timeout, this, &ListModel::resortNeeded);
     connect(meta_, &core::MetadataQuery::result, this, &ListModel::onMetadata);
     connect(sizer_, &core::DirSizer::result, this, &ListModel::onDirSize);
     connect(thumbs_, &core::Thumbnailer::ready, this, &ListModel::onThumbnail);
@@ -97,7 +102,9 @@ void ListModel::append(std::vector<core::Entry> batch)
 {
     if (batch.empty())
         return;
-    core::sortByName(batch);
+    // A batch on its own: folder values are mostly unknown while the
+    // load streams, the full sort in finishLoad has them.
+    core::sortEntries(batch, sortBy_, sortAscending_);
 
     std::vector<quint32> added;
     const auto base = static_cast<quint32>(entries_.size());
@@ -135,12 +142,16 @@ void ListModel::presetDirCount(const QByteArray& name, quint64 direct)
 void ListModel::finishLoad()
 {
     beginResetModel();
-    core::sortByName(entries_);
+    sortEntries();
     marked_.assign(entries_.size(), 0);  // sorted entries: marks are restored by name
     markedCount_ = 0;
     rebuildRows();
     endResetModel();
     Q_EMIT marksChanged();
+    requestSortValues();
+    // The batches and the outgrown vector buffers are garbage now; hand
+    // their pages back so a big folder's footprint is what it holds.
+    malloc_trim(0);
 }
 
 void ListModel::setMarked(int row, bool on)
@@ -216,6 +227,7 @@ void ListModel::setShowHidden(bool on)
     beginResetModel();
     rebuildRows();
     endResetModel();
+    requestSortValues();
 }
 
 void ListModel::setRecursiveSizes(bool on)
@@ -231,6 +243,10 @@ void ListModel::setRecursiveSizes(bool on)
             d.recursive = false;
     }
     rowsRepaint();
+    if (sortBy_ == core::SortBy::Size || sortBy_ == core::SortBy::Items) {
+        resortTimer_->start();  // the folder values changed meaning
+        requestSortValues();
+    }
 }
 
 void ListModel::requestSize(int row)
@@ -447,11 +463,7 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
                 return QLocale().formattedDataSize(static_cast<qint64>(d->bytes), 1,
                                                    QLocale::DataSizeIecFormat);
             }
-            const core::Metadata* m = metadata(e);
-            if (!m || !m->ok)
-                return {};
-            return QLocale().formattedDataSize(static_cast<qint64>(m->size), 1,
-                                               QLocale::DataSizeIecFormat);
+            return QLocale().formattedDataSize(static_cast<qint64>(e.size), 1, QLocale::DataSizeIecFormat);
         }
         case ItemsColumn: {
             if (!e.isDir())
@@ -461,12 +473,10 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
                 return {};
             return QLocale().toString(static_cast<qint64>(d->recursive ? d->total() : d->direct));
         }
-        case ModifiedColumn: {
-            const core::Metadata* m = metadata(e);
-            if (!m || !m->ok)
-                return {};
-            return QDateTime::fromSecsSinceEpoch(m->modified).toString("yyyy-MM-dd HH:mm");
-        }
+        case ModifiedColumn:
+            if (e.modified == 0)
+                return {};  // the backend did not say
+            return QDateTime::fromSecsSinceEpoch(e.modified).toString("yyyy-MM-dd HH:mm");
         default:
             return {};
         }
@@ -554,6 +564,8 @@ void ListModel::onDirSize(quint64 generation, const QByteArray& name, const core
     const int row = rowOf(name);
     if (row >= 0)
         Q_EMIT dataChanged(index(row, SizeColumn), index(row, ItemsColumn));
+    if (size.complete && sortNeedsFolders())
+        resortTimer_->start();
 }
 
 QIcon ListModel::icon(const core::Entry& entry) const
