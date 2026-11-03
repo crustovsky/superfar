@@ -67,6 +67,7 @@ enum class Command {
     Sync,              // Shift+F5: folder sync between the two active tabs
     About,             // unbound: the Help menu, and once per new version
     ToggleTree,        // Ctrl+F5: hide or show the folder tree
+    Pack,              // Alt+F5: the marked items into a new archive
 };
 
 Command lookup(const QKeySequence& key);

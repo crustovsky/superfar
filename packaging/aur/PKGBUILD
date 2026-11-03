@@ -9,7 +9,7 @@ license=('MIT')
 depends=('qt6-base' 'glib2' 'glycin' 'hicolor-icon-theme')
 makedepends=('cmake' 'ninja' 'pkgconf')
 optdepends=('gvfs: trash, mounts, network shares'
-            'libarchive: open archives as folders'
+            'libarchive: open archives as folders, pack into them'
             'tumbler: thumbnails and media previews'
             'xdg-terminal-exec: F4 and the command line in your terminal')
 options=('!debug')

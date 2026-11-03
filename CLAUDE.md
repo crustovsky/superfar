@@ -98,6 +98,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Shift+F5 folder sync panel: compares the active tab with the other
   pane's by size, time and optional SHA-256; copies or trashes the
   checked differences through the job engine
+- Alt+F5 pack panel: the marked items into a new zip, tar.gz, tar.xz,
+  tar.zst or 7z (name, level, this folder or the other pane's) by
+  bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
   the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
   taller rows); Ctrl+F5 hides the tree; a header click sorts the tab
@@ -122,7 +125,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   marked members to the other pane
 - Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
   with credentials asked in the window); Ctrl+G go to folder, fuzzy over
-  history by frecency; Ctrl+H toggles hidden files
+  history by frecency; Ctrl+H toggles hidden files; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
@@ -176,14 +179,15 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   sort.cpp            natural sort via GLib's filename collation key,
                       computed once per entry, dirs first
   dirsize.cpp         recursive size and count walker (see rule 9)
-  jobs/               copy, move, trash, delete, mkdir: progress, pause,
-                      skip, cancel, conflict policy, error log; one worker
-                      thread per job. Copy is g_file_copy with a progress
-                      callback (reflinks, splice, metadata and server-side
-                      remote copy for free): Pause blocks inside the
-                      callback, Skip cancels the per-file cancellable.
-                      Move is g_file_move. Trash failure on another volume
-                      offers permanent delete in the window
+  jobs/               copy, move, trash, delete, extract, pack: progress,
+                      pause, skip, cancel, conflict policy, error log; one
+                      worker thread per job. Copy is g_file_copy with a
+                      progress callback (reflinks, splice, metadata and
+                      server-side remote copy for free): Pause blocks
+                      inside the callback, Skip cancels the per-file
+                      cancellable. Move is g_file_move. Trash failure on
+                      another volume offers permanent delete in the
+                      window. Extract and pack run bsdtar in a child
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal launch
   mounts.cpp          volumes, mount and unmount, GMountOperation that
@@ -295,18 +299,12 @@ a gate.
 
 ## Milestones
 
-All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30):
-skeleton and bench; dual pane, tabs, marks, function bar; jobs and
-monitor; counts and recursive sizes; filter, glob, command line,
-viewer, preview, edit, rename, open-with; desktop integration (DnD,
-clipboard, mounts, Trash, auth, remote URIs, bookmarks, FileManager1);
-config and session; find, properties, Ctrl+D, Network root;
-thumbnails; multi-rename; folder sync; archives. The commit on each tag
-carries the rationale.
+All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30);
+the commit on each tag carries the rationale. Work since then goes
+through GitHub issues, one branch and PR per issue.
 
-Later: multi-folder create, Opus style (F7 grows into a multi-line field:
-one folder per line, and a/b/c creates the whole path, every folder made
-in one go with the cursor on the first); inline folder expanders;
+Later: multi-folder create, Opus style (F7 takes one folder per line,
+a/b/c makes the path, cursor on the first); inline folder expanders;
 translations after 1.0.
 
 ## Release
