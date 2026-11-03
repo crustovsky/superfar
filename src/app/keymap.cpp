@@ -21,6 +21,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_F8), Command::Trash},
         {QKeySequence(Qt::Key_F9), Command::Menu},
         {QKeySequence(Qt::Key_F10), Command::Quit},
+        {QKeySequence(Qt::SHIFT | Qt::Key_F1), Command::About},
         {QKeySequence(Qt::SHIFT | Qt::Key_F4), Command::NewFile},
         {QKeySequence(Qt::SHIFT | Qt::Key_F8), Command::DeletePermanent},
         {QKeySequence(Qt::ALT | Qt::Key_F7), Command::Find},

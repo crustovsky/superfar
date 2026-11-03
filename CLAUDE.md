@@ -91,8 +91,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
   cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
   as [name])
-- F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
-  F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- F1 help (Shift+F1 about), F2 rename inline, F3 view (folder: compute
+  size), F4 edit, F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
 - Shift+F5 folder sync panel: compares the active tab with the other

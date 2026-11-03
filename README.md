@@ -93,6 +93,7 @@ remapped. The defaults:
 | Key | Action |
 |-----|--------|
 | F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
+| Shift+F1 | about: name, version and build date |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
