@@ -100,7 +100,8 @@ remapped. The defaults:
 | F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
-| Ctrl+T, Ctrl+W, Ctrl+Tab | new tab, close tab, next tab |
+| Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+Shift+Tab | new tab, close tab, next tab, previous tab |
+| Ctrl+R | reload the folder |
 | Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |

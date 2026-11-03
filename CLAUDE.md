@@ -125,7 +125,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   marked members to the other pane
 - Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
   with credentials asked in the window); Ctrl+G go to folder, fuzzy over
-  history by frecency; Ctrl+H toggles hidden files
+  history by frecency; Ctrl+H toggles hidden files; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
