@@ -69,6 +69,7 @@ private Q_SLOTS:
     void dirSizeCancel();
     void readerWindows();
     void details();
+    void textTypes();
     void shellQuoting();
     void imageDecode();
     void bookmarks();
@@ -1302,6 +1303,18 @@ void CoreTest::compareTrees()
     const auto hashed = compare(true);
     QCOMPARE(hashed.value("content.txt"), core::Difference::ContentDiffers);
     QCOMPARE(hashed.value("same.txt"), core::Difference::Same);
+}
+
+void CoreTest::textTypes()
+{
+    for (const char* t : {"text/plain", "text/x-c++src", "application/xml", "application/json", "image/svg+xml",
+                          "application/ld+json", "application/x-shellscript", "application/javascript", "application/x-empty"})
+        QVERIFY2(core::isTextType(QString::fromLatin1(t)), t);
+    for (const char* t : {"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          "application/vnd.oasis.opendocument.text", "application/zip", "application/pdf",
+                          "application/octet-stream", "image/png"})
+        QVERIFY2(!core::isTextType(QString::fromLatin1(t)), t);
 }
 
 void CoreTest::archiveListing()

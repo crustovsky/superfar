@@ -41,6 +41,11 @@ struct Details {
 
 void queryDetails(const Location& file, std::function<void(const Details&)> done);
 
+// Whether a content type names text worth showing as such: text/*,
+// XML and JSON (plain or as a +suffix), scripts, the empty file. Office
+// documents carry "xml" in their type and are zips.
+bool isTextType(const QString& contentType);
+
 class MetadataQuery : public QObject {
     Q_OBJECT
 public:
