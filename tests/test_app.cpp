@@ -28,9 +28,7 @@ void AppTest::everyCommandIsComplete()
         const QString name = keymap::name(c);
         QVERIFY2(!name.isEmpty(), qPrintable(QStringLiteral("command %1 (%2) has no config name").arg(i).arg(keymap::label(c))));
         QCOMPARE(keymap::fromName(name), c);
-        // About is reached from the menu and the first start of a version.
-        if (c != Command::About)
-            QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
+        QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
         QVERIFY2(help::text().contains(name.isEmpty() ? QString() : keymap::keysOf(c).isEmpty()
                                                        ? QStringLiteral("(unbound)")
                                                        : keymap::keysOf(c).first().toString(QKeySequence::NativeText)),

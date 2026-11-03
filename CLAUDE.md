@@ -73,8 +73,8 @@ without GTK carries no GNOME-isms.
 
 Rejected: GTK4 + Rust (close second: GPU renderer memory, client-side
 decorations only, selection model fights a FAR cursor), Rust-native
-toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3
-(maintenance only), QML, web / Flutter / wx, a separate backend process.
+toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3, QML,
+web / Flutter / wx, a separate backend process.
 
 ## Dependencies
 
@@ -91,8 +91,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
   cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
   as [name])
-- F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
-  F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- F1 help (Shift+F1 about), F2 rename inline, F3 view (folder: compute
+  size), F4 edit, F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
 - Shift+F5 folder sync panel: compares the active tab with the other
@@ -288,9 +288,8 @@ Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 | anonymous memory after leaving it  | < 24 MB  | 17 MB    |
 
 Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
-folder open, depending on what else shares Qt's pages. Reference on the
-same machine: Thunar 4.20 maps its window in about 340 ms and the bench
-read about 400 MB PSS on either folder.
+folder open, depending on what else shares Qt's pages. Thunar 4.20 on
+the same machine: first frame about 340 ms, about 400 MB PSS.
 
 The 100k folder costs about 360 bytes per entry today (name, display
 string, collation key, row index, name hash). That is the number to
@@ -300,8 +299,7 @@ a gate.
 ## Milestones
 
 All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30);
-the commit on each tag carries the rationale. Work since then goes
-through GitHub issues, one branch and PR per issue.
+the commit on each tag carries the rationale. Since then: issues.
 
 Later: multi-folder create, Opus style (F7 takes one folder per line,
 a/b/c makes the path, cursor on the first); inline folder expanders;
@@ -310,33 +308,27 @@ translations after 1.0.
 ## Release
 
 `tools/release.sh X.Y.Z` bumps the version in CMakeLists.txt (the one
-source: the binary and the tarball read it) and the PKGBUILD, commits
-and tags vX.Y.Z. `git push --follow-tags` runs release.yml, which
-refuses a tag that disagrees with CMakeLists.txt, builds the pacman
-package and the binary tarball on Arch and attaches both to a GitHub
-release with generated notes. CI builds the same two files on every
-push, runs ctest and `tools/smoke.sh`: scripted offscreen sessions
-(start, mkdir, rename, copy, every overlay, bad arguments) that must
-exit cleanly and leave the right files. After the tag is pushed,
-hash GitHub's archive tarball for it into the PKGBUILD's sha256sums
-(the AUR copy must match) and commit that without a tag.
+source) and the PKGBUILD, commits and tags vX.Y.Z. `git push
+--follow-tags` runs release.yml, which refuses a tag that disagrees
+with CMakeLists.txt, builds the pacman package and the binary tarball
+on Arch and attaches both to a GitHub release. CI builds the same two
+files on every push, runs ctest and `tools/smoke.sh` (scripted
+offscreen sessions that must exit cleanly and leave the right files).
+After the tag is pushed, hash GitHub's archive tarball into the
+PKGBUILD's sha256sums (the AUR copy must match) and commit that.
 
-Before a release: build with `-fsanitize=address,undefined` into
-build-asan and run ctest there (tests/test_hostile.cpp is the input
-fuzz: hostile names, loops, an unreadable folder, a sparse file past
-4 GiB, archives whose members climb out), run clang-tidy with the
-bugprone, cert, performance and clang-analyzer checks over
-compile_commands.json, render once with a light theme and once with
-plain Fusion, and soak tabs open and close while memory is sampled:
-it must plateau, not climb. `unshare -Urm tools/screenshots.sh`
-re-renders the README screenshots from a generic demo tree.
+Before a release: ctest in an `-fsanitize=address,undefined` build
+(tests/test_hostile.cpp is the input fuzz), clang-tidy with the
+bugprone, cert, performance and clang-analyzer checks, a render with a
+light theme and one with plain Fusion, and a soak of tabs opening and
+closing while memory is sampled: it must plateau. `unshare -Urm
+tools/screenshots.sh` re-renders the README screenshots.
 
 ## Non-goals
 
 Plugins, theming beyond the platform theme, an embedded terminal, a
-system-wide search index (that is the launcher's job), translations
-before 1.0. Media and PDF previews only as thumbnails from tumbler,
-never through a decoder linked into the process.
+search index (the launcher's job), translations before 1.0. Media and
+PDF previews only as tumbler thumbnails, never an in-process decoder.
 
 ## Conventions
 
@@ -349,5 +341,10 @@ never through a decoder linked into the process.
   never includes QtGui or QtWidgets
 - Test filesystem ops against a temp dir with QtTest, never mock the
   filesystem
+- A defect found while working on something else, pre-existing or just
+  made, gets a GitHub issue first (gh issue create, label bug, the
+  style of the open ones: what is wrong, then "Proposed:" bullets) and
+  its fix closes the issue from the commit. One branch and PR per
+  issue; a PR that builds on another is stacked on it
 - Commit messages carry the rationale. This file holds rules, not history;
   keep it under 350 lines
