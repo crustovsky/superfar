@@ -103,6 +103,7 @@ remapped. The defaults:
 | Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
 | Space, Ctrl+A, * | mark, mark all, invert |
+| Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
 | Ctrl+=, Ctrl+- | mark and unmark by pattern |
 | Enter, Shift+Enter | open with the default app, choose an app |
 | Backspace, Left, Right | go up, go up, enter |
@@ -111,7 +112,7 @@ remapped. The defaults:
 | Ctrl+H | show hidden files |
 | Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
 | Ctrl+Space | the command line: runs in the tab's folder in a terminal |
-| Esc | clear the filter, close the viewer, close the preview |
+| Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
 
 Typing filters the current tab. Backspace edits the filter while one is
 set, Space appends to it. The bar at the bottom shows what each

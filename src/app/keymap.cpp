@@ -41,6 +41,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Space), Command::MarkToggle},
         {QKeySequence(Qt::CTRL | Qt::Key_A), Command::MarkAll},
         {QKeySequence(Qt::Key_Asterisk), Command::InvertMarks},
+        {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A), Command::ClearMarks},
         {QKeySequence(Qt::Key_Backspace), Command::GoUp},
         {QKeySequence(Qt::Key_Left), Command::GoUp},
         {QKeySequence(Qt::Key_Right), Command::Activate},
@@ -139,6 +140,7 @@ QString label(Command command)
     case Command::MarkToggle: return QStringLiteral("Select");
     case Command::MarkAll: return QStringLiteral("Select all");
     case Command::InvertMarks: return QStringLiteral("Invert");
+    case Command::ClearMarks: return QStringLiteral("Clear marks");
     case Command::GoUp: return QStringLiteral("Up");
     case Command::Activate: return QStringLiteral("Enter");
     case Command::Preview: return QStringLiteral("Preview");
@@ -178,7 +180,8 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::NewTab, "NewTab"}, {Command::CloseTab, "CloseTab"}, {Command::NextTab, "NextTab"},
         {Command::PrevTab, "PrevTab"}, {Command::ToggleHidden, "ToggleHidden"}, {Command::Reload, "Reload"},
         {Command::Mark, "Mark"}, {Command::MarkUp, "MarkUp"}, {Command::MarkToggle, "MarkToggle"}, {Command::MarkAll, "MarkAll"},
-        {Command::InvertMarks, "InvertMarks"}, {Command::GoUp, "GoUp"}, {Command::Activate, "Activate"},
+        {Command::InvertMarks, "InvertMarks"}, {Command::ClearMarks, "ClearMarks"}, {Command::GoUp, "GoUp"},
+        {Command::Activate, "Activate"},
         {Command::Preview, "Preview"}, {Command::ToggleSizes, "ToggleSizes"}, {Command::Cancel, "Cancel"},
         {Command::MarkGlob, "MarkGlob"}, {Command::UnmarkGlob, "UnmarkGlob"}, {Command::OpenWith, "OpenWith"},
         {Command::FocusCommandLine, "FocusCommandLine"}, {Command::CopyClip, "CopyClip"},

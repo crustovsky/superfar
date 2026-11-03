@@ -44,6 +44,7 @@ enum class Command {
     MarkToggle,   // toggle the cursor row, stay
     MarkAll,
     InvertMarks,
+    ClearMarks,   // marks come back after a round trip; this drops them
     GoUp,
     Activate,  // enter the cursor folder
     Preview,

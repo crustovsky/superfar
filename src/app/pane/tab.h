@@ -10,6 +10,7 @@
 #include "core/sort.h"
 #include "core/space.h"
 #include "keymap.h"
+#include "pane/markstore.h"
 
 #include <QSet>
 #include <QWidget>
@@ -46,7 +47,11 @@ public:
     // The marked entries, or the cursor entry when nothing is marked.
     std::vector<core::Location> selectedLocations() const;
     QString selectionText() const;  // "3 items" or the one name
+    int markedCount() const;
     void clearMarks();
+    // A job in dir ended: its marks are spent, whether the tab still
+    // shows dir or keeps them for its return.
+    void clearMarks(const core::Location& dir);
     bool monitoring() const;
     // The cursor entry; invalid when the list is empty.
     core::Location cursorLocation() const;
@@ -112,6 +117,11 @@ private:
     void placeCursor();
     void updateStatus();
     void fallBack(const QString& why);
+    // Marks are kept per folder across a round trip: stashed on the way
+    // out, taken back when a load for the folder ends.
+    QByteArray markKey() const;
+    void stashMarks();
+    void restoreMarks();
 
     core::Location location_;
     quint64 generation_ = 0;
@@ -127,7 +137,8 @@ private:
     ListModel* model_;
     ListView* view_;
     QByteArray cursorName_;       // where the cursor goes once the load ends
-    QSet<QByteArray> pendingMarks_;  // marks to restore once the load ends
+    QSet<QByteArray> pendingMarks_;  // marks to restore once the load ends (a reload)
+    MarkStore marks_;                // marks of folders left behind
     QString spaceText_;
     int scrollValue_ = -1;  // restored after a reload
     bool current_ = true;

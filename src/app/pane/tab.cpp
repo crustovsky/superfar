@@ -79,6 +79,7 @@ void Tab::navigate(const core::Location& dir)
         Q_EMIT openInNewTab(dir);
         return;
     }
+    stashMarks();
     pendingMarks_.clear();
     load(dir);
     if (location_.isValid())
@@ -120,10 +121,7 @@ void Tab::onSearchFinished(quint64 generation, quint64 scanned)
     if (generation != generation_)
         return;
     model_->finishLoad();
-    if (!pendingMarks_.isEmpty()) {
-        model_->applyMarks(pendingMarks_);
-        pendingMarks_.clear();
-    }
+    restoreMarks();
     placeCursor();
     Q_EMIT statusChanged(tr("%n matches for %1", nullptr, model_->rowCount()).arg(search_)
                              + tr(", %n entries scanned", nullptr, static_cast<int>(scanned)),
@@ -159,9 +157,53 @@ QString Tab::selectionText() const
     return idx.isValid() ? model_->entryAt(idx.row()).display : QString();
 }
 
+int Tab::markedCount() const
+{
+    return model_->markedCount();
+}
+
 void Tab::clearMarks()
 {
     model_->markAll(false);
+}
+
+void Tab::clearMarks(const core::Location& dir)
+{
+    if (location_ == dir && !isArchive() && search_.isEmpty())
+        model_->markAll(false);
+    else
+        marks_.forget(dir.uri().toUtf8());
+}
+
+QByteArray Tab::markKey() const
+{
+    // One folder view, one key: an archive folder and a search are not
+    // the folder their location names.
+    QByteArray key = location_.uri().toUtf8();
+    if (isArchive())
+        key += '\0' + archiveDir_;
+    else if (!search_.isEmpty())
+        key += '\0' + search_.toUtf8();
+    return key;
+}
+
+void Tab::stashMarks()
+{
+    if (location_.isValid() && model_->markedCount() > 0)
+        marks_.remember(markKey(), model_->markedNames());
+}
+
+void Tab::restoreMarks()
+{
+    // A reload carries its marks itself; what the store holds for this
+    // folder is spent either way, so a cleared set does not come back.
+    QSet<QByteArray> names = marks_.take(markKey());
+    if (!pendingMarks_.isEmpty()) {
+        names = std::move(pendingMarks_);
+        pendingMarks_.clear();
+    }
+    if (!names.isEmpty())
+        model_->applyMarks(names);
 }
 
 bool Tab::monitoring() const
@@ -446,6 +488,9 @@ bool Tab::execute(keymap::Command command)
     case Command::InvertMarks:
         model_->invertMarks();
         return true;
+    case Command::ClearMarks:
+        model_->markAll(false);
+        return true;
     case Command::GoUp:
         if (!model_->filter().isEmpty())
             setFilter(model_->filter().chopped(1));  // Backspace edits the filter first
@@ -502,10 +547,7 @@ void Tab::onFinished(quint64 generation)
     if (generation != generation_)
         return;
     model_->finishLoad();
-    if (!pendingMarks_.isEmpty()) {
-        model_->applyMarks(pendingMarks_);
-        pendingMarks_.clear();
-    }
+    restoreMarks();
     placeCursor();
     updateStatus();
     space_->request(location_, generation_);
