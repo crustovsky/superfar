@@ -299,8 +299,7 @@ a gate.
 ## Milestones
 
 All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30);
-the commit on each tag carries the rationale. Work since then goes
-through GitHub issues, one branch and PR per issue.
+the commit on each tag carries the rationale. Since then: issues.
 
 Later: multi-folder create, Opus style (F7 takes one folder per line,
 a/b/c makes the path, cursor on the first); inline folder expanders;
@@ -328,9 +327,8 @@ tools/screenshots.sh` re-renders the README screenshots.
 ## Non-goals
 
 Plugins, theming beyond the platform theme, an embedded terminal, a
-system-wide search index (that is the launcher's job), translations
-before 1.0. Media and PDF previews only as thumbnails from tumbler,
-never through a decoder linked into the process.
+search index (the launcher's job), translations before 1.0. Media and
+PDF previews only as tumbler thumbnails, never an in-process decoder.
 
 ## Conventions
 
