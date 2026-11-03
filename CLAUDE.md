@@ -73,8 +73,8 @@ without GTK carries no GNOME-isms.
 
 Rejected: GTK4 + Rust (close second: GPU renderer memory, client-side
 decorations only, selection model fights a FAR cursor), Rust-native
-toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3
-(maintenance only), QML, web / Flutter / wx, a separate backend process.
+toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3, QML,
+web / Flutter / wx, a separate backend process.
 
 ## Dependencies
 
@@ -288,9 +288,8 @@ Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 | anonymous memory after leaving it  | < 24 MB  | 17 MB    |
 
 Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
-folder open, depending on what else shares Qt's pages. Reference on the
-same machine: Thunar 4.20 maps its window in about 340 ms and the bench
-read about 400 MB PSS on either folder.
+folder open, depending on what else shares Qt's pages. Thunar 4.20 on
+the same machine: first frame about 340 ms, about 400 MB PSS.
 
 The 100k folder costs about 360 bytes per entry today (name, display
 string, collation key, row index, name hash). That is the number to
@@ -349,5 +348,10 @@ never through a decoder linked into the process.
   never includes QtGui or QtWidgets
 - Test filesystem ops against a temp dir with QtTest, never mock the
   filesystem
+- A defect found while working on something else, pre-existing or just
+  made, gets a GitHub issue first (gh issue create, label bug, the
+  style of the open ones: what is wrong, then "Proposed:" bullets) and
+  its fix closes the issue from the commit. One branch and PR per
+  issue; a PR that builds on another is stacked on it
 - Commit messages carry the rationale. This file holds rules, not history;
   keep it under 350 lines
