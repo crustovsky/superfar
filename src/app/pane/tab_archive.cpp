@@ -27,6 +27,7 @@ void Tab::onArchiveListed(quint64 generation, std::vector<core::ArchiveEntry> en
 
 void Tab::showArchiveDir(const QByteArray& dir)
 {
+    stashMarks();  // under the folder being left; a reload takes its own back
     archiveDir_ = dir;
     const QByteArray prefix = dir.isEmpty() ? QByteArray() : dir + '/';
     // Direct children of dir; folders may exist only implicitly, through
@@ -77,6 +78,7 @@ void Tab::showArchiveDir(const QByteArray& dir)
     for (auto it = counts.cbegin(); it != counts.cend(); ++it)
         model_->presetDirCount(it.key(), it.value());
     model_->finishLoad();
+    restoreMarks();
     placeCursor();
     updateStatus();
     Q_EMIT locationChanged(location_);

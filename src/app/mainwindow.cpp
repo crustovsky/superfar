@@ -396,6 +396,8 @@ void MainWindow::execute(keymap::Command command)
             togglePreview();
             return;
         }
+        if (Tab* tab = active_->activeTab(); tab->markedCount() > 0)
+            tab->clearMarks();  // last of all: nothing else was open
         return;
     default:
         break;
@@ -736,8 +738,8 @@ void MainWindow::runJob(core::Job* job, Tab* sourceTab, const core::Location& de
     QPointer<Tab> source(sourceTab);
     const core::Location sourceDir = sourceTab->location();
     connect(job, &core::Job::finished, this, [this, source, sourceDir, destination] {
-        if (source && source->location() == sourceDir)
-            source->clearMarks();
+        if (source)
+            source->clearMarks(sourceDir);  // live, or kept for the tab's return
         refreshAt(sourceDir);
         refreshAt(destination);
         tree_->refresh(sourceDir);

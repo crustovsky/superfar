@@ -41,11 +41,12 @@ QString describe(keymap::Command c)
     case Command::MarkToggle: return QStringLiteral("mark (when no filter is set)");
     case Command::MarkAll: return QStringLiteral("mark all");
     case Command::InvertMarks: return QStringLiteral("invert marks");
+    case Command::ClearMarks: return QStringLiteral("clear the marks (they come back with the folder after a round trip)");
     case Command::GoUp: return QStringLiteral("go up; with a filter set, edit the filter");
     case Command::Activate: return QStringLiteral("enter the folder, open the file with its default app, or open an archive as a folder");
     case Command::Preview: return QStringLiteral("preview of the cursor item in the other pane, follows the cursor");
     case Command::ToggleSizes: return QStringLiteral("recursive folder sizes and counts for this tab");
-    case Command::Cancel: return QStringLiteral("clear the filter, close the viewer, close the preview");
+    case Command::Cancel: return QStringLiteral("clear the filter, close the viewer or panel, close the preview, then clear the marks");
     case Command::MarkGlob: return QStringLiteral("mark by pattern");
     case Command::UnmarkGlob: return QStringLiteral("unmark by pattern");
     case Command::OpenWith: return QStringLiteral("open the file with a chosen app");

@@ -36,6 +36,7 @@ const std::vector<Group>& groups()
         {"&Select", {
             {Command::Mark, "Mark and move &down"}, {Command::MarkUp, "Mark and move &up"},
             {Command::MarkToggle, "&Mark"}, {Command::MarkAll, "Mark &all"}, {Command::InvertMarks, "&Invert marks"},
+            {Command::ClearMarks, "C&lear marks"},
             {Command::MarkGlob, "Mark by &pattern"}, {Command::UnmarkGlob, "Unmark by pa&ttern"},
             {Command::None, ""},
             {Command::CopyClip, "&Copy to clipboard"}, {Command::CutClip, "Cu&t to clipboard"},

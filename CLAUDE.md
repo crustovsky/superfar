@@ -104,10 +104,13 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
   moves up; Space selects when the filter is empty;
   Ctrl+= / Ctrl+- select and deselect by glob (keypad + and - too);
-  Ctrl+A all; * invert. Selection is marks, separate from the cursor
+  Ctrl+A all; * invert; Ctrl+Shift+A clears. Selection is marks,
+  separate from the cursor; a folder's marks come back when the tab
+  returns to it after a trip into a subfolder or an archive
 - Enter opens a file with its default app; Shift+Enter shows the
   in-window open-with list; Alt+Enter the properties panel; Esc clears
-  the filter, closes the viewer or panel, then the preview
+  the filter, closes the viewer or panel, then the preview, then the
+  marks
 - Ctrl+D bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
