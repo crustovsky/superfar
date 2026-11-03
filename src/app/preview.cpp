@@ -128,10 +128,15 @@ Preview::Preview(const Services& services, QWidget* parent)
     });
     connect(reader_, &core::Reader::opened, this, [this](quint64) { reader_->read(0, kTextCap); });
     connect(reader_, &core::Reader::data, this, [this](quint64, const QByteArray& bytes) {
+        reader_->close();
+        if (bytes.contains('\0')) {
+            // Not text whatever the type said: the details stay on their own.
+            info_->setText(details_ + QLatin1Char('\n') + tr("Binary content"));
+            return;
+        }
         text_->setFont(textFont_);
         text_->setPlainText(QString::fromUtf8(bytes));
         stack_->setCurrentWidget(text_);
-        reader_->close();
     });
     connect(lister_, &core::ArchiveLister::listed, this,
             [this](quint64 gen, const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped) {
@@ -209,9 +214,7 @@ void Preview::onDetails(const core::Details& d)
         image_->load(item_, static_cast<quint32>(box.width()), static_cast<quint32>(box.height()));
         return;
     }
-    const QByteArray type = d.contentType.toUtf8();
-    if (d.contentType.startsWith(QLatin1String("text/")) || type.contains("xml") || type.contains("json")
-        || type.contains("script") || type == "application/x-empty") {
+    if (core::isTextType(d.contentType)) {
         reader_->open(item_);
         return;
     }
