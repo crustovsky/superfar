@@ -230,7 +230,8 @@ QList<QPair<QString, QStringList>> defaults()
 QList<QPair<QString, QString>> retiredDefaults()
 {
     // As the first run wrote them (portable text: Insert is "Ins").
-    return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)}};  // 0.5: Shift+Down joined it
+    return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)},  // 0.5: Shift+Down joined it
+            {QStringLiteral("About"), QString()}};  // 0.7: it got Shift+F1; an empty line unbinds
 }
 
 QList<QKeySequence> keysOf(Command command)
