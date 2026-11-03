@@ -20,7 +20,7 @@ typedef struct _GCancellable GCancellable;
 
 namespace core {
 
-enum class JobKind { Copy, Move, Trash, Delete, Extract };
+enum class JobKind { Copy, Move, Trash, Delete, Extract, Pack };
 
 struct JobProgress {
     enum class Phase { Scanning, Running, Done };

@@ -1,15 +1,21 @@
 // Jobs and the monitor against a real temp directory.
+#include "core/archive.h"
 #include "core/fileops.h"
+#include "core/jobs/pack.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "core/location.h"
 #include "core/monitor.h"
 
+#include <QSet>
 #include <QDir>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace {
 
@@ -58,6 +64,7 @@ class JobsTest : public QObject {
 private Q_SLOTS:
     void createAndRename();
     void copyTree();
+    void packArchive();
     void copyIntoItself();
     void moveSameFilesystem();
     void conflictAnswers();
@@ -320,6 +327,102 @@ void JobsTest::createAndRename()
         QTest::qWait(5);
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(QFile::permissions(tmp.path() + "/renamed.txt") & (QFileDevice::ReadGroup | QFileDevice::ReadOther), QFileDevice::Permissions());
+}
+
+void JobsTest::packArchive()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString root = tmp.path() + "/src";
+    makeTree(root);
+    write(root + "/-dash.txt", "dash");  // a name, not an option
+    const QByteArray latin1 = QByteArray("caf\xe9.txt");
+    {
+        // Raw bytes: a QString would turn them into U+FFFD.
+        const int fd = ::open((QFile::encodeName(root) + "/" + latin1).constData(), O_WRONLY | O_CREAT, 0644);
+        QVERIFY(fd >= 0);
+        QVERIFY(::write(fd, "bytes", 5) == 5);
+        ::close(fd);
+    }
+    QVERIFY(QDir().mkpath(tmp.path() + "/out"));
+
+    auto listBack = [](const core::Location& archive) {
+        core::ArchiveLister lister;
+        QList<QByteArray> paths;
+        QSet<QByteArray> links;
+        bool done = false;
+        QObject::connect(&lister, &core::ArchiveLister::listed,
+                         [&](quint64, std::vector<core::ArchiveEntry> e, core::ArchiveDropped) {
+                             for (const auto& a : e) {
+                                 paths << a.path;
+                                 if (a.symlink)
+                                     links.insert(a.path);
+                             }
+                             done = true;
+                         });
+        QObject::connect(&lister, &core::ArchiveLister::failed, [&](quint64, const QString&) { done = true; });
+        lister.start(archive, 1);
+        while (!done)
+            QTest::qWait(5);
+        return std::make_pair(paths, links);
+    };
+
+    struct Format {
+        const char* ext;
+        const char* best;
+    };
+    for (const Format& f : {Format{"zip", "zip:compression-level=9"}, Format{"tar.gz", "gzip:compression-level=9"},
+                            Format{"tar.xz", "xz:compression-level=9"}, Format{"tar.zst", "zstd:compression-level=19"},
+                            Format{"7z", "7zip:compression=lzma2"}}) {
+        std::vector<QByteArray> names = {"a.txt", "sub", "link", "-dash.txt"};
+        // zip and 7z keep names in Unicode: libarchive refuses to read a
+        // zip member whose name is not UTF-8 and rewrites the 7z one. The
+        // tar formats carry the bytes through.
+        const bool zip = QByteArray(f.ext) == "zip";
+        const bool unicodeNames = zip || QByteArray(f.ext) == "7z";
+        if (!unicodeNames)
+            names.push_back(latin1);
+        const core::Location archive = loc(tmp.path() + "/out/t." + QString::fromLatin1(f.ext));
+        core::PackJob job(loc(root), names, archive, QByteArray(f.best));
+        runJob(job);
+        if (!job.log().empty() && job.log().front().message.contains(QLatin1String("not installed")))
+            QSKIP("bsdtar not available");
+        QVERIFY2(job.log().empty(), job.log().empty() ? "" : qPrintable(job.log().front().message));
+        QVERIFY(QFile::exists(QFile::decodeName(archive.path())));
+        const auto [paths, links] = listBack(archive);
+        for (const char* expected : {"a.txt", "sub", "sub/b.txt", "sub/deep/c.txt", "link", "-dash.txt"})
+            QVERIFY2(paths.contains(expected), qPrintable(QString::fromLatin1("%1 lacks %2").arg(f.ext, expected)));
+        if (!unicodeNames)
+            QVERIFY2(paths.contains(latin1), f.ext);
+        QVERIFY2(links.contains("link") || zip || QByteArray(f.ext) == "7z", f.ext);  // tar keeps the link as a link
+    }
+
+    // The archive is there already: the job asks, Rename makes "t (2).zip",
+    // Skip leaves it alone and logs the skip.
+    const core::Location zip = loc(tmp.path() + "/out/t.zip");
+    {
+        core::PackJob job(loc(root), {"a.txt"}, zip, {});
+        QSignalSpy asked(&job, &core::Job::conflict);
+        connect(&job, &core::Job::conflict, &job, [&job] { job.answerConflict(core::ConflictAction::Rename, false); });
+        runJob(job);
+        QCOMPARE(asked.count(), 1);
+        QVERIFY(job.log().empty());
+        QVERIFY(QFile::exists(tmp.path() + "/out/t (2).zip"));
+    }
+    {
+        core::PackJob job(loc(root), {"a.txt"}, zip, {});
+        connect(&job, &core::Job::conflict, &job, [&job] { job.answerConflict(core::ConflictAction::Skip, false); });
+        runJob(job);
+        QCOMPARE(job.log().size(), 1u);
+        QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Skipped);
+    }
+    // Not local: refused up front, nothing written.
+    {
+        core::PackJob job(core::Location::fromUri(QStringLiteral("sftp://nowhere/x")), {"a"}, zip, {});
+        runJob(job);
+        QCOMPARE(job.log().size(), 1u);
+        QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Failed);
+    }
 }
 
 QTEST_GUILESS_MAIN(JobsTest)

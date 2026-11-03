@@ -18,6 +18,10 @@ void createFile(const Location& file, std::function<void(const QString& error)> 
 // Sets the unix permission bits.
 void setMode(const Location& file, quint32 mode, std::function<void(const QString& error)> done);
 
+// A sibling name that does not exist yet: "name (2).ext", "name (3).ext"
+// and so on. Synchronous; for job workers answering a Rename.
+Location uniqueSibling(const Location& file);
+
 // Renames in place. done() gets the name the filesystem actually used,
 // raw and for display.
 void renameEntry(const Location& file, const QString& newName,

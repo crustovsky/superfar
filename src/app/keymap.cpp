@@ -70,6 +70,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_F2), Command::MultiRename},
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
         {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
+        {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
     };
     return t;
 }
@@ -163,6 +164,7 @@ QString label(Command command)
     case Command::Sync: return QStringLiteral("Sync");
     case Command::About: return QStringLiteral("About");
     case Command::ToggleTree: return QStringLiteral("Tree");
+    case Command::Pack: return QStringLiteral("Pack");
     case Command::None: return {};
     }
     return {};
@@ -189,7 +191,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"}, {Command::Properties, "Properties"},
         {Command::Bookmark, "Bookmark"}, {Command::ToggleThumbnails, "ToggleThumbnails"},
         {Command::MultiRename, "MultiRename"}, {Command::Sync, "Sync"}, {Command::About, "About"},
-        {Command::ToggleTree, "ToggleTree"},
+        {Command::ToggleTree, "ToggleTree"}, {Command::Pack, "Pack"},
     };
     return n;
 }

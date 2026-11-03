@@ -64,6 +64,7 @@ QString describe(keymap::Command c)
     case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
     case Command::About: return QStringLiteral("name, version and build date");
     case Command::ToggleTree: return QStringLiteral("hide or show the folder tree; hidden, it does no work");
+    case Command::Pack: return QStringLiteral("pack the marked items (or the cursor) into a new archive: zip, tar.gz, tar.xz, tar.zst or 7z");
     case Command::None: return {};
     }
     return {};
