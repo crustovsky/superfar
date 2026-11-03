@@ -84,7 +84,7 @@ QString tree(const std::vector<core::ArchiveEntry>& entries, int maxLines)
         for (const core::Entry& e : it.value()) {
             if (lines.size() >= maxLines)
                 return;
-            const QString indent(depth * 2, QLatin1Char(' '));
+            const QString indent(static_cast<qsizetype>(depth) * 2, QLatin1Char(' '));
             if (e.isDir()) {
                 lines << QStringLiteral("%1  %2%3/").arg(QString(), 10).arg(indent, e.display);
                 walk(dir.isEmpty() ? e.name : dir + '/' + e.name, depth + 1);

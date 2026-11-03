@@ -11,7 +11,7 @@
 #include <QVBoxLayout>
 
 namespace {
-const QString kGroup = QStringLiteral("pack");
+constexpr QLatin1StringView kGroup("pack");
 
 struct Format {
     const char* name;  // what the user sees and the state keeps

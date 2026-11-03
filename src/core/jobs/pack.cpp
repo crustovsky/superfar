@@ -144,6 +144,7 @@ void PackJob::run()
     for (const QByteArray& a : {QByteArray("-C"), parentPath, QByteArray("--null"), QByteArray("-T"), listPath})
         args.push_back(a);
     std::vector<const char*> argv;
+    argv.reserve(args.size() + 1);
     for (const QByteArray& a : args)
         argv.push_back(a.constData());
     argv.push_back(nullptr);
