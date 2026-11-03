@@ -36,8 +36,12 @@ you can see in the bar at the bottom.
   the tree.
 - Find in tree opens its results as a tab. Multi-rename and folder sync
   are panels inside the pane, with live previews, presets and undo.
-- Archives open as read-only folders through bsdtar in a child process;
-  thumbnails and video or PDF previews come from tumbler over D-Bus.
+- Archives open as read-only folders through bsdtar in a child process,
+  Alt+F5 packs the marked items into a new one through the same job
+  engine, and the preview of an archive says what is inside before you open it:
+  files, folders, sizes, whether it extracts into one folder or spills
+  into the current one, the newest member, and the top of its tree.
+  Thumbnails and video or PDF previews come from tumbler over D-Bus.
 - One process, no indexer, no thumbnailer process, no daemon. About
   5 MB of its own memory with an empty window, under 50 MB with a
   100,000-entry folder open.
@@ -89,13 +93,16 @@ remapped. The defaults:
 | Key | Action |
 |-----|--------|
 | F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
+| Shift+F1 | about: name, version and build date |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
+| Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
 | Alt+F7, Alt+Enter | find in tree, properties and permissions |
 | F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
-| Ctrl+T, Ctrl+W, Ctrl+Tab | new tab, close tab, next tab |
+| Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+Shift+Tab | new tab, close tab, next tab, previous tab |
+| Ctrl+R | reload the folder |
 | Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |

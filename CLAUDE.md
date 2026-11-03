@@ -46,8 +46,10 @@ These are the product. When in doubt, they win.
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
    style. Same component, same key, different slot. Images fit the slot,
-   text shows its head, folders show count and recursive size, anything
-   else shows type, size, dates and permissions.
+   text shows its head, folders show count and recursive size, archives
+   show a summary (counts, sizes, one folder or a tarbomb, newest member,
+   dropped paths) and the top of their tree from bsdtar's listing,
+   anything else shows type, size, dates and permissions.
 10. **It follows the OS theme.** The app never defines a colour. Whatever
     the platform theme says (Kvantum, qt6ct, Fusion) is what it looks like.
 
@@ -71,8 +73,8 @@ without GTK carries no GNOME-isms.
 
 Rejected: GTK4 + Rust (close second: GPU renderer memory, client-side
 decorations only, selection model fights a FAR cursor), Rust-native
-toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3
-(maintenance only), QML, web / Flutter / wx, a separate backend process.
+toolkits (no drag out, text-only clipboard), KDE Frameworks, GTK3, QML,
+web / Flutter / wx, a separate backend process.
 
 ## Dependencies
 
@@ -89,13 +91,16 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
   cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
   as [name])
-- F1 help, F2 rename inline, F3 view (folder: compute size), F4 edit,
-  F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- F1 help (Shift+F1 about), F2 rename inline, F3 view (folder: compute
+  size), F4 edit, F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
 - Shift+F5 folder sync panel: compares the active tab with the other
   pane's by size, time and optional SHA-256; copies or trashes the
   checked differences through the job engine
+- Alt+F5 pack panel: the marked items into a new zip, tar.gz, tar.xz,
+  tar.zst or 7z (name, level, this folder or the other pane's) by
+  bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
   the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
   taller rows); Ctrl+F5 hides the tree; a header click sorts the tab
@@ -120,7 +125,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   marked members to the other pane
 - Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
   with credentials asked in the window); Ctrl+G go to folder, fuzzy over
-  history by frecency; Ctrl+H toggles hidden files
+  history by frecency; Ctrl+H toggles hidden files; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
@@ -174,14 +179,15 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   sort.cpp            natural sort via GLib's filename collation key,
                       computed once per entry, dirs first
   dirsize.cpp         recursive size and count walker (see rule 9)
-  jobs/               copy, move, trash, delete, mkdir: progress, pause,
-                      skip, cancel, conflict policy, error log; one worker
-                      thread per job. Copy is g_file_copy with a progress
-                      callback (reflinks, splice, metadata and server-side
-                      remote copy for free): Pause blocks inside the
-                      callback, Skip cancels the per-file cancellable.
-                      Move is g_file_move. Trash failure on another volume
-                      offers permanent delete in the window
+  jobs/               copy, move, trash, delete, extract, pack: progress,
+                      pause, skip, cancel, conflict policy, error log; one
+                      worker thread per job. Copy is g_file_copy with a
+                      progress callback (reflinks, splice, metadata and
+                      server-side remote copy for free): Pause blocks
+                      inside the callback, Skip cancels the per-file
+                      cancellable. Move is g_file_move. Trash failure on
+                      another volume offers permanent delete in the
+                      window. Extract and pack run bsdtar in a child
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal launch
   mounts.cpp          volumes, mount and unmount, GMountOperation that
@@ -282,9 +288,8 @@ Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 | anonymous memory after leaving it  | < 24 MB  | 17 MB    |
 
 Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
-folder open, depending on what else shares Qt's pages. Reference on the
-same machine: Thunar 4.20 maps its window in about 340 ms and the bench
-read about 400 MB PSS on either folder.
+folder open, depending on what else shares Qt's pages. Thunar 4.20 on
+the same machine: first frame about 340 ms, about 400 MB PSS.
 
 The 100k folder costs about 360 bytes per entry today (name, display
 string, collation key, row index, name hash). That is the number to
@@ -293,50 +298,37 @@ a gate.
 
 ## Milestones
 
-All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30):
-skeleton and bench; dual pane, tabs, marks, function bar; jobs and
-monitor; counts and recursive sizes; filter, glob, command line,
-viewer, preview, edit, rename, open-with; desktop integration (DnD,
-clipboard, mounts, Trash, auth, remote URIs, bookmarks, FileManager1);
-config and session; find, properties, Ctrl+D, Network root;
-thumbnails; multi-rename; folder sync; archives. The commit on each tag
-carries the rationale.
+All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30);
+the commit on each tag carries the rationale. Since then: issues.
 
-Later: multi-folder create, Opus style (F7 grows into a multi-line field:
-one folder per line, and a/b/c creates the whole path, every folder made
-in one go with the cursor on the first); inline folder expanders;
+Later: multi-folder create, Opus style (F7 takes one folder per line,
+a/b/c makes the path, cursor on the first); inline folder expanders;
 translations after 1.0.
 
 ## Release
 
 `tools/release.sh X.Y.Z` bumps the version in CMakeLists.txt (the one
-source: the binary and the tarball read it) and the PKGBUILD, commits
-and tags vX.Y.Z. `git push --follow-tags` runs release.yml, which
-refuses a tag that disagrees with CMakeLists.txt, builds the pacman
-package and the binary tarball on Arch and attaches both to a GitHub
-release with generated notes. CI builds the same two files on every
-push, runs ctest and `tools/smoke.sh`: scripted offscreen sessions
-(start, mkdir, rename, copy, every overlay, bad arguments) that must
-exit cleanly and leave the right files. After the tag is pushed,
-hash GitHub's archive tarball for it into the PKGBUILD's sha256sums
-(the AUR copy must match) and commit that without a tag.
+source) and the PKGBUILD, commits and tags vX.Y.Z. `git push
+--follow-tags` runs release.yml, which refuses a tag that disagrees
+with CMakeLists.txt, builds the pacman package and the binary tarball
+on Arch and attaches both to a GitHub release. CI builds the same two
+files on every push, runs ctest and `tools/smoke.sh` (scripted
+offscreen sessions that must exit cleanly and leave the right files).
+After the tag is pushed, hash GitHub's archive tarball into the
+PKGBUILD's sha256sums (the AUR copy must match) and commit that.
 
-Before a release: build with `-fsanitize=address,undefined` into
-build-asan and run ctest there (tests/test_hostile.cpp is the input
-fuzz: hostile names, loops, an unreadable folder, a sparse file past
-4 GiB, archives whose members climb out), run clang-tidy with the
-bugprone, cert, performance and clang-analyzer checks over
-compile_commands.json, render once with a light theme and once with
-plain Fusion, and soak tabs open and close while memory is sampled:
-it must plateau, not climb. `unshare -Urm tools/screenshots.sh`
-re-renders the README screenshots from a generic demo tree.
+Before a release: ctest in an `-fsanitize=address,undefined` build
+(tests/test_hostile.cpp is the input fuzz), clang-tidy with the
+bugprone, cert, performance and clang-analyzer checks, a render with a
+light theme and one with plain Fusion, and a soak of tabs opening and
+closing while memory is sampled: it must plateau. `unshare -Urm
+tools/screenshots.sh` re-renders the README screenshots.
 
 ## Non-goals
 
 Plugins, theming beyond the platform theme, an embedded terminal, a
-system-wide search index (that is the launcher's job), translations
-before 1.0. Media and PDF previews only as thumbnails from tumbler,
-never through a decoder linked into the process.
+search index (the launcher's job), translations before 1.0. Media and
+PDF previews only as tumbler thumbnails, never an in-process decoder.
 
 ## Conventions
 
@@ -349,5 +341,10 @@ never through a decoder linked into the process.
   never includes QtGui or QtWidgets
 - Test filesystem ops against a temp dir with QtTest, never mock the
   filesystem
+- A defect found while working on something else, pre-existing or just
+  made, gets a GitHub issue first (gh issue create, label bug, the
+  style of the open ones: what is wrong, then "Proposed:" bullets) and
+  its fix closes the issue from the commit. One branch and PR per
+  issue; a PR that builds on another is stacked on it
 - Commit messages carry the rationale. This file holds rules, not history;
   keep it under 350 lines

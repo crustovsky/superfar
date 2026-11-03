@@ -62,6 +62,10 @@ run copy "Ctrl+A;F5;Return" 2500 "$T/a" "$T/b"
 check "F5 copied to the other pane" sh -c "test -e '$T/b/two.txt' && test -d '$T/b/sub'"
 run newfile "Shift+F4;z;Return" 2500 "$T/a" "$T/b"
 check "Shift+F4 made the file" test -f "$T/a/Z"
+if command -v bsdtar > /dev/null; then
+    run pack "Ctrl+A;Alt+F5;Return" 3500 "$T/a" "$T/b"
+    check "Alt+F5 packed the folder into the other pane" sh -c "bsdtar -tf '$T/b/a.zip' | grep -q '^two.txt$'"
+fi
 
 run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F2;Escape;Shift+F5;Escape;Ctrl+G;Escape;Ctrl+L;Escape" 8000 "$T/a" "$T/b"
 # The session brings the cursor back to the Z file from the newfile run;

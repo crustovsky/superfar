@@ -21,6 +21,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_F8), Command::Trash},
         {QKeySequence(Qt::Key_F9), Command::Menu},
         {QKeySequence(Qt::Key_F10), Command::Quit},
+        {QKeySequence(Qt::SHIFT | Qt::Key_F1), Command::About},
         {QKeySequence(Qt::SHIFT | Qt::Key_F4), Command::NewFile},
         {QKeySequence(Qt::SHIFT | Qt::Key_F8), Command::DeletePermanent},
         {QKeySequence(Qt::ALT | Qt::Key_F7), Command::Find},
@@ -70,6 +71,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_F2), Command::MultiRename},
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
         {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
+        {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
     };
     return t;
 }
@@ -163,6 +165,7 @@ QString label(Command command)
     case Command::Sync: return QStringLiteral("Sync");
     case Command::About: return QStringLiteral("About");
     case Command::ToggleTree: return QStringLiteral("Tree");
+    case Command::Pack: return QStringLiteral("Pack");
     case Command::None: return {};
     }
     return {};
@@ -189,7 +192,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::GoTo, "GoTo"}, {Command::LockTab, "LockTab"}, {Command::Properties, "Properties"},
         {Command::Bookmark, "Bookmark"}, {Command::ToggleThumbnails, "ToggleThumbnails"},
         {Command::MultiRename, "MultiRename"}, {Command::Sync, "Sync"}, {Command::About, "About"},
-        {Command::ToggleTree, "ToggleTree"},
+        {Command::ToggleTree, "ToggleTree"}, {Command::Pack, "Pack"},
     };
     return n;
 }
@@ -227,7 +230,8 @@ QList<QPair<QString, QStringList>> defaults()
 QList<QPair<QString, QString>> retiredDefaults()
 {
     // As the first run wrote them (portable text: Insert is "Ins").
-    return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)}};  // 0.5: Shift+Down joined it
+    return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)},  // 0.5: Shift+Down joined it
+            {QStringLiteral("About"), QString()}};  // 0.7: it got Shift+F1; an empty line unbinds
 }
 
 QList<QKeySequence> keysOf(Command command)

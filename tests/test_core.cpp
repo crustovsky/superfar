@@ -69,6 +69,7 @@ private Q_SLOTS:
     void dirSizeCancel();
     void readerWindows();
     void details();
+    void textTypes();
     void shellQuoting();
     void imageDecode();
     void bookmarks();
@@ -1304,6 +1305,18 @@ void CoreTest::compareTrees()
     QCOMPARE(hashed.value("same.txt"), core::Difference::Same);
 }
 
+void CoreTest::textTypes()
+{
+    for (const char* t : {"text/plain", "text/x-c++src", "application/xml", "application/json", "image/svg+xml",
+                          "application/ld+json", "application/x-shellscript", "application/javascript", "application/x-empty"})
+        QVERIFY2(core::isTextType(QString::fromLatin1(t)), t);
+    for (const char* t : {"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          "application/vnd.oasis.opendocument.text", "application/zip", "application/pdf",
+                          "application/octet-stream", "image/png"})
+        QVERIFY2(!core::isTextType(QString::fromLatin1(t)), t);
+}
+
 void CoreTest::archiveListing()
 {
     const QByteArray sample =
@@ -1322,6 +1335,29 @@ void CoreTest::archiveListing()
     QVERIFY(entries[3].symlink);
     QCOMPARE(entries[3].path, QByteArray("src/link"));
     QCOMPARE(QDateTime::fromSecsSinceEpoch(entries[3].modified).date(), QDate(2021, 1, 5));
+
+    // What the preview says: everything under one folder, with the
+    // folders a path implies counted once.
+    core::ArchiveSummary s = core::summarizeArchive(entries);
+    QCOMPARE(s.files, 3u);
+    QCOMPARE(s.dirs, 2u);  // src, src/sub
+    QCOMPARE(s.bytes, 7u);
+    QCOMPARE(s.topLevel, 1);
+    QCOMPARE(s.topFolder, QByteArray("src"));
+    QCOMPARE(s.symlinks, 1);
+    QCOMPARE(s.executables, 0);
+    QCOMPARE(QDateTime::fromSecsSinceEpoch(s.newest).date(), QDate(2026, 10, 30));
+    // A tarbomb with an executable at its top level.
+    const auto bomb = core::parseArchiveListing(
+        "-rwxr-xr-x  0 michal michal    120 Oct 30 12:14 run.sh\n"
+        "-rw-r--r--  0 michal michal      3 Oct 30 12:14 notes.txt\n"
+        "-rw-r--r--  0 michal michal      3 Oct 30 12:14 lib/x.txt\n", 2026);
+    QVERIFY(bomb[0].executable);
+    s = core::summarizeArchive(bomb);
+    QCOMPARE(s.topLevel, 3);
+    QVERIFY(s.topFolder.isEmpty());
+    QCOMPARE(s.executables, 1);
+    QCOMPARE(s.dirs, 1u);
     QVERIFY(core::isArchiveName("photos.ZIP"));
     QVERIFY(core::isArchiveName("backup.tar.zst"));
     QVERIFY(!core::isArchiveName("notes.txt"));
@@ -1342,7 +1378,8 @@ void CoreTest::archiveListing()
     core::ArchiveLister lister;
     std::vector<core::ArchiveEntry> listed;
     bool done = false;
-    connect(&lister, &core::ArchiveLister::listed, [&](quint64, std::vector<core::ArchiveEntry> e) { listed = e; done = true; });
+    connect(&lister, &core::ArchiveLister::listed,
+            [&](quint64, std::vector<core::ArchiveEntry> e, core::ArchiveDropped) { listed = e; done = true; });
     connect(&lister, &core::ArchiveLister::failed, [&](quint64, const QString& m) { QFAIL(qPrintable(m)); });
     lister.start(zip, 1);
     while (!done)

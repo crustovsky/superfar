@@ -15,6 +15,7 @@ class QLabel;
 class QStackedWidget;
 class TabBar;
 class MultiRenamePanel;
+class PackPanel;
 class SyncPanel;
 class PropertiesPanel;
 class QTimer;
@@ -52,6 +53,8 @@ public:
     void setOverlay(QWidget* widget);
     // Shift+F5: compare the active tab's folder with another.
     void openSync(const core::Location& other);
+    // Alt+F5: pack the marked items into an archive here or in other.
+    void openPack(const core::Location& other);
     bool hasOverlay() const { return overlay_ != nullptr; }
 
 Q_SIGNALS:
@@ -60,6 +63,9 @@ Q_SIGNALS:
     void commandRequested(keymap::Command command);
     void tabOpened(Tab* tab);
     void runJobs(std::vector<core::Job*> jobs);  // from the sync panel
+    // From the pack panel: names in parent go into archive.
+    void packRequested(const core::Location& parent, const std::vector<QByteArray>& names,
+                       const core::Location& archive, const QByteArray& options);
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
 
@@ -88,6 +94,7 @@ private:
     PropertiesPanel* props_ = nullptr;
     MultiRenamePanel* rename_ = nullptr;
     SyncPanel* sync_ = nullptr;
+    PackPanel* pack_ = nullptr;
     QWidget* overlay_ = nullptr;
     QLabel* status_;
     QLabel* space_;

@@ -6,6 +6,7 @@
 #include "pane/listview.h"
 #include "help.h"
 #include "multirename.h"
+#include "packpanel.h"
 #include "properties.h"
 #include "syncpanel.h"
 #include "pane/tab.h"
@@ -14,6 +15,7 @@
 #include "viewer.h"
 
 #include <QApplication>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -288,6 +290,53 @@ void Pane::openSync(const core::Location& other)
     sync_->setFocus();
 }
 
+void Pane::openPack(const core::Location& other)
+{
+    Tab* tab = activeTab();
+    if (!tab)
+        return;
+    if (tab->isArchive()) {
+        showMessage(tr("Archives are read-only here"));
+        return;
+    }
+    if (tab->location().path().isEmpty()) {
+        showMessage(tr("Archives are made from local folders only"));
+        return;
+    }
+    const auto items = tab->selectedLocations();
+    if (items.empty())
+        return;
+    if (!pack_) {
+        pack_ = new PackPanel(services_.config, this);
+        connect(pack_, &PackPanel::closed, this, &Pane::closeOwnOverlay);
+        connect(pack_, &PackPanel::accepted, this,
+                [this](const QByteArray& name, const QByteArray& options, const core::Location& destination) {
+                    Tab* t = activeTab();
+                    if (!t)
+                        return;
+                    std::vector<QByteArray> names;
+                    for (const core::Location& l : t->selectedLocations())
+                        names.push_back(l.basename());
+                    closeOwnOverlay();
+                    Q_EMIT packRequested(t->location(), names, destination.child(name), options);
+                });
+    }
+    // One item names the archive after itself (a file without its
+    // extension); more take the folder's name.
+    QByteArray stem = tab->location().basename();
+    if (items.size() == 1) {
+        stem = items.front().basename();
+        const int dot = stem.lastIndexOf('.');
+        if (dot > 0 && !QFileInfo(items.front().displayPath()).isDir())
+            stem = stem.left(dot);
+    }
+    if (stem.isEmpty())
+        stem = "archive";
+    pack_->show(tab->selectionText(), stem, tab->location(), other);
+    setOverlay(pack_);
+    pack_->setFocus();
+}
+
 void Pane::closeOwnOverlay()
 {
     setOverlay(nullptr);
@@ -315,7 +364,7 @@ void Pane::setOverlay(QWidget* widget)
         content_->removeWidget(overlay_);
         if (overlay_ == viewer_)
             viewer_->clear();
-        else if (overlay_ != props_ && overlay_ != rename_ && overlay_ != sync_)
+        else if (overlay_ != props_ && overlay_ != rename_ && overlay_ != sync_ && overlay_ != pack_)
             overlay_->setParent(nullptr);  // the preview belongs to the window
         overlay_ = nullptr;
     }
@@ -365,7 +414,7 @@ bool Pane::execute(keymap::Command command)
         Q_EMIT sessionChanged();
         return true;
     case Command::Cancel:
-        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_ || overlay_ == rename_ || overlay_ == sync_)) {
+        if (overlay_ && (overlay_ == viewer_ || overlay_ == props_ || overlay_ == rename_ || overlay_ == sync_ || overlay_ == pack_)) {
             closeOwnOverlay();
             return true;
         }

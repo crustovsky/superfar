@@ -8,6 +8,7 @@
 #include "core/dirsize.h"
 #include "core/fileops.h"
 #include "core/jobs/extract.h"
+#include "core/jobs/pack.h"
 #include "core/thumbnails.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -129,6 +130,20 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                 strip_->addJob(job);
             }
         });
+        connect(pane, &Pane::packRequested, this,
+                [this, pane](const core::Location& parent, const std::vector<QByteArray>& names,
+                             const core::Location& archive, const QByteArray& options) {
+                    auto* job = new core::PackJob(parent, names, archive, options);
+                    const core::Location dest = archive.parent();
+                    const QByteArray name = archive.basename();
+                    connect(job, &core::Job::finished, this, [this, dest, name] {
+                        for (Pane* p : {left_, right_})
+                            for (Tab* t : p->tabs())
+                                if (t->location() == dest)
+                                    t->reloadWithCursor(name);  // the new archive under the cursor
+                    });
+                    runJob(job, pane->activeTab(), dest);
+                });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {
                 tree_->reveal(dir);
@@ -381,6 +396,9 @@ void MainWindow::execute(keymap::Command command)
         return;
     case Command::Sync:
         active_->openSync(otherPane()->activeTab()->location());
+        return;
+    case Command::Pack:
+        active_->openPack(otherPane()->activeTab()->location());
         return;
     case Command::Trash:
         if (tree_->hasFocus() && tree_->currentPlace()) {

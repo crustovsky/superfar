@@ -4,6 +4,23 @@
 
 namespace core {
 
+Location uniqueSibling(const Location& file)
+{
+    const QByteArray name = file.basename();
+    const Location parent = file.parent();
+    int dot = name.lastIndexOf('.');
+    if (dot <= 0)
+        dot = name.size();
+    const QByteArray stem = name.left(dot);
+    const QByteArray ext = name.mid(dot);
+    for (int n = 2; n < 10000; ++n) {
+        const Location candidate = parent.child(stem + " (" + QByteArray::number(n) + ")" + ext);
+        if (!g_file_query_exists(candidate.gfile(), nullptr))
+            return candidate;
+    }
+    return file;
+}
+
 namespace {
 struct MkdirRequest {
     std::function<void(const QString&)> done;

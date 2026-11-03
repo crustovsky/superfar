@@ -92,6 +92,16 @@ struct DetailsRequest {
 
 } // namespace
 
+bool isTextType(const QString& contentType)
+{
+    if (contentType.startsWith(QLatin1String("text/")))
+        return true;
+    const QString sub = contentType.section(QLatin1Char('/'), 1);
+    return sub == QLatin1String("xml") || sub == QLatin1String("json") || sub.endsWith(QLatin1String("+xml"))
+        || sub.endsWith(QLatin1String("+json")) || sub.contains(QLatin1String("script"))
+        || sub == QLatin1String("x-empty");
+}
+
 void queryDetails(const Location& file, std::function<void(const Details&)> done)
 {
     if (!file.isValid()) {
