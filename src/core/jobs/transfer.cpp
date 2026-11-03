@@ -1,5 +1,6 @@
 #include "core/jobs/transfer.h"
 
+#include "core/fileops.h"
 #include "core/gobject.h"
 
 namespace core {
@@ -72,22 +73,6 @@ struct TransferJob::Impl {
         self->job.waitIfPaused();
     }
 
-    Location uniqueName(const Location& dst) const
-    {
-        const QByteArray name = dst.basename();
-        const Location parent = dst.parent();
-        int dot = name.lastIndexOf('.');
-        if (dot <= 0)
-            dot = name.size();
-        const QByteArray stem = name.left(dot);
-        const QByteArray ext = name.mid(dot);
-        for (int n = 2; n < 10000; ++n) {
-            const Location candidate = parent.child(stem + " (" + QByteArray::number(n) + ")" + ext);
-            if (!g_file_query_exists(candidate.gfile(), nullptr))
-                return candidate;
-        }
-        return dst;
-    }
 
     // Decides what to do about an existing target. Returns false to skip.
     bool resolveConflict(const Location& src, bool srcIsDir, Location& dst, GFileInfo* dstInfo,
@@ -121,7 +106,7 @@ struct TransferJob::Impl {
             job.logSkip(c.targetPath);
             return false;
         case ConflictAction::Rename:
-            dst = uniqueName(dst);
+            dst = uniqueSibling(dst);
             return true;
         case ConflictAction::Skip:
         case ConflictAction::Ask:

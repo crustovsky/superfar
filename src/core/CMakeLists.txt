@@ -20,6 +20,7 @@ qt_add_library(superfar_core STATIC
   compare.cpp
   archive.cpp
   jobs/extract.cpp
+  jobs/pack.cpp
   fileops.cpp
   jobs/job.cpp
   jobs/transfer.cpp

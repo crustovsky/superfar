@@ -371,7 +371,10 @@ void HostileTest::archiveMembersStayInside()
         "-rw-------  0 0      0           2 Oct 30 16:03 ./ok/inner.txt\n"
         "-rw-------  0 0      0           4 Oct 30 16:03 -rf\n"
         "-rw-------  0 0      0           1 Oct 30 16:03 caf\\303\\251 \\\\ \\n\\t.txt\n";
-    const auto parsed = core::parseArchiveListing(sample, 2026);
+    core::ArchiveDropped dropped;
+    const auto parsed = core::parseArchiveListing(sample, 2026, &dropped);
+    QCOMPARE(dropped.absolute, 1);  // the preview warns about these
+    QCOMPARE(dropped.climbing, 2);
     QList<QByteArray> raw;
     for (const auto& e : parsed)
         raw << e.path;
@@ -400,7 +403,8 @@ void HostileTest::archiveMembersStayInside()
     core::ArchiveLister lister;
     std::vector<core::ArchiveEntry> listed;
     bool done = false;
-    connect(&lister, &core::ArchiveLister::listed, [&](quint64, std::vector<core::ArchiveEntry> e) { listed = e; done = true; });
+    connect(&lister, &core::ArchiveLister::listed,
+            [&](quint64, std::vector<core::ArchiveEntry> e, core::ArchiveDropped) { listed = e; done = true; });
     connect(&lister, &core::ArchiveLister::failed, [&](quint64, const QString& m) { QFAIL(qPrintable(m)); });
     lister.start(archive, 1);
     QTRY_VERIFY(done);

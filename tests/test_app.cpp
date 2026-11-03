@@ -1,6 +1,7 @@
 // App code with no widget behind it: the key table and the help must
 // agree with each other, and the mark store keeps what a tab leaves in
 // a folder.
+#include "archivetext.h"
 #include "help.h"
 #include "keymap.h"
 #include "pane/markstore.h"
@@ -13,6 +14,7 @@ private Q_SLOTS:
     void everyCommandIsComplete();
     void oneCommandPerKey();
     void markStore();
+    void archiveTree();
 };
 
 void AppTest::everyCommandIsComplete()
@@ -64,6 +66,27 @@ void AppTest::markStore()
     QCOMPARE(store.size(), MarkStore::kLimit);
     QVERIFY(store.take("0").isEmpty());  // the oldest went first
     QVERIFY(!store.take(QByteArray::number(MarkStore::kLimit + 2)).isEmpty());
+}
+
+void AppTest::archiveTree()
+{
+    // Folders first at each level, implied folders listed once, the
+    // tail cut with a count.
+    const auto entries = core::parseArchiveListing(
+        "-rw-r--r--  0 m m   3 Oct 30 12:14 zeta.txt\n"
+        "-rw-r--r--  0 m m   4 Oct 30 12:14 src/sub/b.txt\n"
+        "-rw-r--r--  0 m m   5 Oct 30 12:14 src/a.txt\n"
+        "drwxr-xr-x  0 m m   0 Oct 30 12:14 src/\n"
+        "-rw-r--r--  0 m m   6 Oct 30 12:14 alpha.txt\n", 2026);
+    const QStringList lines = archivetext::tree(entries, 100).split(QLatin1Char('\n'));
+    QStringList names;
+    for (const QString& l : lines)
+        names << l.mid(12);  // past the size column
+    QCOMPARE(names, QStringList({"src/", "  sub/", "    b.txt", "  a.txt", "alpha.txt", "zeta.txt"}));
+    QVERIFY(lines[2].trimmed().startsWith(QStringLiteral("4 ")));  // the size sits left of the name
+    const QStringList cut = archivetext::tree(entries, 2).split(QLatin1Char('\n'));
+    QCOMPARE(cut.size(), 3);
+    QCOMPARE(cut.last(), QStringLiteral("and 4 more"));
 }
 
 QTEST_GUILESS_MAIN(AppTest)

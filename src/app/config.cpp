@@ -107,6 +107,16 @@ void Config::migrateState()
         sync();
 }
 
+QString Config::choice(const QString& group, const QString& key, const QString& fallback) const
+{
+    return state_.value(group + QLatin1Char('/') + key, fallback).toString();
+}
+
+void Config::setChoice(const QString& group, const QString& key, const QString& value)
+{
+    state_.setValue(group + QLatin1Char('/') + key, value);
+}
+
 QString Config::lastVersion() const
 {
     return state_.value(QStringLiteral("about/lastVersion")).toString();
