@@ -1,10 +1,12 @@
 #include "preview.h"
 
+#include "archivetext.h"
 #include "elidedlabel.h"
 #include "jobs/format.h"
 #include "services.h"
 
 #include <QDateTime>
+#include <QFontDatabase>
 #include <QImage>
 #include <QLabel>
 #include <QPainter>
@@ -78,6 +80,7 @@ Preview::Preview(const Services& services, QWidget* parent)
     , image_(new core::ImageLoader(this))
     , reader_(new core::Reader(this))
     , sizer_(new core::DirSizer(services.sizes, this))
+    , lister_(new core::ArchiveLister(this))
     , thumbs_(services.thumbs)
     , title_(new ElidedLabel(this))
     , info_(new QLabel(this))
@@ -106,6 +109,7 @@ Preview::Preview(const Services& services, QWidget* parent)
     stack_->addWidget(picture_);
     stack_->addWidget(text_);
     setFocusPolicy(Qt::NoFocus);
+    textFont_ = text_->font();
 
     connect(image_, &core::ImageLoader::decoded, this, &Preview::showImage);
     connect(image_, &core::ImageLoader::failed, this, [this](const QString& m) {
@@ -124,9 +128,19 @@ Preview::Preview(const Services& services, QWidget* parent)
     });
     connect(reader_, &core::Reader::opened, this, [this](quint64) { reader_->read(0, kTextCap); });
     connect(reader_, &core::Reader::data, this, [this](quint64, const QByteArray& bytes) {
+        text_->setFont(textFont_);
         text_->setPlainText(QString::fromUtf8(bytes));
         stack_->setCurrentWidget(text_);
         reader_->close();
+    });
+    connect(lister_, &core::ArchiveLister::listed, this,
+            [this](quint64 gen, const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped) {
+                if (gen == generation_)
+                    showArchive(entries, dropped);
+            });
+    connect(lister_, &core::ArchiveLister::failed, this, [this](quint64 gen, const QString& m) {
+        if (gen == generation_)  // no bsdtar, or an archive it cannot read (encrypted, damaged)
+            info_->setText(details_ + QLatin1Char('\n') + m);
     });
     connect(sizer_, &core::DirSizer::result, this,
             [this](quint64 gen, const QByteArray&, const core::DirSize& s) {
@@ -163,6 +177,7 @@ void Preview::clear()
     image_->cancel();
     reader_->close();
     sizer_->cancelAll();
+    lister_->cancel();
     picture_->clear();
     text_->clear();
     info_->clear();
@@ -181,6 +196,12 @@ void Preview::onDetails(const core::Details& d)
     info_->setText(details_);
     if (d.isDir) {
         sizer_->request(item_.parent(), item_.basename(), generation_, true);
+        return;
+    }
+    if (core::isArchiveName(item_.basename()) && !item_.path().isEmpty()) {
+        // The same bsdtar run the archive tab pays for; nothing decoded here.
+        packedBytes_ = d.size;
+        lister_->start(item_, generation_);
         return;
     }
     if (d.contentType.startsWith(QLatin1String("image/"))) {
@@ -220,6 +241,17 @@ void Preview::showImage(const core::ImageFrame& frame)
     info_->setText(details_ + QLatin1Char('\n')
                    + tr("Dimensions: %1 × %2").arg(frame.sourceWidth).arg(frame.sourceHeight));
     stack_->setCurrentWidget(picture_);
+}
+
+void Preview::showArchive(const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped)
+{
+    info_->setText(details_ + QLatin1Char('\n') + archivetext::summary(core::summarizeArchive(entries), dropped, packedBytes_));
+    // The first screen of the tree, no more: the archive tab shows the rest.
+    const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    const int fit = std::max(12, text_->viewport()->height() / QFontMetrics(mono).lineSpacing());
+    text_->setFont(mono);
+    text_->setPlainText(archivetext::tree(entries, fit));
+    stack_->setCurrentWidget(text_);
 }
 
 QString Preview::detailsText(const core::Details& d) const

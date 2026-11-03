@@ -46,8 +46,10 @@ These are the product. When in doubt, they win.
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
    style. Same component, same key, different slot. Images fit the slot,
-   text shows its head, folders show count and recursive size, anything
-   else shows type, size, dates and permissions.
+   text shows its head, folders show count and recursive size, archives
+   show a summary (counts, sizes, one folder or a tarbomb, newest member,
+   dropped paths) and the top of their tree from bsdtar's listing,
+   anything else shows type, size, dates and permissions.
 10. **It follows the OS theme.** The app never defines a colour. Whatever
     the platform theme says (Kvantum, qt6ct, Fusion) is what it looks like.
 

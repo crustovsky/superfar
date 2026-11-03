@@ -17,10 +17,11 @@ target_link_libraries(test_hostile PRIVATE superfar_core Qt6::Test)
 add_test(NAME hostile COMMAND test_hostile)
 
 # The key table, the help and the mark store: app code without widgets.
-qt_add_executable(test_app test_app.cpp ${CMAKE_SOURCE_DIR}/src/app/keymap.cpp ${CMAKE_SOURCE_DIR}/src/app/help.cpp)
+qt_add_executable(test_app test_app.cpp ${CMAKE_SOURCE_DIR}/src/app/keymap.cpp ${CMAKE_SOURCE_DIR}/src/app/help.cpp
+  ${CMAKE_SOURCE_DIR}/src/app/archivetext.cpp)
 target_include_directories(test_app PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(test_app PRIVATE SUPERFAR_VERSION="test" SUPERFAR_BUILD_DATE="test")
-target_link_libraries(test_app PRIVATE Qt6::Gui Qt6::Test)
+target_link_libraries(test_app PRIVATE superfar_core Qt6::Gui Qt6::Test)
 add_test(NAME app COMMAND test_app)
 
 # A tab with its list over a temp folder, on the offscreen platform.

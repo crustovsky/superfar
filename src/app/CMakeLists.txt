@@ -18,6 +18,7 @@ qt_add_executable(superfar
   fm1.cpp
   viewer.cpp
   preview.cpp
+  archivetext.cpp
   pane/delegate.cpp
   jobs/bars.cpp
   jobs/panel.cpp

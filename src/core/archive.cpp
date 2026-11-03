@@ -5,6 +5,8 @@
 #include <QDate>
 #include <QDateTime>
 #include <QPointer>
+#include <QSet>
+#include <algorithm>
 
 namespace core {
 
@@ -105,7 +107,36 @@ QString bsdtarError(const GError* error)
     return errorMessage(error);
 }
 
-std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int currentYear)
+ArchiveSummary summarizeArchive(const std::vector<ArchiveEntry>& entries)
+{
+    ArchiveSummary s;
+    QSet<QByteArray> folders;
+    QSet<QByteArray> top;
+    for (const ArchiveEntry& e : entries) {
+        const int slash = e.path.indexOf('/');
+        top.insert(slash < 0 ? e.path : e.path.left(slash));
+        for (int i = slash; i >= 0; i = e.path.indexOf('/', i + 1))
+            folders.insert(e.path.left(i));  // the folders a path implies
+        if (e.isDir) {
+            folders.insert(e.path);
+        } else {
+            ++s.files;
+            s.bytes += e.size;
+            if (e.executable && slash < 0)
+                ++s.executables;
+        }
+        if (e.symlink)
+            ++s.symlinks;
+        s.newest = std::max(s.newest, e.modified);
+    }
+    s.dirs = static_cast<quint64>(folders.size());
+    s.topLevel = static_cast<int>(top.size());
+    if (top.size() == 1 && folders.contains(*top.cbegin()))
+        s.topFolder = *top.cbegin();
+    return s;
+}
+
+std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int currentYear, ArchiveDropped* dropped)
 {
     std::vector<ArchiveEntry> out;
     for (const QByteArray& raw : output.split('\n')) {
@@ -123,6 +154,7 @@ std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int curr
         ArchiveEntry e;
         e.isDir = mode[0] == 'd';
         e.symlink = mode[0] == 'l';
+        e.executable = mode[3] == 'x' || mode[3] == 's';
         e.size = field(line, 4).toULongLong();
         const int day = field(line, 6).toInt();
         const QByteArray clock = field(line, 7);
@@ -147,14 +179,19 @@ std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int curr
         // What bsdtar does on extraction, so the listing shows what would
         // land: leading slashes go, "./" goes, and a member that climbs
         // out with ".." is refused, so it is not shown either.
+        if (path.startsWith('/') && dropped)
+            ++dropped->absolute;
         while (path.startsWith('/'))
             path = path.mid(1);
         while (path.startsWith("./"))
             path = path.mid(2);
         if (path.isEmpty() || path == ".")
             continue;
-        if (path == ".." || path.startsWith("../") || path.contains("/../") || path.endsWith("/.."))
+        if (path == ".." || path.startsWith("../") || path.contains("/../") || path.endsWith("/..")) {
+            if (dropped)
+                ++dropped->climbing;
             continue;
+        }
         e.path = path;
         out.push_back(std::move(e));
     }
@@ -189,8 +226,10 @@ struct ArchiveLister::Call {
         }
         gsize n = 0;
         const char* text = out ? static_cast<const char*>(g_bytes_get_data(out, &n)) : nullptr;
-        Q_EMIT call->owner->listed(call->generation,
-                                   parseArchiveListing(QByteArray(text, static_cast<qsizetype>(n)), QDate::currentDate().year()));
+        ArchiveDropped dropped;
+        std::vector<ArchiveEntry> entries =
+            parseArchiveListing(QByteArray(text, static_cast<qsizetype>(n)), QDate::currentDate().year(), &dropped);
+        Q_EMIT call->owner->listed(call->generation, std::move(entries), dropped);
     }
 };
 

@@ -36,8 +36,11 @@ you can see in the bar at the bottom.
   the tree.
 - Find in tree opens its results as a tab. Multi-rename and folder sync
   are panels inside the pane, with live previews, presets and undo.
-- Archives open as read-only folders through bsdtar in a child process;
-  thumbnails and video or PDF previews come from tumbler over D-Bus.
+- Archives open as read-only folders through bsdtar in a child process,
+  and the preview of an archive says what is inside before you open it:
+  files, folders, sizes, whether it extracts into one folder or spills
+  into the current one, the newest member, and the top of its tree.
+  Thumbnails and video or PDF previews come from tumbler over D-Bus.
 - One process, no indexer, no thumbnailer process, no daemon. About
   5 MB of its own memory with an empty window, under 50 MB with a
   100,000-entry folder open.
