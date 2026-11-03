@@ -309,26 +309,21 @@ translations after 1.0.
 ## Release
 
 `tools/release.sh X.Y.Z` bumps the version in CMakeLists.txt (the one
-source: the binary and the tarball read it) and the PKGBUILD, commits
-and tags vX.Y.Z. `git push --follow-tags` runs release.yml, which
-refuses a tag that disagrees with CMakeLists.txt, builds the pacman
-package and the binary tarball on Arch and attaches both to a GitHub
-release with generated notes. CI builds the same two files on every
-push, runs ctest and `tools/smoke.sh`: scripted offscreen sessions
-(start, mkdir, rename, copy, every overlay, bad arguments) that must
-exit cleanly and leave the right files. After the tag is pushed,
-hash GitHub's archive tarball for it into the PKGBUILD's sha256sums
-(the AUR copy must match) and commit that without a tag.
+source) and the PKGBUILD, commits and tags vX.Y.Z. `git push
+--follow-tags` runs release.yml, which refuses a tag that disagrees
+with CMakeLists.txt, builds the pacman package and the binary tarball
+on Arch and attaches both to a GitHub release. CI builds the same two
+files on every push, runs ctest and `tools/smoke.sh` (scripted
+offscreen sessions that must exit cleanly and leave the right files).
+After the tag is pushed, hash GitHub's archive tarball into the
+PKGBUILD's sha256sums (the AUR copy must match) and commit that.
 
-Before a release: build with `-fsanitize=address,undefined` into
-build-asan and run ctest there (tests/test_hostile.cpp is the input
-fuzz: hostile names, loops, an unreadable folder, a sparse file past
-4 GiB, archives whose members climb out), run clang-tidy with the
-bugprone, cert, performance and clang-analyzer checks over
-compile_commands.json, render once with a light theme and once with
-plain Fusion, and soak tabs open and close while memory is sampled:
-it must plateau, not climb. `unshare -Urm tools/screenshots.sh`
-re-renders the README screenshots from a generic demo tree.
+Before a release: ctest in an `-fsanitize=address,undefined` build
+(tests/test_hostile.cpp is the input fuzz), clang-tidy with the
+bugprone, cert, performance and clang-analyzer checks, a render with a
+light theme and one with plain Fusion, and a soak of tabs opening and
+closing while memory is sampled: it must plateau. `unshare -Urm
+tools/screenshots.sh` re-renders the README screenshots.
 
 ## Non-goals
 
