@@ -24,7 +24,7 @@ public:
     VideoPlayer(QWidget* slot, PageStrip* strip, QObject* parent);
     ~VideoPlayer() override;
 
-    // Probes, then plays from the start; frames come through frameReady.
+    // Probes, then shows the first frame paused; frames come through frameReady.
     void start(const core::Location& file);
     // Kills the child and hides the strip.
     void cancel();

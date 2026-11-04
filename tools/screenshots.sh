@@ -42,7 +42,7 @@ shot folder-sizes "Ctrl+F3" 7000 /usr/share $D
 shot preview "Ctrl+Q" 5000 $D/Pictures $D
 shot viewer "F3" 3500 $D/Downloads $D
 shot pdf-pages "Down;Down;Ctrl+Q;Ctrl+PgDown" 5000 $D/Documents $D
-shot video "Ctrl+Q;Ctrl+PgDown" 6000 $D/Videos $D
+shot video "Ctrl+Q;Ctrl+P;Ctrl+PgDown" 6000 $D/Videos $D
 shot help "F1" 3500 $D $D/Documents
 shot go-to "Ctrl+G" 3500 $D $D/Documents
 shot multi-rename "Ctrl+A;Shift+F2;Ctrl+A;I;M;G;_;*;Tab;Ctrl+A;H;O;L;I;D;A;Y;_;{;N;}" 12000 $D/Pictures $D

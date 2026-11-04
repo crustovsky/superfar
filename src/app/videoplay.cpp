@@ -85,7 +85,7 @@ void VideoPlayer::onInfo(quint64 generation, const core::VideoInfo& info)
     if (info.duration > 0)
         line += tr(", %1 s").arg(info.duration, 0, 'f', 1);
     Q_EMIT note(line);
-    restart(0, true);
+    restart(0, false);  // the first frame, still: play is a key away
 }
 
 void VideoPlayer::restart(double at, bool play)

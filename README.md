@@ -42,8 +42,9 @@ you can see in the bar at the bottom.
   files, folders, sizes, whether it extracts into one folder or spills
   into the current one, the newest member, and the top of its tree.
   Thumbnails come from tumbler over D-Bus. A PDF shows its pages,
-  rendered at slot size by pdftoppm in a child process; a video plays
-  without sound, decoded at slot size by ffmpeg in a child process.
+  rendered at slot size by pdftoppm in a child process; a video shows
+  its first frame and plays on Ctrl+P, without sound, decoded at slot
+  size by ffmpeg in a child process.
   Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown and Ctrl+End page or seek, Ctrl+P
   plays and pauses, and the strip under the details has the same
   buttons and a playhead.
@@ -66,8 +67,8 @@ buttons; pdftoppm renders each page in a child process:
 
 ![PDF pages](docs/screenshots/pdf-pages.png)
 
-A video playing in the preview, without sound, decoded by ffmpeg in a
-child process; Ctrl+P pauses, the same keys seek:
+A video in the preview, playing after Ctrl+P, without sound, decoded by
+ffmpeg in a child process; the same keys seek:
 
 ![Video](docs/screenshots/video.png)
 
