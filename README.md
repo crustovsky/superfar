@@ -61,6 +61,16 @@ The preview following the cursor:
 
 ![Preview](docs/screenshots/preview.png)
 
+A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the
+buttons; pdftoppm renders each page in a child process:
+
+![PDF pages](docs/screenshots/pdf-pages.png)
+
+A video playing in the preview, without sound, decoded by ffmpeg in a
+child process; Ctrl+P pauses, the same keys seek:
+
+![Video](docs/screenshots/video.png)
+
 The F3 viewer on a binary file:
 
 ![Viewer](docs/screenshots/viewer.png)
@@ -145,9 +155,11 @@ panes, onto tree folders and to other apps.
 Dependencies: Qt 6 (Core, Gui, Widgets, DBus), GLib and GIO 2.74 or
 newer, libglycin 2, CMake 3.28, Ninja, a C++23 compiler. At run time,
 optional: bsdtar (libarchive) for archives, tumbler for thumbnails,
-gvfs for the trash, mounts and network shares, xdg-terminal-exec or
-$TERMINAL for F4 and the command line. Without one of them the window
-says so when you reach the feature; nothing else changes.
+pdftoppm and pdfinfo (poppler) for PDF pages in the preview, ffmpeg
+and ffprobe for video in the preview, gvfs for the trash, mounts and
+network shares, xdg-terminal-exec or $TERMINAL for F4 and the command
+line. Without one of them the window says so when you reach the
+feature, or the preview keeps the thumbnail; nothing else changes.
 
 ```sh
 cmake -S . -B build -G Ninja
@@ -186,8 +198,9 @@ window and splitter sizes, dragged column widths.
 All twelve milestones of the plan are done; [CLAUDE.md](CLAUDE.md)
 holds the rules the code follows.
 Non-goals: plugins, theming beyond the platform theme, an embedded
-terminal, a search index, translations before 1.0. Media and PDF show
-as tumbler thumbnails, never through a decoder in the process.
+terminal, a search index, translations before 1.0. Nothing decodes
+media or documents in the process: thumbnails come from tumbler, PDF
+pages and video frames from poppler and ffmpeg in child processes.
 
 Known limits: copies go through GIO, which writes the holes of a sparse
 file out as zeros (Nautilus and Thunar do the same). Drag and drop,
