@@ -215,6 +215,12 @@ struct ArchiveLister::Call {
         std::unique_ptr<GBytes, void (*)(GBytes*)> errGuard(err, [](GBytes* b) { if (b) g_bytes_unref(b); });
         if (!call->owner || isCancelled(gerr.get()))
             return;
+        if (call->owner->process_ == proc.get()) {  // done: nothing to kill later
+            g_object_unref(call->owner->process_);
+            g_object_unref(call->owner->cancellable_);
+            call->owner->process_ = nullptr;
+            call->owner->cancellable_ = nullptr;
+        }
         if (gerr || !g_subprocess_get_successful(proc.get())) {
             gsize n = 0;
             const char* text = err ? static_cast<const char*>(g_bytes_get_data(err, &n)) : nullptr;
@@ -263,16 +269,21 @@ void ArchiveLister::start(const Location& archive, quint64 generation)
         return;
     }
     cancellable_ = g_cancellable_new();
+    process_ = proc.release();
     auto* call = new Call{this, generation};
-    g_subprocess_communicate_async(proc.get(), nullptr, cancellable_, &Call::onDone, call);
+    g_subprocess_communicate_async(process_, nullptr, cancellable_, &Call::onDone, call);
 }
 
 void ArchiveLister::cancel()
 {
     if (!cancellable_)
         return;
+    // Cancelling the read does not stop the child (rule 16).
     g_cancellable_cancel(cancellable_);
+    g_subprocess_force_exit(process_);
+    g_object_unref(process_);
     g_object_unref(cancellable_);
+    process_ = nullptr;
     cancellable_ = nullptr;
 }
 

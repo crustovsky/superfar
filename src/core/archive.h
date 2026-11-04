@@ -13,6 +13,7 @@
 
 typedef struct _GCancellable GCancellable;
 typedef struct _GError GError;
+typedef struct _GSubprocess GSubprocess;
 
 namespace core {
 
@@ -75,7 +76,10 @@ Q_SIGNALS:
 
 private:
     struct Call;
+    // The child is held so that cancel can kill it: cancelling the GIO
+    // call alone lets bsdtar list to the end for nobody.
     GCancellable* cancellable_ = nullptr;
+    GSubprocess* process_ = nullptr;
 };
 
 } // namespace core
