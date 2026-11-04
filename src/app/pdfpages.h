@@ -6,30 +6,31 @@
 
 #include "core/location.h"
 #include "core/pages.h"
+#include "pagestrip.h"
 
 #include <QImage>
 #include <QObject>
 #include <vector>
 
-class PageStrip;
 class QWidget;
 
 class PdfPages : public QObject {
     Q_OBJECT
 public:
-    // slot: the widget whose size a page is rendered to fit. The strip is
-    // created as a child of stripParent for the caller to lay out.
-    PdfPages(QWidget* slot, QWidget* stripParent);
+    // slot: the widget whose size a page is rendered to fit; strip: the
+    // preview's, shared with the video side, driven while a document is open.
+    PdfPages(QWidget* slot, PageStrip* strip, QObject* parent);
 
-    PageStrip* strip() const { return strip_; }
     // Starts with the first page; pages come through pageReady.
     void start(const core::Location& file);
     // Kills the children, drops the cache and hides the strip.
     void cancel();
 
+    bool active() const { return info_.pages > 1; }  // takes the step keys
     int pageCount() const { return info_.pages; }
     int page() const { return page_; }
     void goToPage(int page);  // clamped to the document
+    void step(Step step);
 
 Q_SIGNALS:
     void pageReady(const QImage& image);

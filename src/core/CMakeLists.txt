@@ -20,6 +20,7 @@ qt_add_library(superfar_core STATIC
   compare.cpp
   archive.cpp
   pages.cpp
+  video.cpp
   jobs/extract.cpp
   jobs/pack.cpp
   fileops.cpp

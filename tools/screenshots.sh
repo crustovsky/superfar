@@ -28,7 +28,10 @@ printf 'body { margin: 0; }\n' > $D/Backup/site/style.css
 printf 'old notes\n' > $D/Backup/site/TODO.txt
 touch -d '2026-06-01 10:00' $D/Backup/site/style.css $D/Backup/site/TODO.txt
 printf 'Welcome to the demo folder.\n' > $D/README.txt
-touch -d '2026-10-12 09:30' $D/Documents/* $D/Pictures/* $D/Music/* $D/Downloads/* $D/Projects/site/* $D/README.txt
+cp tests/data/pages.pdf $D/Documents/manual.pdf
+mkdir -p $D/Videos
+ffmpeg -nostdin -v error -f lavfi -i testsrc2=duration=30:size=1280x720:rate=25 -c:v mpeg4 -q:v 4 $D/Videos/pattern.mp4 2>/dev/null || true
+touch -d '2026-10-12 09:30' $D/Documents/* $D/Pictures/* $D/Music/* $D/Downloads/* $D/Projects/site/* $D/Videos/* $D/README.txt
 export XDG_CONFIG_HOME=$PWD/build/shotcfg XDG_STATE_HOME=$PWD/build/shotstate QT_QPA_PLATFORM=offscreen
 # A state that knows the version, so the about note stays out of the shots.
 mkdir -p build/shotstate/superfar
@@ -38,6 +41,8 @@ shot dual-pane "Down;Down" 3500 /usr/share $D
 shot folder-sizes "Ctrl+F3" 7000 /usr/share $D
 shot preview "Ctrl+Q" 5000 $D/Pictures $D
 shot viewer "F3" 3500 $D/Downloads $D
+shot pdf-pages "Down;Down;Ctrl+Q;Ctrl+PgDown" 5000 $D/Documents $D
+shot video "Ctrl+Q;Ctrl+P;Ctrl+PgDown" 6000 $D/Videos $D
 shot help "F1" 3500 $D $D/Documents
 shot go-to "Ctrl+G" 3500 $D $D/Documents
 shot multi-rename "Ctrl+A;Shift+F2;Ctrl+A;I;M;G;_;*;Tab;Ctrl+A;H;O;L;I;D;A;Y;_;{;N;}" 12000 $D/Pictures $D

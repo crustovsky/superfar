@@ -3,52 +3,80 @@
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 2 0 obj
-<< /Length 38 >>
-stream
-BT /F1 72 Tf 200 400 Td (Page 1) Tj ET
-endstream
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+<< /Length 688 >>
+stream
+BT /F2 20 Tf 72 700 Td (Getting started) Tj ET
+BT /F1 12 Tf 72 660 Td (superfar keeps two panes open, each with its own tabs,) Tj ET
+BT /F1 12 Tf 72 642 Td (path bar and status line. The active pane is unmistakable.) Tj ET
+BT /F1 12 Tf 72 624 Td (Function keys do the work: F5 copies, F6 moves, F7 makes a) Tj ET
+BT /F1 12 Tf 72 606 Td (folder and F8 sends to the trash. Hold Shift, Ctrl or Alt) Tj ET
+BT /F1 12 Tf 72 588 Td (and the bar at the bottom relabels itself.) Tj ET
+BT /F1 12 Tf 72 570 Td (Nothing pops up. Progress, conflicts and questions appear) Tj ET
+BT /F1 12 Tf 72 552 Td (inside the window, where the keyboard already is.) Tj ET
+BT /F1 10 Tf 290 60 Td (Page 1 of 3) Tj ET
+endstream
 endobj
 4 0 obj
-<< /Length 38 >>
-stream
-BT /F1 72 Tf 200 400 Td (Page 2) Tj ET
-endstream
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
 endobj
 5 0 obj
-<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 1 0 R >> >> >>
-endobj
-6 0 obj
-<< /Length 38 >>
+<< /Length 691 >>
 stream
-BT /F1 72 Tf 200 400 Td (Page 3) Tj ET
+BT /F2 20 Tf 72 700 Td (Working with panes) Tj ET
+BT /F1 12 Tf 72 660 Td (superfar keeps two panes open, each with its own tabs,) Tj ET
+BT /F1 12 Tf 72 642 Td (path bar and status line. The active pane is unmistakable.) Tj ET
+BT /F1 12 Tf 72 624 Td (Function keys do the work: F5 copies, F6 moves, F7 makes a) Tj ET
+BT /F1 12 Tf 72 606 Td (folder and F8 sends to the trash. Hold Shift, Ctrl or Alt) Tj ET
+BT /F1 12 Tf 72 588 Td (and the bar at the bottom relabels itself.) Tj ET
+BT /F1 12 Tf 72 570 Td (Nothing pops up. Progress, conflicts and questions appear) Tj ET
+BT /F1 12 Tf 72 552 Td (inside the window, where the keyboard already is.) Tj ET
+BT /F1 10 Tf 290 60 Td (Page 2 of 3) Tj ET
 endstream
 endobj
+6 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
+endobj
 7 0 obj
-<< /Type /Page /Parent 8 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+<< /Length 698 >>
+stream
+BT /F2 20 Tf 72 700 Td (Keys and the function bar) Tj ET
+BT /F1 12 Tf 72 660 Td (superfar keeps two panes open, each with its own tabs,) Tj ET
+BT /F1 12 Tf 72 642 Td (path bar and status line. The active pane is unmistakable.) Tj ET
+BT /F1 12 Tf 72 624 Td (Function keys do the work: F5 copies, F6 moves, F7 makes a) Tj ET
+BT /F1 12 Tf 72 606 Td (folder and F8 sends to the trash. Hold Shift, Ctrl or Alt) Tj ET
+BT /F1 12 Tf 72 588 Td (and the bar at the bottom relabels itself.) Tj ET
+BT /F1 12 Tf 72 570 Td (Nothing pops up. Progress, conflicts and questions appear) Tj ET
+BT /F1 12 Tf 72 552 Td (inside the window, where the keyboard already is.) Tj ET
+BT /F1 10 Tf 290 60 Td (Page 3 of 3) Tj ET
+endstream
 endobj
 8 0 obj
-<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R] /Count 3 >>
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> >>
 endobj
 9 0 obj
-<< /Type /Catalog /Pages 8 0 R >>
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R] /Count 3 >>
+endobj
+10 0 obj
+<< /Type /Catalog /Pages 9 0 R >>
 endobj
 xref
-0 10
+0 11
 0000000000 65535 f 
 0000000009 00000 n 
 0000000079 00000 n 
-0000000167 00000 n 
-0000000293 00000 n 
-0000000381 00000 n 
-0000000507 00000 n 
-0000000595 00000 n 
-0000000721 00000 n 
-0000000790 00000 n 
+0000000154 00000 n 
+0000000893 00000 n 
+0000001029 00000 n 
+0000001771 00000 n 
+0000001907 00000 n 
+0000002656 00000 n 
+0000002792 00000 n 
+0000002861 00000 n 
 trailer
-<< /Size 10 /Root 9 0 R >>
+<< /Size 11 /Root 10 0 R >>
 startxref
-839
+2911
 %%EOF

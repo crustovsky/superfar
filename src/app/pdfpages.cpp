@@ -1,7 +1,5 @@
 #include "pdfpages.h"
 
-#include "pagestrip.h"
-
 #include <QWidget>
 #include <algorithm>
 
@@ -9,13 +7,13 @@ namespace {
 constexpr size_t kCachedPages = 4;
 }
 
-PdfPages::PdfPages(QWidget* slot, QWidget* stripParent)
-    : QObject(stripParent)
+PdfPages::PdfPages(QWidget* slot, PageStrip* strip, QObject* parent)
+    : QObject(parent)
     , slot_(slot)
-    , strip_(new PageStrip(stripParent))
+    , strip_(strip)
     , renderer_(new core::PageRenderer(this))
 {
-    connect(strip_, &PageStrip::pageRequested, this, &PdfPages::goToPage);
+    connect(strip_, &PageStrip::stepRequested, this, &PdfPages::step);
     connect(renderer_, &core::PageRenderer::infoReady, this, &PdfPages::onInfo);
     connect(renderer_, &core::PageRenderer::rendered, this, &PdfPages::onRendered);
     connect(renderer_, &core::PageRenderer::failed, this, &PdfPages::onFailed);
@@ -36,7 +34,19 @@ void PdfPages::cancel()
     info_ = core::PdfInfo();
     page_ = 0;
     cache_.clear();
-    strip_->setPages(0, 0);
+    strip_->clear();
+}
+
+void PdfPages::step(Step step)
+{
+    if (!active())
+        return;
+    switch (step) {
+    case Step::First: goToPage(1); return;
+    case Step::Prev: goToPage(page_ - 1); return;
+    case Step::Next: goToPage(page_ + 1); return;
+    case Step::Last: goToPage(info_.pages); return;
+    }
 }
 
 void PdfPages::goToPage(int page)

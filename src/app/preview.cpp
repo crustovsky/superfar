@@ -6,6 +6,7 @@
 #include "pagestrip.h"
 #include "pdfpages.h"
 #include "services.h"
+#include "videoplay.h"
 
 #include <QDateTime>
 #include <QFontDatabase>
@@ -80,6 +81,11 @@ bool isPdfType(const QString& contentType)
 {
     return contentType == QLatin1String("application/pdf") || contentType == QLatin1String("application/x-pdf");
 }
+
+bool isVideoType(const QString& contentType)
+{
+    return contentType.startsWith(QLatin1String("video/"));
+}
 } // namespace
 
 Preview::Preview(const Services& services, QWidget* parent)
@@ -91,18 +97,20 @@ Preview::Preview(const Services& services, QWidget* parent)
     , thumbs_(services.thumbs)
     , title_(new ElidedLabel(this))
     , info_(new QLabel(this))
+    , strip_(new PageStrip(this))
     , stack_(new QStackedWidget(this))
     , empty_(new QWidget(this))
     , picture_(new ImageView(this))
     , text_(new QPlainTextEdit(this))
 {
-    pdf_ = new PdfPages(stack_, this);
+    pdf_ = new PdfPages(stack_, strip_, this);
+    video_ = new VideoPlayer(stack_, strip_, this);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(title_);
     layout->addWidget(info_);
-    layout->addWidget(pdf_->strip());
+    layout->addWidget(strip_);
     layout->addWidget(stack_, 1);
     title_->setContentsMargins(4, 2, 4, 2);
     picture_->setMinimumSize(1, 1);
@@ -168,12 +176,10 @@ Preview::Preview(const Services& services, QWidget* parent)
                          .arg(s.complete ? QString() : tr(" (still counting)"));
                 addNote(t);
             });
-    connect(pdf_, &PdfPages::pageReady, this, [this](const QImage& image) {
-        thumbUri_.clear();  // a page beats the thumbnail, whenever that lands
-        picture_->setImage(image);
-        stack_->setCurrentWidget(picture_);
-    });
+    connect(pdf_, &PdfPages::pageReady, this, &Preview::showPicture);
     connect(pdf_, &PdfPages::note, this, &Preview::addNote);
+    connect(video_, &VideoPlayer::frameReady, this, &Preview::showPicture);
+    connect(video_, &VideoPlayer::note, this, &Preview::addNote);
 }
 
 void Preview::show(const core::Location& item)
@@ -199,6 +205,7 @@ void Preview::clear()
     sizer_->cancelAll();
     lister_->cancel();
     pdf_->cancel();
+    video_->cancel();
     picture_->clear();
     text_->clear();
     info_->clear();
@@ -207,19 +214,30 @@ void Preview::clear()
     stack_->setCurrentWidget(empty_);
 }
 
-int Preview::pageCount() const
+bool Preview::step(Step step)
 {
-    return pdf_->pageCount();
+    if (pdf_->active())
+        pdf_->step(step);
+    else if (video_->active())
+        video_->step(step);
+    else
+        return false;
+    return true;
 }
 
-int Preview::page() const
+bool Preview::togglePlay()
 {
-    return pdf_->page();
+    if (!video_->active())
+        return false;
+    video_->togglePlay();
+    return true;
 }
 
-void Preview::goToPage(int page)
+void Preview::showPicture(const QImage& image)
 {
-    pdf_->goToPage(page);
+    thumbUri_.clear();  // a page or frame beats the thumbnail, whenever that lands
+    picture_->setImage(image);
+    stack_->setCurrentWidget(picture_);
 }
 
 void Preview::onDetails(const core::Details& d)
@@ -254,6 +272,11 @@ void Preview::onDetails(const core::Details& d)
         // slot size replaces it when pdftoppm is there.
         showThumbnail(d.contentType);
         pdf_->start(item_);
+        return;
+    }
+    if (isVideoType(d.contentType) && !item_.path().isEmpty()) {
+        showThumbnail(d.contentType);
+        video_->start(item_);
         return;
     }
     showThumbnail(d.contentType);
