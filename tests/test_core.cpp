@@ -1392,6 +1392,15 @@ void CoreTest::archiveListing()
     paths.sort();
     QCOMPARE(paths, QStringList({"src", "src/a.txt", "src/sub", "src/sub/b.txt"}));
 
+    // Cancelled at once: the child is killed, nothing arrives later.
+    listed.clear();
+    done = false;
+    lister.start(zip, 2);
+    lister.cancel();
+    QTest::qWait(300);
+    QVERIFY(!done);
+    QVERIFY(listed.empty());
+
     QVERIFY(QDir().mkpath(tmp.path() + "/out"));
     core::ExtractJob job(zip, {QByteArray("src/sub/b.txt")}, core::Location::fromPath(QFile::encodeName(tmp.path() + "/out")), 2);
     QSignalSpy finished(&job, &core::Job::finished);
