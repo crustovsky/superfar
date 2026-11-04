@@ -85,5 +85,13 @@ if command -v pdftoppm > /dev/null && [ -d /usr/share/mime ]; then
     run pdfpages "Ctrl+Q;Ctrl+PgDown;Ctrl+End;Ctrl+PgUp;Ctrl+Home;Escape" 4500 "$T/pdf" "$T/b"
     XDG_DATA_DIRS=$T/data
 fi
+if command -v ffmpeg > /dev/null && [ -d /usr/share/mime ]; then
+    # A clip made here; the preview plays, seeks, pauses and closes.
+    mkdir -p "$T/video" "$T/mime" && ln -sfn /usr/share/mime "$T/mime/mime"
+    ffmpeg -nostdin -v error -f lavfi -i testsrc=duration=3:size=320x240:rate=25 -c:v mpeg4 "$T/video/clip.mp4"
+    XDG_DATA_DIRS=$T/mime
+    run video "Ctrl+Q;Ctrl+PgDown;Ctrl+P;Ctrl+Home;Ctrl+P;Ctrl+End;Escape" 5000 "$T/video" "$T/b"
+    XDG_DATA_DIRS=$T/data
+fi
 
 exit $fail

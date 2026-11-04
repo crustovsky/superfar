@@ -21,6 +21,7 @@ qt_add_executable(superfar
   preview.cpp
   pagestrip.cpp
   pdfpages.cpp
+  videoplay.cpp
   archivetext.cpp
   pane/delegate.cpp
   jobs/bars.cpp

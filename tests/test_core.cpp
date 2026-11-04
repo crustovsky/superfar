@@ -13,6 +13,7 @@
 #include "core/reader.h"
 #include "core/rename.h"
 #include "core/thumbnails.h"
+#include "core/video.h"
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/sort.h"
@@ -26,6 +27,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <cmath>
 #include <unistd.h>
 #include <utime.h>
 
@@ -82,6 +84,7 @@ private Q_SLOTS:
     void compareTrees();
     void archiveListing();
     void pdfPages();
+    void videoFrames();
 };
 
 namespace {
@@ -1474,6 +1477,81 @@ void CoreTest::pdfPages()
             ++dark;
     QVERIFY(dark > 100);
     QVERIFY(dark < page.rgb.size() / 3 / 10);
+}
+
+void CoreTest::videoFrames()
+{
+    const QByteArray json = R"({"streams":[{"width":1920,"height":1080,"r_frame_rate":"30000/1001",
+        "avg_frame_rate":"0/0","duration":"12.5","tags":{},"side_data_list":[{"rotation":-90}]}],
+        "format":{"duration":"13.0"}})";
+    core::VideoInfo v = core::parseVideoInfo(json);
+    QCOMPARE(v.width, 1080u);  // sideways phone video stands up
+    QCOMPARE(v.height, 1920u);
+    QVERIFY(std::abs(v.frameRate - 29.97) < 0.01);  // the nominal rate when the average is 0/0
+    QCOMPARE(v.duration, 12.5);
+    v = core::parseVideoInfo(R"({"streams":[{"width":640,"height":480,"avg_frame_rate":"25/1"}],"format":{"duration":"3"}})");
+    QCOMPARE(v.frameRate, 25.0);
+    QCOMPARE(v.duration, 3.0);  // the container's when the stream has none
+    QCOMPARE(core::parseVideoInfo("{}").width, 0u);
+
+    core::FrameSize f = core::fitFrame(1920, 1080, 480, 480);
+    QCOMPARE(f.width, 480u);
+    QCOMPARE(f.height, 270u);
+    f = core::fitFrame(320, 240, 1000, 1000);
+    QCOMPARE(f.width, 320u);  // never upscaled
+
+    // A clip made on the spot, probed, then three frames from half a second in.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QProcess make;
+    make.start(QStringLiteral("ffmpeg"), {QStringLiteral("-nostdin"), QStringLiteral("-v"), QStringLiteral("error"),
+                                          QStringLiteral("-f"), QStringLiteral("lavfi"), QStringLiteral("-i"),
+                                          QStringLiteral("testsrc=duration=2:size=320x240:rate=25"), QStringLiteral("-c:v"),
+                                          QStringLiteral("mpeg4"), tmp.path() + QStringLiteral("/clip.mp4")});
+    if (!make.waitForFinished(20000) || make.exitCode() != 0)
+        QSKIP("ffmpeg not available");
+    const core::Location clip = core::Location::fromPath(QFile::encodeName(tmp.path() + "/clip.mp4"));
+    core::FrameStreamer streamer;
+    core::VideoInfo got;
+    int frames = 0;
+    quint32 w = 0, h = 0;
+    qsizetype bytes = 0;
+    bool done = false, ended = false;
+    connect(&streamer, &core::FrameStreamer::infoReady, [&](quint64, core::VideoInfo i) { got = i; done = true; });
+    connect(&streamer, &core::FrameStreamer::frame, [&](quint64, QByteArray bgra, quint32 fw, quint32 fh) {
+        ++frames; w = fw; h = fh; bytes = bgra.size(); done = true;
+    });
+    connect(&streamer, &core::FrameStreamer::ended, [&](quint64) { ended = true; done = true; });
+    connect(&streamer, &core::FrameStreamer::failed, [&](quint64, const QString& m, bool) { QFAIL(qPrintable(m)); });
+    streamer.probe(clip, 1);
+    while (!done)
+        QTest::qWait(5);
+    QCOMPARE(got.width, 320u);
+    QCOMPARE(got.height, 240u);
+    QCOMPARE(got.frameRate, 25.0);
+    QVERIFY(std::abs(got.duration - 2.0) < 0.1);
+    streamer.start(clip, 0.5, core::fitFrame(320, 240, 160, 160), 25, 2);
+    for (int i = 0; i < 3; ++i) {
+        done = false;
+        streamer.readFrame(i == 2 ? 5 : 0);  // the third skips five
+        while (!done)
+            QTest::qWait(5);
+    }
+    QCOMPARE(frames, 3);
+    QCOMPARE(w, 160u);
+    QCOMPARE(h, 120u);
+    QCOMPARE(bytes, 160 * 120 * 4);
+    QVERIFY(!ended);
+    // 1.5 s at 25 fps is about 37 frames; 8 are consumed, the rest then the end.
+    for (int i = 0; i < 60 && !ended; ++i) {
+        done = false;
+        streamer.readFrame(0);
+        while (!done)
+            QTest::qWait(5);
+    }
+    QVERIFY(ended);
+    QVERIFY(frames >= 30 && frames <= 34);
+    streamer.stop();
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

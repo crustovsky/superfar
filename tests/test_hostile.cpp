@@ -6,6 +6,7 @@
 // real temp directory through raw POSIX calls, so the bytes stay bytes.
 #include "core/archive.h"
 #include "core/pages.h"
+#include "core/video.h"
 #include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/finder.h"
@@ -145,6 +146,7 @@ private Q_SLOTS:
     void copyKeepsNamesAndLinks();
     void archiveMembersStayInside();
     void pdfToolOutput();
+    void videoProbeOutput();
 
 private:
     QTemporaryDir tmp_;
@@ -455,6 +457,22 @@ void HostileTest::pdfToolOutput()
     QVERIFY(core::parsePpm("P6\n1 1\n65535\n" + QByteArray(6, 'a')).rgb.isEmpty());
     QVERIFY(core::parsePpm("P6\n-1 1\n255\n" + QByteArray(3, 'a')).rgb.isEmpty());
     QVERIFY(core::parsePpm("P6 1 1 255 " + QByteArray(3, 'a')).width == 1);
+}
+
+void HostileTest::videoProbeOutput()
+{
+    // ffprobe's JSON is parsed, never trusted: absurd values give nothing.
+    QCOMPARE(core::parseVideoInfo("not json").width, 0u);
+    QCOMPARE(core::parseVideoInfo(R"({"streams":[{"width":-5,"height":1e30}]})").width, 0u);
+    QCOMPARE(core::parseVideoInfo(R"({"streams":[{"width":99999,"height":10}]})").width, 0u);
+    const core::VideoInfo v = core::parseVideoInfo(R"({"streams":[{"width":"16","height":"9","avg_frame_rate":"1/0",
+        "r_frame_rate":"-25/1","duration":"nan","side_data_list":[{"rotation":"ninety"}]}],"format":{"duration":"-1"}})");
+    QCOMPARE(v.width, 16u);
+    QCOMPARE(v.frameRate, 0.0);
+    QCOMPARE(v.duration, 0.0);
+    QCOMPARE(core::parseVideoInfo(R"({"streams":[{"width":16,"height":9,"avg_frame_rate":"100000/1"}]})").frameRate, 0.0);
+    QCOMPARE(core::fitFrame(0, 0, 100, 100).width, 1u);
+    QCOMPARE(core::fitFrame(16384, 16384, 0, 0).width, 1u);
 }
 
 QTEST_GUILESS_MAIN(HostileTest)

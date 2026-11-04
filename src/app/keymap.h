@@ -72,6 +72,7 @@ enum class Command {
     PreviewPrev,
     PreviewNext,
     PreviewLast,
+    PreviewPlay,       // a previewed video: play or pause
 };
 
 Command lookup(const QKeySequence& key);
