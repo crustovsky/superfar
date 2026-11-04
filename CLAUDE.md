@@ -131,8 +131,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+Space focuses the command line, which runs in the active tab's
   directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
   the window until Enter; Ctrl+Enter inserts the cursor's name
-- Ctrl+Q preview; Ctrl+C / Ctrl+X / Ctrl+V interoperate with other file
-  managers
+- Ctrl+Q preview (Ctrl+Home / PgUp / PgDown / End page through a PDF);
+  Ctrl+C / Ctrl+X / Ctrl+V interoperate with other file managers
 
 ## Config
 
@@ -328,7 +328,7 @@ tools/screenshots.sh` re-renders the README screenshots.
 
 Plugins, theming beyond the platform theme, an embedded terminal, a
 search index (the launcher's job), translations before 1.0. Media and
-PDF previews only as tumbler thumbnails, never an in-process decoder.
+PDF previews via tumbler or a child renderer, never a linked decoder.
 
 ## Conventions
 

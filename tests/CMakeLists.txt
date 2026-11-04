@@ -1,5 +1,6 @@
 qt_add_executable(test_core test_core.cpp)
 target_link_libraries(test_core PRIVATE superfar_core Qt6::Test)
+target_compile_definitions(test_core PRIVATE SUPERFAR_TEST_DATA="${CMAKE_SOURCE_DIR}/tests/data")
 add_test(NAME core COMMAND test_core)
 
 qt_add_executable(test_jobs test_jobs.cpp)

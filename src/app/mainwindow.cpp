@@ -363,6 +363,21 @@ void MainWindow::execute(keymap::Command command)
     case Command::Preview:
         togglePreview();
         return;
+    case Command::PreviewFirst:
+    case Command::PreviewPrev:
+    case Command::PreviewNext:
+    case Command::PreviewLast:
+        // Only paged preview content takes these keys; otherwise the tab
+        // gives them their list meaning (first row, page up, ...).
+        if (preview_ && preview_->pageCount() > 1) {
+            const int page = command == Command::PreviewFirst ? 1
+                : command == Command::PreviewLast             ? preview_->pageCount()
+                : command == Command::PreviewPrev             ? preview_->page() - 1
+                                                              : preview_->page() + 1;
+            preview_->goToPage(page);
+            return;
+        }
+        break;
     case Command::FocusCommandLine:
         cmdline_->setFocus();
         return;

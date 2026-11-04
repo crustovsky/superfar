@@ -5,6 +5,7 @@
 // 4 GiB and an archive whose members try to climb out. All against a
 // real temp directory through raw POSIX calls, so the bytes stay bytes.
 #include "core/archive.h"
+#include "core/pages.h"
 #include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/finder.h"
@@ -143,6 +144,7 @@ private Q_SLOTS:
     void shellQuoteRoundTrip();
     void copyKeepsNamesAndLinks();
     void archiveMembersStayInside();
+    void pdfToolOutput();
 
 private:
     QTemporaryDir tmp_;
@@ -436,6 +438,23 @@ void HostileTest::archiveMembersStayInside()
     runJob(bad);
     QVERIFY(!bad.log().empty());
     QVERIFY(!QFile::exists(QFile::decodeName(join(base, "escape.txt"))));
+}
+
+void HostileTest::pdfToolOutput()
+{
+    // What the tools print is parsed, never trusted: absurd sizes and
+    // counts give an empty result, not an allocation.
+    QCOMPARE(core::parsePdfInfo("Pages: -5\nPage size: -1 x 0 pts\n").pages, 0);
+    QCOMPARE(core::parsePdfInfo("Pages: 99999999999999999999\n").pages, 0);
+    QCOMPARE(core::parsePdfInfo(QByteArray("\0\xff\n:::\n", 8)).widthPt, 0.0);
+    QVERIFY(core::parsePpm("").rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6").rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6\n99999999999 99999999999\n255\n").rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6\n40000 40000\n255\nxyz").rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6\n0 0\n255\n").rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6\n1 1\n65535\n" + QByteArray(6, 'a')).rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6\n-1 1\n255\n" + QByteArray(3, 'a')).rgb.isEmpty());
+    QVERIFY(core::parsePpm("P6 1 1 255 " + QByteArray(3, 'a')).width == 1);
 }
 
 QTEST_GUILESS_MAIN(HostileTest)

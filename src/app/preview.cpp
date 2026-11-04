@@ -3,6 +3,8 @@
 #include "archivetext.h"
 #include "elidedlabel.h"
 #include "jobs/format.h"
+#include "pagestrip.h"
+#include "pdfpages.h"
 #include "services.h"
 
 #include <QDateTime>
@@ -73,6 +75,11 @@ QString permissions(quint32 mode)
         s += (mode & (0400 >> i)) ? QLatin1Char(bits[i]) : QLatin1Char('-');
     return QStringLiteral("%1 (%2)").arg(s).arg(mode & 07777, 4, 8, QLatin1Char('0'));
 }
+
+bool isPdfType(const QString& contentType)
+{
+    return contentType == QLatin1String("application/pdf") || contentType == QLatin1String("application/x-pdf");
+}
 } // namespace
 
 Preview::Preview(const Services& services, QWidget* parent)
@@ -89,11 +96,13 @@ Preview::Preview(const Services& services, QWidget* parent)
     , picture_(new ImageView(this))
     , text_(new QPlainTextEdit(this))
 {
+    pdf_ = new PdfPages(stack_, this);
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(title_);
     layout->addWidget(info_);
+    layout->addWidget(pdf_->strip());
     layout->addWidget(stack_, 1);
     title_->setContentsMargins(4, 2, 4, 2);
     picture_->setMinimumSize(1, 1);
@@ -113,7 +122,7 @@ Preview::Preview(const Services& services, QWidget* parent)
 
     connect(image_, &core::ImageLoader::decoded, this, &Preview::showImage);
     connect(image_, &core::ImageLoader::failed, this, [this](const QString& m) {
-        info_->setText(details_ + QLatin1Char('\n') + tr("Could not decode: %1").arg(m));
+        addNote(tr("Could not decode: %1").arg(m));
     });
     connect(thumbs_, &core::Thumbnailer::ready, this, [this](const QString& uri, const QString& path) {
         if (uri != thumbUri_)
@@ -131,7 +140,7 @@ Preview::Preview(const Services& services, QWidget* parent)
         reader_->close();
         if (bytes.contains('\0')) {
             // Not text whatever the type said: the details stay on their own.
-            info_->setText(details_ + QLatin1Char('\n') + tr("Binary content"));
+            addNote(tr("Binary content"));
             return;
         }
         text_->setFont(textFont_);
@@ -145,7 +154,7 @@ Preview::Preview(const Services& services, QWidget* parent)
             });
     connect(lister_, &core::ArchiveLister::failed, this, [this](quint64 gen, const QString& m) {
         if (gen == generation_)  // no bsdtar, or an archive it cannot read (encrypted, damaged)
-            info_->setText(details_ + QLatin1Char('\n') + m);
+            addNote(m);
     });
     connect(sizer_, &core::DirSizer::result, this,
             [this](quint64 gen, const QByteArray&, const core::DirSize& s) {
@@ -157,8 +166,14 @@ Preview::Preview(const Services& services, QWidget* parent)
                          .arg(s.files)
                          .arg(s.dirs)
                          .arg(s.complete ? QString() : tr(" (still counting)"));
-                info_->setText(details_ + QLatin1Char('\n') + t);
+                addNote(t);
             });
+    connect(pdf_, &PdfPages::pageReady, this, [this](const QImage& image) {
+        thumbUri_.clear();  // a page beats the thumbnail, whenever that lands
+        picture_->setImage(image);
+        stack_->setCurrentWidget(picture_);
+    });
+    connect(pdf_, &PdfPages::note, this, &Preview::addNote);
 }
 
 void Preview::show(const core::Location& item)
@@ -183,12 +198,28 @@ void Preview::clear()
     reader_->close();
     sizer_->cancelAll();
     lister_->cancel();
+    pdf_->cancel();
     picture_->clear();
     text_->clear();
     info_->clear();
     title_->clear();
     details_.clear();
     stack_->setCurrentWidget(empty_);
+}
+
+int Preview::pageCount() const
+{
+    return pdf_->pageCount();
+}
+
+int Preview::page() const
+{
+    return pdf_->page();
+}
+
+void Preview::goToPage(int page)
+{
+    pdf_->goToPage(page);
 }
 
 void Preview::onDetails(const core::Details& d)
@@ -218,18 +249,35 @@ void Preview::onDetails(const core::Details& d)
         reader_->open(item_);
         return;
     }
+    if (isPdfType(d.contentType) && !item_.path().isEmpty()) {
+        // The thumbnail first, as it is usually cached; the first page at
+        // slot size replaces it when pdftoppm is there.
+        showThumbnail(d.contentType);
+        pdf_->start(item_);
+        return;
+    }
+    showThumbnail(d.contentType);
+}
+
+void Preview::showThumbnail(const QString& contentType)
+{
     // Video, PDF, documents, fonts, audio with cover art: whatever tumbler
     // has a thumbnailer for, at its largest size.
-    if (thumbs_->supports(d.contentType)) {
-        const QString uri = item_.uri();
-        const QString path = thumbs_->request(uri, d.contentType, core::Thumbnailer::Flavor::XXLarge);
-        if (!path.isEmpty()) {
-            picture_->setImage(QImage(path));
-            stack_->setCurrentWidget(picture_);
-        } else {
-            thumbUri_ = uri;
-        }
+    if (!thumbs_->supports(contentType))
+        return;
+    const QString uri = item_.uri();
+    const QString path = thumbs_->request(uri, contentType, core::Thumbnailer::Flavor::XXLarge);
+    if (!path.isEmpty()) {
+        picture_->setImage(QImage(path));
+        stack_->setCurrentWidget(picture_);
+    } else {
+        thumbUri_ = uri;
     }
+}
+
+void Preview::addNote(const QString& text)
+{
+    info_->setText(details_ + QLatin1Char('\n') + text);
 }
 
 void Preview::showImage(const core::ImageFrame& frame)
@@ -241,14 +289,13 @@ void Preview::showImage(const core::ImageFrame& frame)
                        QImage::Format_ARGB32_Premultiplied, [](void* p) { delete static_cast<QByteArray*>(p); },
                        bytes);
     picture_->setImage(image);
-    info_->setText(details_ + QLatin1Char('\n')
-                   + tr("Dimensions: %1 × %2").arg(frame.sourceWidth).arg(frame.sourceHeight));
+    addNote(tr("Dimensions: %1 × %2").arg(frame.sourceWidth).arg(frame.sourceHeight));
     stack_->setCurrentWidget(picture_);
 }
 
 void Preview::showArchive(const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped)
 {
-    info_->setText(details_ + QLatin1Char('\n') + archivetext::summary(core::summarizeArchive(entries), dropped, packedBytes_));
+    addNote(archivetext::summary(core::summarizeArchive(entries), dropped, packedBytes_));
     // The first screen of the tree, no more: the archive tab shows the rest.
     const QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     const int fit = std::max(12, text_->viewport()->height() / QFontMetrics(mono).lineSpacing());
