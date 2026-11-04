@@ -72,6 +72,10 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
         {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
         {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
+        {QKeySequence(Qt::CTRL | Qt::Key_Home), Command::PreviewFirst},
+        {QKeySequence(Qt::CTRL | Qt::Key_PageUp), Command::PreviewPrev},
+        {QKeySequence(Qt::CTRL | Qt::Key_PageDown), Command::PreviewNext},
+        {QKeySequence(Qt::CTRL | Qt::Key_End), Command::PreviewLast},
     };
     return t;
 }
@@ -166,6 +170,10 @@ QString label(Command command)
     case Command::About: return QStringLiteral("About");
     case Command::ToggleTree: return QStringLiteral("Tree");
     case Command::Pack: return QStringLiteral("Pack");
+    case Command::PreviewFirst: return QStringLiteral("First page");
+    case Command::PreviewPrev: return QStringLiteral("Previous page");
+    case Command::PreviewNext: return QStringLiteral("Next page");
+    case Command::PreviewLast: return QStringLiteral("Last page");
     case Command::None: return {};
     }
     return {};
@@ -193,6 +201,8 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::Bookmark, "Bookmark"}, {Command::ToggleThumbnails, "ToggleThumbnails"},
         {Command::MultiRename, "MultiRename"}, {Command::Sync, "Sync"}, {Command::About, "About"},
         {Command::ToggleTree, "ToggleTree"}, {Command::Pack, "Pack"},
+        {Command::PreviewFirst, "PreviewFirst"}, {Command::PreviewPrev, "PreviewPrev"},
+        {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
     };
     return n;
 }

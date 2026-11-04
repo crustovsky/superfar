@@ -68,6 +68,10 @@ enum class Command {
     About,             // Shift+F1, the Help menu, and once per new version
     ToggleTree,        // Ctrl+F5: hide or show the folder tree
     Pack,              // Alt+F5: the marked items into a new archive
+    PreviewFirst,      // paged preview content: first page
+    PreviewPrev,
+    PreviewNext,
+    PreviewLast,
 };
 
 Command lookup(const QKeySequence& key);

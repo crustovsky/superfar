@@ -7,6 +7,7 @@
 #include "core/finder.h"
 #include "core/jobs/extract.h"
 #include "core/mounts.h"
+#include "core/pages.h"
 #include "core/image.h"
 #include "core/listing.h"
 #include "core/reader.h"
@@ -80,6 +81,7 @@ private Q_SLOTS:
     void renameRules();
     void compareTrees();
     void archiveListing();
+    void pdfPages();
 };
 
 namespace {
@@ -1400,6 +1402,78 @@ void CoreTest::archiveListing()
     QFile out(tmp.path() + "/out/b.txt");
     QVERIFY(out.open(QIODevice::ReadOnly));
     QCOMPARE(out.readAll(), QByteArray("world!"));
+}
+
+void CoreTest::pdfPages()
+{
+    const QByteArray info =
+        "Title:           x\n"
+        "Pages:           25\n"
+        "Encrypted:       no\n"
+        "Page size:       595.276 x 841.89 pts (A4)\n"
+        "Page rot:        90\n";
+    core::PdfInfo parsed = core::parsePdfInfo(info);
+    QCOMPARE(parsed.pages, 25);
+    QCOMPARE(parsed.widthPt, 841.89);  // rotation applied
+    QCOMPARE(parsed.heightPt, 595.276);
+    QVERIFY(!parsed.encrypted);
+    parsed = core::parsePdfInfo("Encrypted:       yes (print:no copy:no)\n");
+    QCOMPARE(parsed.pages, 0);
+    QVERIFY(parsed.encrypted);
+
+    // The dpi that fits a letter page into a box, long side limiting.
+    QCOMPARE(core::fitDpi(612, 792, 612, 792), 72.0);
+    QCOMPARE(core::fitDpi(612, 792, 1224, 10000), 144.0);
+    QCOMPARE(core::fitDpi(612, 792, 10000, 396), 36.0);
+    QCOMPARE(core::fitDpi(0, 0, 100, 100), 72.0);  // unknown size: as is
+
+    QByteArray ppm = "P6\n2 3\n255\n";
+    ppm += QByteArray(2 * 3 * 3, '\x7f');
+    core::Raster r = core::parsePpm(ppm);
+    QCOMPARE(r.width, 2u);
+    QCOMPARE(r.height, 3u);
+    QCOMPARE(r.rgb.size(), 18);
+    QVERIFY(core::parsePpm(ppm.left(ppm.size() - 1)).rgb.isEmpty());  // short body
+    QVERIFY(core::parsePpm("P3\n2 3\n255\n").rgb.isEmpty());  // ASCII variant: not what pdftoppm writes
+
+    // A real document through the tools: the count, then page two.
+    const core::Location pdf = core::Location::fromPath(QByteArray(SUPERFAR_TEST_DATA "/pages.pdf"));
+    core::PageRenderer renderer;
+    core::PdfInfo got;
+    core::Raster page;
+    int pageNumber = 0;
+    bool done = false, missing = false;
+    connect(&renderer, &core::PageRenderer::infoReady, [&](quint64, core::PdfInfo i) { got = i; done = true; });
+    connect(&renderer, &core::PageRenderer::rendered,
+            [&](quint64, int p, double, core::Raster raster) { pageNumber = p; page = raster; done = true; });
+    connect(&renderer, &core::PageRenderer::failed, [&](quint64, const QString& m, bool notInstalled) {
+        missing = notInstalled;
+        done = true;
+        if (!notInstalled)
+            QFAIL(qPrintable(m));
+    });
+    renderer.info(pdf, 1);
+    while (!done)
+        QTest::qWait(5);
+    if (missing)
+        QSKIP("poppler not available");
+    QCOMPARE(got.pages, 3);
+    QCOMPARE(got.widthPt, 612.0);
+    done = false;
+    renderer.render(pdf, 2, core::fitDpi(got.widthPt, got.heightPt, 306, 1000), 1);
+    while (!done)
+        QTest::qWait(5);
+    QCOMPARE(pageNumber, 2);
+    QCOMPARE(page.width, 306u);
+    QCOMPARE(page.height, 396u);
+    QCOMPARE(page.rgb.size(), 306 * 396 * 3);
+    // Mostly white paper with some black text on it.
+    int dark = 0;
+    for (int i = 0; i < page.rgb.size(); i += 3)
+        if (static_cast<unsigned char>(page.rgb[i]) < 0x80)
+            ++dark;
+    QVERIFY(dark > 100);
+    QVERIFY(dark < page.rgb.size() / 3 / 10);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

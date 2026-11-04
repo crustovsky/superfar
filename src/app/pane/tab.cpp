@@ -8,7 +8,9 @@
 #include "pane/listview.h"
 #include "services.h"
 
+#include <QCoreApplication>
 #include <QFileInfo>
+#include <QKeyEvent>
 #include <QLocale>
 #include <QPointer>
 #include <QScrollBar>
@@ -462,6 +464,20 @@ bool Tab::execute(keymap::Command command)
             return false;
         setFilter(QString());
         return true;
+    case Command::PreviewFirst:
+    case Command::PreviewPrev:
+    case Command::PreviewNext:
+    case Command::PreviewLast: {
+        // No paged preview took the key: it keeps the list meaning of its
+        // unmodified twin, as Ctrl+Home moved to the first row before.
+        const Qt::Key key = command == Command::PreviewFirst ? Qt::Key_Home
+            : command == Command::PreviewLast                ? Qt::Key_End
+            : command == Command::PreviewPrev                ? Qt::Key_PageUp
+                                                             : Qt::Key_PageDown;
+        QKeyEvent plain(QEvent::KeyPress, key, Qt::NoModifier);
+        QCoreApplication::sendEvent(view_, &plain);
+        return true;
+    }
     case Command::Rename:
         if (isArchive()) {
             Q_EMIT message(tr("Archives are read-only here"));

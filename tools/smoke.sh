@@ -75,5 +75,15 @@ run filter "t;w;Escape;p;Backspace" 3000 "$T/a" "$T/b"
 run badargs "" 1200 /nonexistent/deeper foo://x
 run fileargs "" 1200 /etc/hostname /etc
 run viewer "Down;F3;Escape" 2000 "$T/a" "$T/b"
+if command -v pdftoppm > /dev/null && [ -d /usr/share/mime ]; then
+    # Alone in its folder, so the cursor is on it; the pages render in a
+    # child. The MIME database must be in sight for the file to be a PDF
+    # at all, but desktop entries must not: a data dir with only mime.
+    mkdir "$T/pdf" "$T/mime" && cp "$(dirname "$0")/../tests/data/pages.pdf" "$T/pdf/"
+    ln -s /usr/share/mime "$T/mime/mime"
+    XDG_DATA_DIRS=$T/mime
+    run pdfpages "Ctrl+Q;Ctrl+PgDown;Ctrl+End;Ctrl+PgUp;Ctrl+Home;Escape" 4500 "$T/pdf" "$T/b"
+    XDG_DATA_DIRS=$T/data
+fi
 
 exit $fail
