@@ -367,17 +367,19 @@ void MainWindow::execute(keymap::Command command)
     case Command::PreviewPrev:
     case Command::PreviewNext:
     case Command::PreviewLast:
-        // Only paged preview content takes these keys; otherwise the tab
-        // gives them their list meaning (first row, page up, ...).
-        if (preview_ && preview_->pageCount() > 1) {
-            const int page = command == Command::PreviewFirst ? 1
-                : command == Command::PreviewLast             ? preview_->pageCount()
-                : command == Command::PreviewPrev             ? preview_->page() - 1
-                                                              : preview_->page() + 1;
-            preview_->goToPage(page);
+        // Only a paged or playing preview takes these keys; otherwise the
+        // tab gives them their list meaning (first row, page up, ...).
+        if (preview_
+            && preview_->step(command == Command::PreviewFirst ? Step::First
+                              : command == Command::PreviewLast ? Step::Last
+                              : command == Command::PreviewPrev ? Step::Prev
+                                                                : Step::Next))
             return;
-        }
         break;
+    case Command::PreviewPlay:
+        if (preview_)
+            preview_->togglePlay();
+        return;
     case Command::FocusCommandLine:
         cmdline_->setFocus();
         return;

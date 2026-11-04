@@ -76,6 +76,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_PageUp), Command::PreviewPrev},
         {QKeySequence(Qt::CTRL | Qt::Key_PageDown), Command::PreviewNext},
         {QKeySequence(Qt::CTRL | Qt::Key_End), Command::PreviewLast},
+        {QKeySequence(Qt::CTRL | Qt::Key_P), Command::PreviewPlay},
     };
     return t;
 }
@@ -174,6 +175,7 @@ QString label(Command command)
     case Command::PreviewPrev: return QStringLiteral("Previous page");
     case Command::PreviewNext: return QStringLiteral("Next page");
     case Command::PreviewLast: return QStringLiteral("Last page");
+    case Command::PreviewPlay: return QStringLiteral("Play");
     case Command::None: return {};
     }
     return {};
@@ -203,6 +205,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::ToggleTree, "ToggleTree"}, {Command::Pack, "Pack"},
         {Command::PreviewFirst, "PreviewFirst"}, {Command::PreviewPrev, "PreviewPrev"},
         {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
+        {Command::PreviewPlay, "PreviewPlay"},
     };
     return n;
 }

@@ -12,6 +12,7 @@ optdepends=('gvfs: trash, mounts, network shares'
             'libarchive: open archives as folders, pack into them'
             'tumbler: thumbnails and media previews'
             'poppler: PDF pages in the preview'
+            'ffmpeg: video playback in the preview'
             'xdg-terminal-exec: F4 and the command line in your terminal')
 options=('!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")

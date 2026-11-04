@@ -65,10 +65,11 @@ QString describe(keymap::Command c)
     case Command::About: return QStringLiteral("name, version and build date");
     case Command::ToggleTree: return QStringLiteral("hide or show the folder tree; hidden, it does no work");
     case Command::Pack: return QStringLiteral("pack the marked items (or the cursor) into a new archive: zip, tar.gz, tar.xz, tar.zst or 7z");
-    case Command::PreviewFirst: return QStringLiteral("preview of a PDF: first page (the list keeps these keys otherwise)");
-    case Command::PreviewPrev: return QStringLiteral("preview of a PDF: previous page");
-    case Command::PreviewNext: return QStringLiteral("preview of a PDF: next page");
-    case Command::PreviewLast: return QStringLiteral("preview of a PDF: last page");
+    case Command::PreviewFirst: return QStringLiteral("previewed PDF or video: first page, or the start (the list keeps these keys otherwise)");
+    case Command::PreviewPrev: return QStringLiteral("previewed PDF or video: previous page, or back 10 seconds");
+    case Command::PreviewNext: return QStringLiteral("previewed PDF or video: next page, or forward 10 seconds");
+    case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
+    case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
     case Command::None: return {};
     }
     return {};

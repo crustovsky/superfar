@@ -2,8 +2,9 @@
 // whatever fits (rule 8): an image through libglycin, a text head as
 // plain bytes capped at 1 MiB, a folder's count and recursive size, an
 // archive's summary and the top of its tree from bsdtar's listing, a
-// PDF's pages rendered by pdftoppm in a child, and for anything else
-// type, size, dates and permissions.
+// PDF's pages rendered by pdftoppm in a child, a video's frames decoded
+// by ffmpeg in a child, and for anything else type, size, dates and
+// permissions.
 #pragma once
 
 #include "core/archive.h"
@@ -13,6 +14,7 @@
 #include "core/metadata.h"
 #include "core/reader.h"
 #include "core/thumbnails.h"
+#include "pagestrip.h"
 
 #include <QFont>
 #include <QWidget>
@@ -24,6 +26,7 @@ class PdfPages;
 class QLabel;
 class QPlainTextEdit;
 class QStackedWidget;
+class VideoPlayer;
 
 class Preview : public QWidget {
     Q_OBJECT
@@ -33,16 +36,18 @@ public:
     void show(const core::Location& item);
     void clear();
 
-    // Paged content (a PDF with more than one page) takes the page keys.
-    int pageCount() const;
-    int page() const;
-    void goToPage(int page);  // clamped to the document
+    // The step keys go to paged content (a PDF with more than one page)
+    // or to a video; false when neither is shown, so the key keeps its
+    // list meaning. Play toggles a video; false otherwise.
+    bool step(Step step);
+    bool togglePlay();
 
 private:
     void onDetails(const core::Details& d);
     void showImage(const core::ImageFrame& frame);
     void showArchive(const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped);
     void showThumbnail(const QString& contentType);
+    void showPicture(const QImage& image);
     void addNote(const QString& text);
     QString detailsText(const core::Details& d) const;
 
@@ -58,8 +63,10 @@ private:
     core::Thumbnailer* thumbs_;
     QString thumbUri_;  // the thumbnail awaited for the current item
     PdfPages* pdf_;
+    VideoPlayer* video_;
     QLabel* title_;
     QLabel* info_;      // details, always above the content
+    PageStrip* strip_;  // pages or transport, below the details
     QStackedWidget* stack_;
     QWidget* empty_;
     ImageView* picture_;
