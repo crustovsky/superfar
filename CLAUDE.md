@@ -87,10 +87,11 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 ## Keys (FAR-style, remappable)
 
-- Tab switches panes; Shift+Tab focuses the tree
-- Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
-  cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
-  as [name])
+- Each command has a function key where one fits (the bar shows it):
+  Shift a variant, Ctrl what the pane shows, Alt panels, tools; chords second
+- Tab switches panes; Shift+Tab focuses the tree; Ctrl+T new tab (same
+  folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab cycle; Ctrl+Shift+L locks
+  a tab so navigation opens a new tab (shown as [name])
 - F1 help (Shift+F1 about), F2 rename inline (Tab: the row's mode and
   owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
   copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
@@ -102,10 +103,10 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Alt+F5 pack panel: the marked items into a new zip, tar.gz, tar.xz,
   tar.zst or 7z (name, level, this folder or the other pane's) by
   bsdtar in a child, with progress, conflict and abort like a copy
-- Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
-  the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
-  taller rows); Ctrl+F5 hides the tree; Ctrl+F6 lists the columns to
-  show, hide or move; a header click sorts, a drag moves, a right click lists
+- Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows the
+  direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus, taller
+  rows); Ctrl+F5 the tree; Ctrl+F6 the column list (show, hide, move);
+  Ctrl+F7 (Ctrl+H) hidden files; a header click sorts, a drag moves it
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
@@ -114,11 +115,11 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Ctrl+A all; * invert; Ctrl+Shift+A clears. Selection is marks,
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
-- Enter opens a file with its default app; Shift+Enter shows the in-window
-  open-with list; Alt+F2 (also Alt+Enter) the properties panel (mode and
-  owner of the marked items, down their folders if asked); Esc clears the
-  filter, closes the viewer or panel, then the preview, then the marks
-- Ctrl+D bookmarks the current folder (or removes the bookmark)
+- Enter opens a file with its default app; Shift+F3 (Shift+Enter) shows the
+  in-window open-with list; Alt+F2 (Alt+Enter) the properties panel (mode
+  and owner of the marked items, down their folders if asked); Esc clears
+  the filter, closes the viewer or panel, then the preview, then the marks
+- Alt+F6 (Ctrl+D) bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
 - Backspace and Left go up; Right and Enter open the cursor folder;
@@ -126,30 +127,29 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   read-only folder listed by bsdtar in a child process, F5 extracts the
   marked members to the other pane
 - Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
-  with credentials asked in the window); Ctrl+G go to folder, fuzzy over
-  history by frecency; Ctrl+H toggles hidden files; Ctrl+R reloads
+  with credentials asked in the window); Alt+F1 (Ctrl+G) go to folder, fuzzy
+  over history by frecency; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
   directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
   the window until Enter; Ctrl+Enter inserts the cursor's name
-- Ctrl+Q preview (Ctrl+Home / PgUp / PgDown / End page a PDF or seek a
-  video, Ctrl+P plays); Ctrl+C / Ctrl+X / Ctrl+V interoperate with others
+- Ctrl+F8 (Ctrl+Q) preview (Ctrl+Home / PgUp / PgDown / End page a PDF or
+  seek a video, Ctrl+P plays); Ctrl+C / Ctrl+X / Ctrl+V work across apps
 
 ## Config
 
-`~/.config/superfar/superfar.ini`, written with defaults on first run
-and never again: the user owns it (chezmoi and friends must see no
-churn). `[keys]` has one line per command (`Copy=F5`,
-`GoUp="Backspace;Left"`; empty unbinds). `[columns/left]` and
-`[columns/right]` seed a pane: `order=name,modified,size`,
-`hidden=items`. `[layout]` has `split=side-by-side|stacked` and
-`preview=borrow|third`. `~/.local/state/superfar/state.ini` holds what
-the app writes on its own: `[session]` tabs per pane (hidden, locked,
-sizes, thumbs, sort, cursor), active tab and pane, tree shown or not;
-`[history]` the Ctrl+G folders by visit count and last time; `[window]`
-size; `[layout]` splitter sizes; `[columns/*]` dragged widths, and the
-order and hidden set once the window changes them (they then win).
+`~/.config/superfar/superfar.ini`, written with defaults on first run and
+never again: the user owns it (chezmoi and friends must see no churn).
+`[keys]` has one line per command (`Copy=F5`, `GoUp="Backspace;Left"`; empty
+unbinds). `[columns/left]` and `[columns/right]` seed a pane:
+`order=name,modified,size`, `hidden=items`. `[layout]` has
+`split=side-by-side|stacked` and `preview=borrow|third`.
+`~/.local/state/superfar/state.ini` holds what the app writes on its own:
+`[session]` tabs per pane (hidden, locked, sizes, thumbs, sort, cursor),
+active tab and pane, tree shown or not; `[history]` the Ctrl+G folders by
+visit count and last time; `[window]` size; `[layout]` splitter sizes;
+`[columns/*]` widths, and order and hidden once the window changes them.
 
 ## Layout
 

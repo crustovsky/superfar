@@ -33,12 +33,12 @@ you can see in the bar at the bottom.
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
-| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+Q |
+| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
 | **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
-| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Ctrl+G, Ctrl+L |
+| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
 | **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space |
@@ -95,7 +95,7 @@ The F3 viewer on a binary file:
 
 ![Viewer](docs/screenshots/viewer.png)
 
-Folder history on Ctrl+G, ranked by frecency:
+Folder history on Alt+F1, ranked by frecency:
 
 ![Go to](docs/screenshots/go-to.png)
 
@@ -122,8 +122,21 @@ Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache:
 
 ## Keys
 
+Almost everything is on a function key, in four layers, and the bar at
+the bottom shows the layer of whatever modifier you hold. Shift is a
+variant of the plain key, Ctrl is what the pane shows, Alt is panels
+and tools:
+
+| | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plain | help | rename | view | edit | copy | move | new folder | trash | menu | quit |
+| Shift | about | multi-rename | open with | new file | sync | | | delete | | |
+| Ctrl | left pane | right pane | sizes | thumbnails | tree | columns | hidden files | preview | | |
+| Alt | go to | properties | | | pack | bookmark | find | | | |
+
 F1 shows the full table inside the window, with whatever you have
-remapped. The defaults:
+remapped. The defaults, with the keys other file managers use kept as
+second keys:
 
 | Key | Action |
 |-----|--------|
@@ -144,18 +157,20 @@ remapped. The defaults:
 | Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
 | Ctrl+F6 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
-| Ctrl+D | bookmark this folder, or remove the bookmark |
+| Alt+F6, Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
 | Space, Ctrl+A, * | mark, mark all, invert |
 | Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
 | Ctrl+=, Ctrl+- | mark and unmark by pattern |
-| Enter, Shift+Enter | open with the default app, choose an app |
+| Enter | open with the default app |
+| Shift+F3, Shift+Enter | choose an app to open with |
 | Backspace, Left, Right | go up, go up, enter |
-| Ctrl+Q | preview the cursor item |
+| Ctrl+F8, Ctrl+Q | preview the cursor item |
 | Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End | previewed PDF: first, previous, next, last page; video: start, back 10 s, forward 10 s, end |
 | Ctrl+P | previewed video: play or pause |
-| Ctrl+L, Ctrl+G | type a path or URI, go to a folder from history |
-| Ctrl+H | show hidden files |
+| Ctrl+L | type a path or URI |
+| Alt+F1, Ctrl+G | go to a folder from history |
+| Ctrl+F7, Ctrl+H | show hidden files |
 | Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
 | Ctrl+Space | the command line: runs in the tab's folder in a terminal |
 | Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
