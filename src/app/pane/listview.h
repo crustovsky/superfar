@@ -33,8 +33,10 @@ public:
     // Only the first tab of the first pane reports bench marks.
     void setBenchReporter(bool on) { benchReporter_ = on; }
     bool activePane() const { return active_; }
-    // The least Name is given: its icon and about ten characters. When
-    // that and the other columns do not fit, the list scrolls sideways.
+    // The least Name is given: its icon and half a dozen characters,
+    // enough to tell files apart and little enough that the default
+    // columns in a narrow pane still fit without scrolling. When that
+    // and the other columns do not fit, the list scrolls sideways.
     int nameFloor() const;
     // The cursor row across the whole list, for its outline and repaint.
     QRect rowRect(const QModelIndex& index) const;
