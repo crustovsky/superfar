@@ -30,7 +30,7 @@ add_test(NAME app COMMAND test_app)
 # the offscreen platform.
 set(TAB_SOURCES pane/tab.cpp pane/tab_archive.cpp pane/tab_attributes.cpp pane/listmodel.cpp
     pane/listmodel_sort.cpp pane/listmodel_attrs.cpp pane/listview.cpp pane/delegate.cpp pane/columns.cpp
-    ownercompletion.cpp attributesedit.cpp keymap.cpp bench.cpp uris.cpp)
+    ownercompletion.cpp attributesedit.cpp keymap.cpp menu.cpp bench.cpp uris.cpp)
 list(TRANSFORM TAB_SOURCES PREPEND ${CMAKE_SOURCE_DIR}/src/app/)
 qt_add_executable(test_tab test_tab.cpp ${TAB_SOURCES})
 target_include_directories(test_tab PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)

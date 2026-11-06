@@ -63,6 +63,9 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void startDrag(Qt::DropActions supportedActions) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+    // A right click: the cursor goes to the row under it and a menu
+    // offers the commands for it, or for the folder on empty space.
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint) override;
     void resizeEvent(QResizeEvent* event) override;
 

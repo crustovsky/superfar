@@ -79,6 +79,13 @@ Pane::Pane(const Services& services, QWidget* parent)
     connect(tabBar_, &QTabBar::currentChanged, this, &Pane::onCurrentTab);
     connect(tabBar_, &TabBar::closeRequested, this, &Pane::closeTab);
     connect(tabBar_, &TabBar::newTabRequested, this, [this] { newTab(core::Location::home()); });
+    connect(tabBar_, &TabBar::commandRequested, this, [this](keymap::Command command) {
+        // This pane's tabs, whichever pane is active: the strip takes no
+        // focus, so the pane does it here.
+        if (Tab* tab = activeTab())
+            tab->setFocus();
+        execute(command);
+    });
     path_->installEventFilter(this);
 }
 

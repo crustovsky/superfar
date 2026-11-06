@@ -27,7 +27,7 @@ you can see in the bar at the bottom.
 | **Two panes** | Always open, each with its own path bar, tabs and status line; the active one is unmistakable. | Tab, Ctrl+F1, Ctrl+F2 |
 | **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+Shift+L |
 | **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
-| **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9. | always on screen |
+| **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9, and a right click offers the same commands for what is under the pointer. | always on screen |
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
 | **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F6, the header |
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
@@ -166,7 +166,12 @@ function key does; hold Shift, Ctrl or Alt and it relabels, naming the
 modifier at its left end. F8 on a mount in the tree unmounts it, or
 ejects it when it is removable.
 
-With the mouse: middle click closes a tab, a double click on the empty
+With the mouse: a right click brings a short menu of what the keys do
+for the thing under it, each entry with its key beside it: an item of
+the list (the marked items when there are marks; the menu's first line
+says which), the list's empty space (new folder, paste, what the pane
+shows), a tab, a folder or a mount in the tree. Middle click closes a
+tab, a double click on the empty
 tab strip opens one at home, a double click on the path bar edits the
 path (the same as Ctrl+L, for a remote location), and files drag
 between panes, onto tree folders and to other apps. On a column header

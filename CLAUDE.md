@@ -28,7 +28,7 @@ These are the product. When in doubt, they win.
    active tab of the active pane. Selecting a folder navigates that tab.
 5. **Function key bar, not menus.** A clickable bar at the bottom shows
    F1 to F10 with their actions; holding Shift, Ctrl or Alt relabels it.
-   The menu bar is hidden; F9 shows it.
+   The menu bar is hidden; F9 shows it; a right click has a short menu.
 6. **Folder counts and sizes.** Folders show their item count by default on
    local filesystems. An opt-in mode (per tab, toggled from the function
    bar) computes recursive size and count down the tree, Opus style. F3 on

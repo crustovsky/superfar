@@ -129,6 +129,7 @@ QString text()
     lines << QCoreApplication::translate("help", "Click a column header to sort by it; click again to reverse. Folders stay first.");
     lines << QCoreApplication::translate("help", "Drag a header to move its column, its edge to resize it; a right click lists the columns (Ctrl+F6 from the keys).");
     lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
+    lines << QCoreApplication::translate("help", "A right click on an item, the empty list, a tab or the tree lists what the keys do there.");
     return lines.join(QLatin1Char('\n'));
 }
 

@@ -113,6 +113,9 @@ Q_SIGNALS:
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
+    // A right click chooses the folder as a click does (the active tab
+    // goes there) and lists what can be done with it.
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void showEvent(QShowEvent* event) override;
     void focusInEvent(QFocusEvent* event) override;
 

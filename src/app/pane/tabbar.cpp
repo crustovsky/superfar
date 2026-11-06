@@ -1,5 +1,8 @@
 #include "pane/tabbar.h"
 
+#include "menu.h"
+
+#include <QContextMenuEvent>
 #include <QFontMetrics>
 #include <QMouseEvent>
 #include <QStyleOptionTab>
@@ -23,6 +26,17 @@ void TabBar::mouseReleaseEvent(QMouseEvent* event)
         }
     }
     QTabBar::mouseReleaseEvent(event);
+}
+
+void TabBar::contextMenuEvent(QContextMenuEvent* event)
+{
+    // The commands are for the current tab, so the tab under the
+    // pointer becomes it first.
+    if (const int index = tabAt(event->pos()); index >= 0)
+        setCurrentIndex(index);
+    menu::popup(this, menu::Context::Tabs, QString(), event->globalPos(),
+                [this](keymap::Command command) { Q_EMIT commandRequested(command); });
+    event->accept();
 }
 
 QSize TabBar::tabSizeHint(int index) const
