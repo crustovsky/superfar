@@ -104,7 +104,7 @@ void ListModel::append(std::vector<core::Entry> batch)
         return;
     // A batch on its own: folder values are mostly unknown while the
     // load streams, the full sort in finishLoad has them.
-    core::sortEntries(batch, sortBy_, sortAscending_);
+    core::sortEntries(batch, sortBy_, sortAscending_, {}, &ids_);
 
     std::vector<quint32> added;
     const auto base = static_cast<quint32>(entries_.size());
@@ -335,7 +335,9 @@ Qt::ItemFlags ListModel::flags(const QModelIndex& index) const
     if (!index.isValid())
         return Qt::ItemIsDropEnabled;  // empty space: into this folder
     Qt::ItemFlags f = QAbstractTableModel::flags(index) | Qt::ItemIsDragEnabled;
-    if (index.column() == NameColumn)
+    const int column = index.column();
+    if (column == NameColumn
+        || ((column == PermissionsColumn || column == OwnerColumn) && entryAt(index.row()).mode != 0))
         f |= Qt::ItemIsEditable;
     if (entryAt(index.row()).isDir())
         f |= Qt::ItemIsDropEnabled;
@@ -383,18 +385,6 @@ bool ListModel::dropMimeData(const QMimeData* data, Qt::DropAction action, int, 
         if (s == target || s.parent() == target)
             return false;  // onto itself or where it already is
     Q_EMIT dropRequested(sources, target, action == Qt::MoveAction);
-    return true;
-}
-
-bool ListModel::setData(const QModelIndex& index, const QVariant& value, int role)
-{
-    if (role != Qt::EditRole || !index.isValid() || index.column() != NameColumn)
-        return false;
-    const core::Entry& e = entryAt(index.row());
-    const QString newName = value.toString();
-    if (newName.isEmpty() || newName == e.display || newName.contains(QLatin1Char('/')))
-        return false;
-    Q_EMIT renameRequested(e.name, newName);
     return true;
 }
 
@@ -477,10 +467,15 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
             if (e.modified == 0)
                 return {};  // the backend did not say
             return QDateTime::fromSecsSinceEpoch(e.modified).toString("yyyy-MM-dd HH:mm");
+        case PermissionsColumn:
+        case OwnerColumn:
+            return attributeText(e, index.column(), false);
         default:
             return {};
         }
     case Qt::EditRole:
+        if (index.column() == PermissionsColumn || index.column() == OwnerColumn)
+            return attributeText(e, index.column(), true);
         return index.column() == NameColumn ? QVariant(e.display) : QVariant();
     case Qt::DecorationRole:
         if (index.column() == NameColumn)

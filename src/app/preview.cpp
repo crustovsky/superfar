@@ -1,6 +1,7 @@
 #include "preview.h"
 
 #include "archivetext.h"
+#include "core/unixattrs.h"
 #include "elidedlabel.h"
 #include "jobs/format.h"
 #include "pagestrip.h"
@@ -68,13 +69,10 @@ QString when(qint64 secs)
 
 QString permissions(quint32 mode)
 {
+    // The letters as the list's Permissions column has them, s and t included.
     if (mode == 0)
         return {};
-    QString s;
-    const char* bits = "rwxrwxrwx";
-    for (int i = 0; i < 9; ++i)
-        s += (mode & (0400 >> i)) ? QLatin1Char(bits[i]) : QLatin1Char('-');
-    return QStringLiteral("%1 (%2)").arg(s).arg(mode & 07777, 4, 8, QLatin1Char('0'));
+    return QStringLiteral("%1 (%2)").arg(core::modeString(mode).mid(1)).arg(mode & 07777, 4, 8, QLatin1Char('0'));
 }
 
 bool isPdfType(const QString& contentType)

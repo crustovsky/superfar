@@ -1,16 +1,12 @@
 #include "properties.h"
 
-#include "core/fileops.h"
+#include "attributesedit.h"
 #include "elidedlabel.h"
 #include "jobs/format.h"
 
-#include <QCheckBox>
 #include <QDateTime>
-#include <QGridLayout>
 #include <QKeyEvent>
 #include <QLabel>
-#include <QPointer>
-#include <QPushButton>
 #include <QVBoxLayout>
 
 namespace {
@@ -25,7 +21,7 @@ PropertiesPanel::PropertiesPanel(core::DirSizePool* sizes, QWidget* parent)
     , sizer_(new core::DirSizer(sizes, this))
     , title_(new ElidedLabel(this))
     , info_(new QLabel(this))
-    , modeLabel_(new QLabel(this))
+    , editor_(new AttributesEditor(this))
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -37,34 +33,12 @@ PropertiesPanel::PropertiesPanel(core::DirSizePool* sizes, QWidget* parent)
     info_->setWordWrap(true);
     info_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(info_);
-
-    auto* grid = new QGridLayout;
-    grid->setContentsMargins(6, 0, 6, 0);
-    const char* who[] = {"Owner", "Group", "Others"};
-    const char* what[] = {"read", "write", "execute"};
-    for (int c = 0; c < 3; ++c)
-        grid->addWidget(new QLabel(tr(what[c]), this), 0, c + 1);
-    for (int r = 0; r < 3; ++r) {
-        grid->addWidget(new QLabel(tr(who[r]), this), r + 1, 0);
-        for (int c = 0; c < 3; ++c) {
-            auto* box = new QCheckBox(this);
-            bits_[static_cast<size_t>(r * 3 + c)] = box;
-            grid->addWidget(box, r + 1, c + 1);
-            connect(box, &QCheckBox::toggled, this, [this] {
-                modeLabel_->setText(QStringLiteral("%1").arg(modeFromBoxes(), 4, 8, QLatin1Char('0')));
-            });
-        }
-    }
-    grid->addWidget(modeLabel_, 1, 4);
-    auto* applyBtn = new QPushButton(tr("&Apply permissions"), this);
-    auto* closeBtn = new QPushButton(tr("&Close"), this);
-    grid->addWidget(applyBtn, 2, 4);
-    grid->addWidget(closeBtn, 3, 4);
-    grid->setColumnStretch(5, 1);
-    layout->addLayout(grid);
+    layout->addWidget(editor_);
     layout->addStretch(1);
-    connect(applyBtn, &QPushButton::clicked, this, &PropertiesPanel::apply);
-    connect(closeBtn, &QPushButton::clicked, this, &PropertiesPanel::closed);
+    connect(editor_, &AttributesEditor::applyRequested, this,
+            [this](const core::AttributeChange& change) { Q_EMIT applyRequested(items_, change); });
+    connect(editor_, &AttributesEditor::closeRequested, this, &PropertiesPanel::closed);
+    connect(editor_, &AttributesEditor::message, this, &PropertiesPanel::message);
     setFocusPolicy(Qt::StrongFocus);
 
     connect(sizer_, &core::DirSizer::result, this, [this](quint64 gen, const QByteArray&, const core::DirSize& s) {
@@ -93,6 +67,7 @@ void PropertiesPanel::show(const std::vector<core::Location>& items)
     fileBytes_ = 0;
     folderTotals_ = core::DirSize();
     firstSeen_ = false;
+    editor_->clear();
     title_->setText(items.size() == 1 ? items.front().displayPath()
                                       : tr("%n items", nullptr, static_cast<int>(items.size())));
     info_->setText(tr("Reading"));
@@ -110,12 +85,8 @@ void PropertiesPanel::onDetails(const core::Details& d)
     if (!firstSeen_ && d.ok) {
         firstSeen_ = true;
         first_ = d;
-        for (int i = 0; i < 9; ++i) {
-            QSignalBlocker block(bits_[static_cast<size_t>(i)]);
-            bits_[static_cast<size_t>(i)]->setChecked(d.mode & (0400 >> i));
-        }
-        modeLabel_->setText(QStringLiteral("%1").arg(d.mode & 07777, 4, 8, QLatin1Char('0')));
     }
+    editor_->add(d);
     if (d.isDir) {
         ++folders_;
     } else {
@@ -123,6 +94,7 @@ void PropertiesPanel::onDetails(const core::Details& d)
         fileBytes_ += d.size;
     }
     if (pendingDetails_ == 0) {
+        editor_->finish();
         // Folders get a walk each once every item is known.
         for (const core::Location& item : items_) {
             core::Location parent = item.parent();
@@ -164,33 +136,10 @@ void PropertiesPanel::refresh()
     info_->setText(lines.join(QLatin1Char('\n')));
 }
 
-quint32 PropertiesPanel::modeFromBoxes() const
+void PropertiesPanel::reread()
 {
-    quint32 mode = 0;
-    for (int i = 0; i < 9; ++i)
-        if (bits_[static_cast<size_t>(i)]->isChecked())
-            mode |= 0400 >> i;
-    return mode;
-}
-
-void PropertiesPanel::apply()
-{
-    const quint32 mode = modeFromBoxes();
-    QPointer<PropertiesPanel> guard(this);
-    auto remaining = std::make_shared<int>(static_cast<int>(items_.size()));
-    for (const core::Location& item : items_) {
-        // The nine bits the boxes show; setuid, setgid and sticky stay.
-        core::setMode(item, mode, 0777, [guard, remaining](const QString& error) {
-            if (!guard)
-                return;
-            if (!error.isEmpty())
-                Q_EMIT guard->message(error);
-            if (--*remaining == 0) {
-                Q_EMIT guard->message(tr("Permissions applied"));
-                Q_EMIT guard->changed();
-            }
-        });
-    }
+    if (!items_.empty())
+        show(std::vector<core::Location>(items_));
 }
 
 void PropertiesPanel::keyPressEvent(QKeyEvent* event)

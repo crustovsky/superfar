@@ -7,6 +7,7 @@
 #include "core/apps.h"
 #include "core/dirsize.h"
 #include "core/fileops.h"
+#include "core/jobs/attributes.h"
 #include "core/jobs/extract.h"
 #include "core/jobs/pack.h"
 #include "core/thumbnails.h"
@@ -150,6 +151,19 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                                     t->reloadWithCursor(name);  // the new archive under the cursor
                     });
                     runJob(job, pane->activeTab(), dest);
+                });
+        connect(pane, &Pane::attributesRequested, this,
+                [this, pane](const std::vector<core::Location>& items, const core::AttributeChange& change) {
+                    // A job, so a tree gets progress, Abort and a log of
+                    // what was refused. The marks stay: the owner may
+                    // follow the mode.
+                    auto* job = new core::AttributesJob(items, change);
+                    const core::Location dir = pane->activeTab()->location();
+                    connect(job, &core::Job::finished, this, [this, pane, dir] {
+                        refreshAt(dir);
+                        pane->refreshProperties();
+                    });
+                    strip_->addJob(job);
                 });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {

@@ -26,9 +26,11 @@ target_compile_definitions(test_app PRIVATE SUPERFAR_VERSION="test" SUPERFAR_BUI
 target_link_libraries(test_app PRIVATE superfar_core Qt6::Gui Qt6::Test)
 add_test(NAME app COMMAND test_app)
 
-# A tab with its list over a temp folder, on the offscreen platform.
-set(TAB_SOURCES pane/tab.cpp pane/tab_archive.cpp pane/listmodel.cpp pane/listmodel_sort.cpp
-    pane/listview.cpp pane/delegate.cpp pane/columns.cpp keymap.cpp bench.cpp uris.cpp)
+# A tab with its list over a temp folder, and the attributes editor, on
+# the offscreen platform.
+set(TAB_SOURCES pane/tab.cpp pane/tab_archive.cpp pane/tab_attributes.cpp pane/listmodel.cpp
+    pane/listmodel_sort.cpp pane/listmodel_attrs.cpp pane/listview.cpp pane/delegate.cpp pane/columns.cpp
+    ownercompletion.cpp attributesedit.cpp keymap.cpp bench.cpp uris.cpp)
 list(TRANSFORM TAB_SOURCES PREPEND ${CMAKE_SOURCE_DIR}/src/app/)
 qt_add_executable(test_tab test_tab.cpp ${TAB_SOURCES})
 target_include_directories(test_tab PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)

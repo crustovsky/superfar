@@ -1,8 +1,12 @@
 // A tab over a real temp folder, offscreen: the marks of a folder
 // survive a round trip into a subfolder or an archive and act only
 // where they live.
+#include "attributesedit.h"
 #include "core/dirsize.h"
 #include "core/thumbnails.h"
+#include "core/unixattrs.h"
+#include "ownercompletion.h"
+#include "pane/listmodel.h"
 #include "pane/listview.h"
 #include "pane/tab.h"
 #include "services.h"
@@ -10,10 +14,16 @@
 #include <QDir>
 #include <QFile>
 #include <QHeaderView>
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace {
 
@@ -27,6 +37,12 @@ void write(const QString& path, const QByteArray& content)
 core::Location loc(const QString& path)
 {
     return core::Location::fromPath(QFile::encodeName(path));
+}
+
+quint32 modeOf(const QString& path)
+{
+    struct stat st {};
+    return ::stat(QFile::encodeName(path).constData(), &st) == 0 ? quint32(st.st_mode & 07777) : ~0u;
 }
 
 QStringList markedNames(const Tab& tab)
@@ -54,6 +70,10 @@ private Q_SLOTS:
     void marksAcrossAnArchive();
     void cursorRowSpansTheList();
     void columnsHideAndMove();
+    void attributeCells();
+    void tabWalksTheRow();
+    void ownerCompletion();
+    void attributesEditor();
 
 private:
     // Runs go() and waits for the load it starts.
@@ -229,7 +249,7 @@ void TabTest::columnsHideAndMove()
     view->setColumnShown(SizeColumn, false);
     QCOMPARE(changed.size(), 1);
     QVERIFY(view->isColumnHidden(SizeColumn));
-    QCOMPARE(view->columnLayout().hiddenNames(), QStringList({"size", "items"}));
+    QCOMPARE(view->columnLayout().hiddenNames(), QStringList({"size", "items", "permissions", "owner"}));
     QCOMPARE(h->sectionSize(NameColumn) + h->sectionSize(ModifiedColumn), view->viewport()->width());
     view->setColumnShown(SizeColumn, true);
     QCOMPARE(changed.size(), 2);
@@ -251,6 +271,219 @@ void TabTest::columnsHideAndMove()
     tab.setSort(core::SortBy::Modified, false);
     QCOMPARE(h->sortIndicatorSection(), int(ModifiedColumn));
     QCOMPARE(tab.sortBy(), core::SortBy::Modified);
+}
+
+void TabTest::attributeCells()
+{
+    using namespace columns;
+    QVERIFY(QFile::setPermissions(root_ + "/a.txt", QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                                        | QFileDevice::ReadGroup | QFileDevice::ReadOther));
+    Tab tab(services_);
+    tab.resize(900, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    view->applyColumns(Layout::from({"name", "permissions", "owner"}, {}), {});
+    QAbstractItemModel* m = view->model();
+    auto cell = [&](int column) { return m->index(tab.view()->model()->match(m->index(0, 0), Qt::DisplayRole, QStringLiteral("a.txt")).value(0).row(), column); };
+    QSignalSpy messages(&tab, &Tab::message);
+
+    // What ls -l says, from the listing's own stat.
+    QCOMPARE(cell(PermissionsColumn).data().toString(), QStringLiteral("-rw-r--r--"));
+    struct stat st {};
+    QCOMPARE(::stat(QFile::encodeName(root_ + "/a.txt").constData(), &st), 0);
+    core::IdNames ids;
+    QCOMPARE(cell(OwnerColumn).data().toString(), ids.owner(st.st_uid, st.st_gid));
+    QVERIFY(m->index(0, PermissionsColumn).data().toString().startsWith(QLatin1Char('d')));  // sub/
+
+    // The cell edits the nine letters; either spelling changes the file
+    // and the row follows.
+    QVERIFY(cell(PermissionsColumn).flags() & Qt::ItemIsEditable);
+    QVERIFY(cell(OwnerColumn).flags() & Qt::ItemIsEditable);
+    QVERIFY(!(cell(SizeColumn).flags() & Qt::ItemIsEditable));
+    QCOMPARE(cell(PermissionsColumn).data(Qt::EditRole).toString(), QStringLiteral("rw-r--r--"));
+    QVERIFY(m->setData(cell(PermissionsColumn), QStringLiteral("rwxr-x---"), Qt::EditRole));
+    QTRY_COMPARE(modeOf(root_ + "/a.txt"), 0750u);
+    QTRY_COMPARE(cell(PermissionsColumn).data().toString(), QStringLiteral("-rwxr-x---"));
+    QVERIFY(m->setData(cell(PermissionsColumn), QStringLiteral("0604"), Qt::EditRole));
+    QTRY_COMPARE(modeOf(root_ + "/a.txt"), 0604u);
+    QVERIFY(messages.isEmpty());
+
+    // Not a mode, nobody's name: a message, and the file as it was.
+    QVERIFY(!m->setData(cell(PermissionsColumn), QStringLiteral("rwxrwxrwz"), Qt::EditRole));
+    QCOMPARE(messages.size(), 1);
+    QVERIFY(!m->setData(cell(OwnerColumn), QStringLiteral("no-such-user-zz"), Qt::EditRole));
+    QCOMPARE(messages.size(), 2);
+    QVERIFY(messages.last().first().toString().contains(QStringLiteral("no-such-user-zz")));
+    QCOMPARE(modeOf(root_ + "/a.txt"), 0604u);
+    // The text as it stands asks for nothing.
+    QVERIFY(!m->setData(cell(OwnerColumn), cell(OwnerColumn).data(Qt::EditRole), Qt::EditRole));
+    QVERIFY(!m->setData(cell(PermissionsColumn), QStringLiteral("rw----r--"), Qt::EditRole));
+    QCOMPARE(messages.size(), 2);
+    if (::geteuid() != 0) {
+        // Giving the file to root is refused by the system: its words, in the pane.
+        QVERIFY(m->setData(cell(OwnerColumn), QStringLiteral("root"), Qt::EditRole));
+        QTRY_COMPARE(messages.size(), 3);
+    }
+
+    // A header click on Permissions orders by the bits, folders first.
+    QVERIFY(QFile::setPermissions(root_ + "/b.txt", QFileDevice::ReadOwner));
+    load(tab, [&] { tab.reload(); });
+    tab.setSort(core::SortBy::Permissions, true);
+    QCOMPARE(tab.sortBy(), core::SortBy::Permissions);
+    QCOMPARE(m->index(0, NameColumn).data().toString(), QStringLiteral("sub"));
+    QCOMPARE(m->index(1, NameColumn).data().toString(), QStringLiteral("b.txt"));  // 0400 before 0604
+}
+
+void TabTest::tabWalksTheRow()
+{
+    using namespace columns;
+    QVERIFY(QFile::setPermissions(root_ + "/a.txt", QFileDevice::ReadOwner | QFileDevice::WriteOwner));
+    Tab tab(services_);
+    tab.resize(900, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    view->applyColumns(Layout::from({"name", "owner", "permissions"}, {}), {});
+    view->setCurrentIndex(view->model()->index(1, 0));  // a.txt
+    auto editor = [&] { return view->viewport()->findChild<QLineEdit*>(); };
+
+    // F2 opens the name; Tab goes along the row in the order shown.
+    tab.execute(keymap::Command::Rename);
+    QVERIFY(view->isEditing());
+    QCOMPARE(view->currentIndex().column(), int(NameColumn));
+    QTest::keyClick(editor(), Qt::Key_Tab);
+    QTRY_COMPARE(view->currentIndex().column(), int(OwnerColumn));
+    QTRY_VERIFY(view->isEditing() && editor());
+    QTest::keyClick(editor(), Qt::Key_Tab);
+    QTRY_COMPARE(view->currentIndex().column(), int(PermissionsColumn));
+    QTRY_VERIFY(view->isEditing() && editor() && editor()->text() == QLatin1String("rw-------"));
+    QCOMPARE(tab.currentName(), QByteArray("a.txt"));  // still the same row, not renamed
+
+    // Typed and entered: the file has the mode.
+    editor()->setText(QStringLiteral("rwxr-xr-x"));
+    QTest::keyClick(editor(), Qt::Key_Return);
+    QTRY_COMPARE(modeOf(root_ + "/a.txt"), 0755u);
+    QTRY_VERIFY(!view->isEditing());
+
+    // Shift+Tab walks back, around the row's end.
+    tab.execute(keymap::Command::Rename);
+    QTest::keyClick(editor(), Qt::Key_Backtab);
+    QTRY_COMPARE(view->currentIndex().column(), int(PermissionsColumn));
+    QTRY_VERIFY(view->isEditing() && editor());
+    QTest::keyClick(editor(), Qt::Key_Escape);
+    QTRY_VERIFY(!view->isEditing());
+    QVERIFY(QFile::exists(root_ + "/a.txt"));
+}
+
+void TabTest::ownerCompletion()
+{
+    // Users before the colon, groups after it, completed in the line.
+    QLineEdit edit;
+    completeOwners(&edit);
+    edit.show();
+    edit.activateWindow();
+    edit.setFocus();
+    if (!QTest::qWaitForWindowActive(&edit) || !edit.hasFocus())
+        QSKIP("no window activation on this platform");
+    QTest::keyClicks(&edit, QStringLiteral("roo"));
+    QCOMPARE(edit.text(), QStringLiteral("root"));
+    QCOMPARE(edit.selectedText(), QStringLiteral("t"));
+    QTest::keyClick(&edit, Qt::Key_End);
+    QTest::keyClicks(&edit, QStringLiteral(":roo"));
+    QCOMPARE(edit.text(), QStringLiteral("root:root"));
+}
+
+void TabTest::attributesEditor()
+{
+    // The properties panel's editor over a file (rw-r--r--) and a folder
+    // (rwxr-xr-x), both root's: it asks only for what was changed in it.
+    qRegisterMetaType<core::AttributeChange>();
+    AttributesEditor editor;
+    QSignalSpy applied(&editor, &AttributesEditor::applyRequested);
+    QSignalSpy said(&editor, &AttributesEditor::message);
+    auto details = [](quint32 mode, bool dir) {
+        core::Details d;
+        d.ok = true;
+        d.mode = mode;
+        d.isDir = dir;
+        d.owner = d.group = QStringLiteral("root");
+        return d;
+    };
+    editor.clear();
+    editor.add(details(0100644, false));
+    editor.add(details(040755, true));
+    editor.finish();
+    // Nine bits in reading order, then "the contents too" (the one with a text).
+    QList<QCheckBox*> boxes;
+    QCheckBox* contents = nullptr;
+    for (QCheckBox* box : editor.findChildren<QCheckBox*>()) {
+        if (box->text().isEmpty())
+            boxes.append(box);
+        else
+            contents = box;
+    }
+    QCOMPARE(boxes.size(), 9);
+    QVERIFY(contents);
+    boxes.append(contents);
+    auto* apply = editor.findChildren<QPushButton*>().value(0);
+    auto* owner = editor.findChild<QLineEdit*>();
+    QVERIFY(apply && owner);
+    QCOMPARE(owner->text(), QStringLiteral("root:root"));
+    // Bits both have are checked, the execute bits only the folder has
+    // are half checked.
+    QCOMPARE(boxes[0]->checkState(), Qt::Checked);
+    QCOMPARE(boxes[2]->checkState(), Qt::PartiallyChecked);
+    QCOMPARE(boxes[6]->checkState(), Qt::Checked);
+    QCOMPARE(boxes[8]->checkState(), Qt::PartiallyChecked);
+    QCOMPARE(boxes[1]->isTristate(), false);
+
+    // Nothing changed: nothing asked, and it says so.
+    apply->click();
+    QCOMPARE(applied.size(), 0);
+    QCOMPARE(said.size(), 1);
+
+    // Others lose read. The half-checked bits are not in the mask, so
+    // the folder keeps its execute bits and the file gets none.
+    boxes[6]->click();
+    QCOMPARE(boxes[6]->checkState(), Qt::Unchecked);
+    apply->click();
+    QCOMPARE(applied.size(), 1);
+    auto change = applied.last().first().value<core::AttributeChange>();
+    QCOMPARE(change.mode, std::optional<quint32>(0640));
+    QCOMPARE(change.modeMask, 0666u);
+    QVERIFY(change.owner.isEmpty());  // the owner was not edited
+    QVERIFY(!change.recursive);
+
+    // The group alone, typed next to the owner as it is, down the tree:
+    // no uid is asked for, and no mode once the items are read again.
+    editor.clear();
+    editor.add(details(0100644, false));
+    editor.add(details(040755, true));
+    editor.finish();
+    owner->setText(QStringLiteral("root:54321"));
+    boxes[9]->click();
+    apply->click();
+    QCOMPARE(applied.size(), 2);
+    change = applied.last().first().value<core::AttributeChange>();
+    QVERIFY(!change.mode);
+    QVERIFY(!change.owner.uid);
+    QCOMPARE(change.owner.gid, std::optional<quint32>(54321));
+    QVERIFY(change.recursive);
+
+    // A name nobody has: said, not asked for.
+    owner->setText(QStringLiteral("no-such-user-zz:root"));
+    apply->click();
+    QCOMPARE(applied.size(), 2);
+    QCOMPARE(said.size(), 2);
+    QVERIFY(said.last().first().toString().contains(QStringLiteral("no-such-user-zz")));
+
+    // Files only: there is no "contents" to offer.
+    editor.clear();
+    editor.add(details(0100600, false));
+    editor.finish();
+    QVERIFY(boxes[9]->isHidden());
+    QCOMPARE(boxes[2]->isTristate(), false);
 }
 
 QTEST_MAIN(TabTest)

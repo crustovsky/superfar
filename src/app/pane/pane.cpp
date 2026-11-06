@@ -359,6 +359,12 @@ void Pane::openPack(const core::Location& other)
     pack_->setFocus();
 }
 
+void Pane::refreshProperties()
+{
+    if (props_ && overlay_ == props_)
+        props_->reread();
+}
+
 void Pane::closeOwnOverlay()
 {
     setOverlay(nullptr);
@@ -471,10 +477,7 @@ bool Pane::execute(keymap::Command command)
             props_ = new PropertiesPanel(services_.sizes, this);
             connect(props_, &PropertiesPanel::closed, this, &Pane::closeOwnOverlay);
             connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
-            connect(props_, &PropertiesPanel::changed, this, [this] {
-                if (Tab* t = activeTab())
-                    t->reload();
-            });
+            connect(props_, &PropertiesPanel::applyRequested, this, &Pane::attributesRequested);
         }
         props_->show(items);
         setOverlay(props_);

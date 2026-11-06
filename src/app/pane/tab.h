@@ -9,6 +9,7 @@
 #include "core/monitor.h"
 #include "core/sort.h"
 #include "core/space.h"
+#include "core/unixattrs.h"
 #include "keymap.h"
 #include "pane/markstore.h"
 
@@ -112,6 +113,8 @@ private:
     void typed(const QString& text);
     void setFilter(const QString& text);
     void rename(const QByteArray& name, const QString& newName);
+    void changeMode(const QByteArray& name, quint32 permissions);
+    void changeOwner(const QByteArray& name, const core::OwnerChange& owner);
     void applySort(int column, bool ascending);
     void resort();
     void placeCursor();

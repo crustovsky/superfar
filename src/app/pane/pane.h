@@ -4,6 +4,7 @@
 #pragma once
 
 #include "config.h"
+#include "core/jobs/attributes.h"
 #include "core/jobs/job.h"
 #include "core/location.h"
 #include "keymap.h"
@@ -63,6 +64,8 @@ public:
     // Alt+F5: pack the marked items into an archive here or in other.
     void openPack(const core::Location& other);
     bool hasOverlay() const { return overlay_ != nullptr; }
+    // A job changed what the properties panel shows: it reads again.
+    void refreshProperties();
 
 Q_SIGNALS:
     void locationChanged(const core::Location& dir);  // of the active tab
@@ -73,6 +76,8 @@ Q_SIGNALS:
     // From the pack panel: names in parent go into archive.
     void packRequested(const core::Location& parent, const std::vector<QByteArray>& names,
                        const core::Location& archive, const QByteArray& options);
+    // From the properties panel: permissions and owner for the items.
+    void attributesRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
     void columnsChanged(const QStringList& order, const QStringList& hidden);

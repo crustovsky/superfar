@@ -100,13 +100,18 @@ void AppTest::columnLayout()
     QCOMPARE(plain.order.size(), int(ColumnCount));
     QCOMPARE(plain.order.first(), int(NameColumn));
     QCOMPARE(plain.orderNames().mid(0, 4), QStringList({"name", "size", "items", "modified"}));
-    QCOMPARE(plain.hiddenNames(), QStringList());
+    // Permissions and Owner exist, last and off until asked for.
+    QCOMPARE(plain.orderNames().mid(4), QStringList({"permissions", "owner"}));
+    QCOMPARE(plain.hiddenNames(), QStringList({"permissions", "owner"}));
+    // Listing one in the order asks for it; hidden= still has the last word.
+    QCOMPARE(Layout::from({"name", "owner", "size"}, {}).hiddenNames(), QStringList{"permissions"});
+    QCOMPARE(Layout::from({"name", "owner", "size"}, {"owner"}).hiddenNames(), QStringList({"owner", "permissions"}));
 
     // A saved order is kept; Name comes first wherever it was written,
     // unknown names and repeats are dropped, the unlisted follow.
     const Layout moved = Layout::from({"modified", "bogus", "name", "modified", "size"}, {"items", "name", "nope"});
     QCOMPARE(moved.orderNames().mid(0, 4), QStringList({"name", "modified", "size", "items"}));
-    QCOMPARE(moved.hiddenNames(), QStringList({"items"}));  // Name cannot be hidden
+    QCOMPARE(moved.hiddenNames(), QStringList({"items", "permissions", "owner"}));  // Name cannot be hidden
     QVERIFY(!moved.hidden[NameColumn]);
 
     // Names and back: what the state stores reads as the same layout.

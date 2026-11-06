@@ -1,7 +1,11 @@
 #include "pane/columns.h"
 
+#include "core/unixattrs.h"
+
 #include <QCoreApplication>
 #include <QLocale>
+
+#include <unistd.h>
 
 namespace columns {
 
@@ -12,6 +16,8 @@ const Spec kSpecs[ColumnCount] = {
     {"size", QT_TRANSLATE_NOOP("columns", "Size"), true, true, core::SortBy::Size},
     {"items", QT_TRANSLATE_NOOP("columns", "Items"), true, true, core::SortBy::Items},
     {"modified", QT_TRANSLATE_NOOP("columns", "Modified"), true, false, core::SortBy::Modified},
+    {"permissions", QT_TRANSLATE_NOOP("columns", "Permissions"), false, false, core::SortBy::Permissions},
+    {"owner", QT_TRANSLATE_NOOP("columns", "Owner"), false, false, core::SortBy::Owner},
 };
 
 } // namespace
@@ -46,6 +52,13 @@ QString widest(int column)
     case SizeColumn: return QStringLiteral("8888.8 MiB");
     case ItemsColumn: return QLocale().toString(88888888);
     case ModifiedColumn: return QStringLiteral("8888-88-88 88:88");
+    case PermissionsColumn: return QStringLiteral("drwxrwxrwx");
+    case OwnerColumn: {
+        // Names have no widest. Most rows are this user's or root's:
+        // room for both, the edge drags for the rest.
+        static const QString mine = core::IdNames().owner(::geteuid(), ::getegid());
+        return mine.size() > 9 ? mine : QStringLiteral("root:root");
+    }
     default: return {};
     }
 }

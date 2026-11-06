@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core/location.h"
+#include "core/unixattrs.h"
 
 #include <QString>
 #include <functional>
@@ -18,7 +19,14 @@ void createFile(const Location& file, std::function<void(const QString& error)> 
 // Sets the mode bits named by mask from mode and leaves the file's
 // others as they are: with the mask 0777, read, write and execute
 // change while setuid, setgid and sticky stay.
-void setMode(const Location& file, quint32 mode, quint32 mask, std::function<void(const QString& error)> done);
+// A link is left alone (and says so) unless followLinks asks for its
+// target, which is what a list row over a link shows.
+void setMode(const Location& file, quint32 mode, quint32 mask, std::function<void(const QString& error)> done,
+             bool followLinks = false);
+// Sets the owner, the group, or both. Without followLinks a link
+// itself changes hands, not its target.
+void setOwner(const Location& file, const OwnerChange& owner, std::function<void(const QString& error)> done,
+              bool followLinks = false);
 // The mode a file gets: its old bits outside the mask, the new inside.
 constexpr quint32 mergedMode(quint32 old, quint32 mode, quint32 mask)
 {

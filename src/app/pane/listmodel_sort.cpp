@@ -22,7 +22,7 @@ core::SortBy ListModel::sortOf(int column)
 void ListModel::sortEntries()
 {
     core::sortEntries(entries_, sortBy_, sortAscending_,
-                      sortNeedsFolders() ? folderValues() : QHash<QByteArray, quint64>());
+                      sortNeedsFolders() ? folderValues() : QHash<QByteArray, quint64>(), &ids_);
 }
 
 bool ListModel::sortNeedsFolders() const

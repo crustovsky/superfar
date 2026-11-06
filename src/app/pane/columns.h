@@ -13,7 +13,7 @@
 
 namespace columns {
 
-enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
+enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, PermissionsColumn, OwnerColumn, ColumnCount };
 
 struct Spec {
     const char* name;

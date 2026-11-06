@@ -12,6 +12,7 @@ qt_add_executable(superfar
   devaids.cpp
   help.cpp
   properties.cpp
+  attributesedit.cpp
   multirename.cpp
   syncpanel.cpp
   packpanel.cpp
@@ -32,9 +33,12 @@ qt_add_executable(superfar
   pane/tabbar.cpp
   pane/tab.cpp
   pane/tab_archive.cpp
+  pane/tab_attributes.cpp
   pane/listview.cpp
   pane/listmodel.cpp
   pane/listmodel_sort.cpp
+  pane/listmodel_attrs.cpp
+  ownercompletion.cpp
 )
 target_include_directories(superfar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -14,7 +14,7 @@ QString describe(keymap::Command c)
     using keymap::Command;
     switch (c) {
     case Command::Help: return QStringLiteral("this help");
-    case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next name, Enter applies");
+    case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next row, Tab to the row's permissions and owner when shown, Enter applies");
     case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
     case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
     case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them");
@@ -57,7 +57,7 @@ QString describe(keymap::Command c)
     case Command::EditPath: return QStringLiteral("type a path or URI; remote ones are mounted");
     case Command::GoTo: return QStringLiteral("go to a folder from history, ranked by frecency");
     case Command::LockTab: return QStringLiteral("lock the tab: navigation opens a new tab");
-    case Command::Properties: return QStringLiteral("properties and permissions of the marked items or the cursor item");
+    case Command::Properties: return QStringLiteral("properties of the marked items or the cursor item; change their permissions and owner, down the folders if asked");
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
     case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
