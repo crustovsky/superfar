@@ -141,16 +141,16 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 `~/.config/superfar/superfar.ini` is the user's: written with defaults on
 first run, then touched only to add a new command's line or update one still
-at an old default (no other churn for chezmoi). `[keys]` has one line per
-command (`Copy=F5`, `GoUp="Backspace;Left"`; empty unbinds).
-`[columns/left]` and `[columns/right]` seed a pane:
-`order=name,modified,size`, `hidden=items`. `[layout]` has
-`split=side-by-side|stacked` and `preview=borrow|third`.
-`~/.local/state/superfar/state.ini` holds what the app writes on its own:
-`[session]` tabs per pane (hidden, locked, sizes, thumbs, sort, cursor),
-active tab and pane, tree shown or not; `[history]` the Ctrl+G folders by
-visit count and last time; `[window]` size; `[layout]` splitter sizes;
-`[columns/*]` widths, and order and hidden once the window changes them.
+at an old default, nothing else. `[keys]` has one line per command
+(`Copy=F5`, `GoUp="Backspace;Left"`; empty unbinds). `[columns/left]` and
+`[columns/right]` seed a pane with `order=` and `hidden=` lists of column
+names. `[layout]` has `split=side-by-side|stacked` and
+`preview=borrow|third`. `~/.local/state/superfar/state.ini` holds what the
+app writes on its own: `[session]` tabs per pane (hidden, locked, sizes,
+thumbs, sort, cursor), active tab and pane, tree shown or not; `[history]`
+the Ctrl+G folders by count and last visit; `[window]` size; `[layout]`
+splitter sizes; `[columns/*]` widths and, once the window changes them,
+order and hidden.
 
 ## Layout
 
