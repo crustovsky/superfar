@@ -94,4 +94,14 @@ if command -v ffmpeg > /dev/null && [ -d /usr/share/mime ]; then
     XDG_DATA_DIRS=$T/data
 fi
 
+# The Columns command has no key of its own; the config gives it one.
+# Space on the first row hides Size, the last row resets.
+sed -i 's/^Columns=.*/Columns=Ctrl+K/' "$XDG_CONFIG_HOME/superfar/superfar.ini"
+before=$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")
+run columns "Ctrl+K;Space;Escape" 2500 "$T/a" "$T/b"
+check "the Columns bar hid Size, in the state" grep -q '^left.hidden=size$' "$XDG_STATE_HOME/superfar/state.ini"
+run columnsreset "Ctrl+K;End;Return;Escape" 2500 "$T/a" "$T/b"
+check "Reset columns forgot it" sh -c "! grep -q '^left.hidden' '$XDG_STATE_HOME/superfar/state.ini'"
+check "the column list left the config alone" test "$before" = "$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")"
+
 exit $fail

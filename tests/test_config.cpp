@@ -22,6 +22,7 @@ private Q_SLOTS:
     void historyRanking();
     void columns();
     void handWrittenLists();
+    void columnLayout();
     void stateSeparate();
     void abbreviationMatch();
 };
@@ -173,6 +174,55 @@ void ConfigTest::handWrittenLists()
     QCOMPARE(c.columns(QStringLiteral("right")).hidden, both);
     QCOMPARE(c.keyBindings().value(QStringLiteral("Copy")), QStringList{QStringLiteral("Ctrl+,")});
     QCOMPARE(c.keyBindings().value(QStringLiteral("Move")), QStringList{QStringLiteral("F6")});
+}
+
+void ConfigTest::columnLayout()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/superfar.ini";
+    const QString left = QStringLiteral("left"), right = QStringLiteral("right");
+    {
+        // The user's seed, typed by hand, and no state yet.
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[columns/left]\norder=name,modified,size\nhidden=items\n");
+    }
+    const QByteArray seed = [&] { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }();
+    {
+        Config c(path);
+        QCOMPARE(c.columns(left).order, QStringList({"name", "modified", "size"}));
+        QCOMPARE(c.columns(left).hidden, QStringList{"items"});
+        QVERIFY(c.columns(right).order.isEmpty());
+        // A change from the window goes to the state, both lists at once.
+        c.setColumnLayout(left, {"name", "size", "items", "modified"}, {});
+        c.setColumnLayout(right, {"name", "items", "size", "modified"}, {"size", "modified"});
+        c.setColumnWidth(right, QStringLiteral("size"), 77);
+        c.sync();
+    }
+    {
+        Config c(path);
+        // The state wins as a whole: its empty hidden set, not the seed's.
+        QCOMPARE(c.columns(left).order, QStringList({"name", "size", "items", "modified"}));
+        QCOMPARE(c.columns(left).hidden, QStringList());
+        QCOMPARE(c.columns(right).order, QStringList({"name", "items", "size", "modified"}));
+        QCOMPARE(c.columns(right).hidden, QStringList({"size", "modified"}));
+        QCOMPARE(c.columns(right).widths.value(QStringLiteral("size")), 77);
+        // Reset forgets the state's part: the seed again, widths gone.
+        c.resetColumns(left);
+        c.resetColumns(right);
+        QCOMPARE(c.columns(left).order, QStringList({"name", "modified", "size"}));
+        QCOMPARE(c.columns(left).hidden, QStringList{"items"});
+        QVERIFY(c.columns(right).order.isEmpty());
+        QVERIFY(c.columns(right).hidden.isEmpty());
+        QVERIFY(c.columns(right).widths.isEmpty());
+        c.sync();
+    }
+    // The config is the user's: none of this wrote to it, and its
+    // order= did not migrate into the state as a width would.
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    QCOMPARE(f.readAll(), seed);
 }
 
 void ConfigTest::stateSeparate()

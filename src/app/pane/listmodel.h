@@ -11,6 +11,7 @@
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/sort.h"
+#include "pane/columns.h"
 
 #include <QAbstractTableModel>
 #include <QHash>
@@ -23,7 +24,8 @@ class QTimer;
 class ListModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
+    using Column = columns::Column;  // the table in columns.h
+    using enum columns::Column;
     enum Role { PartialRole = Qt::UserRole + 1, IsDirRole };  // PartialRole: a total still being walked
     static Column columnOf(core::SortBy by);
     static core::SortBy sortOf(int column);

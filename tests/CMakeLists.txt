@@ -17,9 +17,10 @@ qt_add_executable(test_hostile test_hostile.cpp)
 target_link_libraries(test_hostile PRIVATE superfar_core Qt6::Test)
 add_test(NAME hostile COMMAND test_hostile)
 
-# The key table, the help and the mark store: app code without widgets.
+# The key table, the help, the column table and the mark store: app code
+# without widgets.
 qt_add_executable(test_app test_app.cpp ${CMAKE_SOURCE_DIR}/src/app/keymap.cpp ${CMAKE_SOURCE_DIR}/src/app/help.cpp
-  ${CMAKE_SOURCE_DIR}/src/app/archivetext.cpp)
+  ${CMAKE_SOURCE_DIR}/src/app/archivetext.cpp ${CMAKE_SOURCE_DIR}/src/app/pane/columns.cpp)
 target_include_directories(test_app PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(test_app PRIVATE SUPERFAR_VERSION="test" SUPERFAR_BUILD_DATE="test")
 target_link_libraries(test_app PRIVATE superfar_core Qt6::Gui Qt6::Test)
@@ -27,7 +28,7 @@ add_test(NAME app COMMAND test_app)
 
 # A tab with its list over a temp folder, on the offscreen platform.
 set(TAB_SOURCES pane/tab.cpp pane/tab_archive.cpp pane/listmodel.cpp pane/listmodel_sort.cpp
-    pane/listview.cpp pane/delegate.cpp keymap.cpp bench.cpp uris.cpp)
+    pane/listview.cpp pane/delegate.cpp pane/columns.cpp keymap.cpp bench.cpp uris.cpp)
 list(TRANSFORM TAB_SOURCES PREPEND ${CMAKE_SOURCE_DIR}/src/app/)
 qt_add_executable(test_tab test_tab.cpp ${TAB_SOURCES})
 target_include_directories(test_tab PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)

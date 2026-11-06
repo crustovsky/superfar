@@ -4,6 +4,7 @@
 #pragma once
 
 #include "keymap.h"
+#include "pane/columns.h"
 
 #include <QHash>
 #include <QTreeView>
@@ -15,9 +16,13 @@ public:
 
     // Fixed widths for the numeric columns from font metrics (rule 12).
     void sizeColumns();
-    // Config: saved widths by column name and the hidden set.
-    void applyColumns(const QHash<QString, int>& widths, const QStringList& hidden);
-    static QString columnName(int column);
+    // The pane's arrangement: the order, the hidden set, and the saved
+    // widths by column name over the font-metric ones.
+    void applyColumns(const columns::Layout& layout, const QHash<QString, int>& widths);
+    columns::Layout columnLayout() const;
+    // As the user would from the header: reported by columnsChanged().
+    // Name stays; a hidden column keeps its width for its return.
+    void setColumnShown(int column, bool shown);
 
     // The header's sort indicator; the header flips it on a click and
     // sortChanged() reports both.
@@ -39,6 +44,8 @@ Q_SIGNALS:
     void cursorMoved();
     void editingFinished();
     void columnResized(const QString& column, int width);  // by the user
+    void columnsChanged(const columns::Layout& layout);    // dragged, shown or hidden by the user
+    void columnsResetRequested();
     void sortChanged(int column, bool ascending);
 
 protected:
@@ -55,6 +62,7 @@ protected:
 private:
     void fitName();  // Name takes the width the other columns leave
     void onSectionResized(int column, int oldSize, int newSize);
+    void showColumnMenu(const QPoint& pos);  // a right click on the header
 
     bool active_ = false;
     bool paintedRows_ = false;

@@ -41,7 +41,7 @@ These are the product. When in doubt, they win.
    Unattended never stops: it applies the default policy, logs every skip
    and failure, and shows the list when the job ends.
 8. **Columns fit their content.** Size, count and date never truncate; each
-   pane keeps its own column set.
+   pane keeps its own set, order and widths, changed from its header.
 9. **Previews are big.** Ctrl+Q previews the cursor item. By default it
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
@@ -103,7 +103,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
   the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
-  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab
+  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab,
+  a drag moves the column, a right click (or Columns, unbound) lists them
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
@@ -140,13 +141,14 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 and never again: the user owns it (chezmoi and friends must see no
 churn). `[keys]` has one line per command (`Copy=F5`,
 `GoUp=Backspace;Left`; empty unbinds). `[columns/left]` and
-`[columns/right]` hold `hidden=items,modified`. `[layout]` has
-`split=side-by-side|stacked` and `preview=borrow|third`.
-`~/.local/state/superfar/state.ini` holds what the app writes on its
-own: `[session]` tabs per pane (hidden, locked, sizes, thumbs, sort,
-cursor), active tab and pane, tree shown or not; `[history]` the Ctrl+G
-folders by visit count and last time; `[window]` size; `[layout]` splitter
-sizes; `[columns/*]` dragged widths, moved out of the config after 0.5.
+`[columns/right]` seed a pane: `order=name,modified,size`,
+`hidden=items`. `[layout]` has `split=side-by-side|stacked` and
+`preview=borrow|third`. `~/.local/state/superfar/state.ini` holds what
+the app writes on its own: `[session]` tabs per pane (hidden, locked,
+sizes, thumbs, sort, cursor), active tab and pane, tree shown or not;
+`[history]` the Ctrl+G folders by visit count and last time; `[window]`
+size; `[layout]` splitter sizes; `[columns/*]` dragged widths, and the
+order and hidden set once the window changes them (they then win).
 
 ## Layout
 
@@ -269,11 +271,10 @@ src/app/
 superfar and Thunar, warm cache by default and cold with `--cold`. It
 reports time to first frame (window mapped, measured from outside with
 hyprctl), superfar's own marks (first rows, loaded), and memory after the
-app settles: PSS for the whole footprint and anonymous memory for what
-the app itself allocates. PSS shares library pages with every process
-that maps them, so it drifts with whatever else is running; gates are on
-anonymous memory. Thunar is a different toolkit: shown for reference,
-never a gate.
+app settles: PSS for the whole footprint and anonymous memory for what the
+app itself allocates. PSS shares library pages with every process that maps
+them, so it drifts with whatever else is running; gates are on anonymous
+memory. Thunar is a different toolkit: shown for reference, never a gate.
 
 Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 
@@ -291,10 +292,9 @@ Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
 folder open, depending on what else shares Qt's pages. Thunar 4.20 on
 the same machine: first frame about 340 ms, about 400 MB PSS.
 
-The 100k folder costs about 360 bytes per entry today (name, display
-string, collation key, row index, name hash). That is the number to
-shrink, not the gate to loosen. A milestone is not done while it misses
-a gate.
+The 100k folder costs about 360 bytes per entry today (name, display string,
+collation key, row index, name hash). That is the number to shrink, not the
+gate to loosen. A milestone is not done while it misses a gate.
 
 ## Milestones
 

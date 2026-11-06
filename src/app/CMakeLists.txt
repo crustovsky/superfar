@@ -23,6 +23,7 @@ qt_add_executable(superfar
   pdfpages.cpp
   videoplay.cpp
   archivetext.cpp
+  pane/columns.cpp
   pane/delegate.cpp
   jobs/bars.cpp
   jobs/panel.cpp

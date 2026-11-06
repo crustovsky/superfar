@@ -60,7 +60,9 @@ bool isState(const QString& key)
         return true;
     if (key == QLatin1String("layout/tree") || key == QLatin1String("layout/panes"))
         return true;
-    return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"));
+    // Dragged widths; the arrangement in the config is the user's seed.
+    return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"))
+        && !key.endsWith(QLatin1String("/order"));
 }
 
 // A line written by hand as a,b reads as a list; the same value set
@@ -182,16 +184,19 @@ void Config::writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults
 Config::Columns Config::columns(const QString& side) const
 {
     Columns c;
+    const QString group = QStringLiteral("columns/") + side;
+    const QString order = group + QStringLiteral("/order");
+    const QString hidden = group + QStringLiteral("/hidden");
+    // The arrangement is one thing: all of it from the state once the
+    // window has changed it, else all of it from the config.
+    QSettings& from = state_.contains(order) || state_.contains(hidden) ? state_ : settings_;
+    c.order = names(from.value(order));
+    c.hidden = names(from.value(hidden));
     for (QSettings* s : {&settings_, &state_}) {
-        s->beginGroup(QStringLiteral("columns/") + side);
-        for (const QString& key : s->childKeys()) {
-            if (key == QLatin1String("hidden")) {
-                if (s == &settings_)
-                    c.hidden = names(s->value(key));
-            } else {
+        s->beginGroup(group);
+        for (const QString& key : s->childKeys())
+            if (key != QLatin1String("order") && key != QLatin1String("hidden"))
                 c.widths.insert(key, s->value(key).toInt());  // the state, read last, wins
-            }
-        }
         s->endGroup();
     }
     return c;
@@ -200,6 +205,17 @@ Config::Columns Config::columns(const QString& side) const
 void Config::setColumnWidth(const QString& side, const QString& column, int width)
 {
     state_.setValue(QStringLiteral("columns/%1/%2").arg(side, column), width);
+}
+
+void Config::setColumnLayout(const QString& side, const QStringList& order, const QStringList& hidden)
+{
+    state_.setValue(QStringLiteral("columns/%1/order").arg(side), order.join(QLatin1Char(',')));
+    state_.setValue(QStringLiteral("columns/%1/hidden").arg(side), hidden.join(QLatin1Char(',')));
+}
+
+void Config::resetColumns(const QString& side)
+{
+    state_.remove(QStringLiteral("columns/") + side);
 }
 
 bool Config::stackedSplit() const

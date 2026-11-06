@@ -123,6 +123,7 @@ remapped. The defaults:
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
+| (no key) `Columns` | the pane's column list as a bar: Space shows or hides a column; also under View in the F9 menu |
 | Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
 | Space, Ctrl+A, * | mark, mark all, invert |
@@ -147,9 +148,13 @@ ejects it when it is removable.
 
 With the mouse: middle click closes a tab, a double click on the empty
 tab strip opens one at home, a double click on the path bar edits the
-path (the same as Ctrl+L, for a remote location), a click on a column header sorts by it and a second click reverses
-it (folders stay first), header edges drag, and files drag between
-panes, onto tree folders and to other apps.
+path (the same as Ctrl+L, for a remote location), and files drag
+between panes, onto tree folders and to other apps. On a column header
+a click sorts by it and a second click reverses it (folders stay
+first), a drag moves the column, an edge resizes it, and a right click
+lists the columns with check marks to show or hide them, with Reset
+columns at the bottom. Name stays first and stays shown. Each pane
+keeps its own columns, and remembers them.
 
 ## Build
 
@@ -189,10 +194,16 @@ glib 2.90 and glycin 2 or newer. From a checkout, `tools/mkpkg.sh` and
 first run and never touched again, so a dotfile manager can own it.
 `[keys]` has one line per command (`Copy=F5`, `GoUp=Backspace;Left`,
 empty unbinds); `[columns/left]` and `[columns/right]` take
-`hidden=items,modified`; `[layout]` has `split=side-by-side|stacked`
-and `preview=borrow|third`. What the app records on its own goes to
-`~/.local/state/superfar/state.ini`: the session, the Ctrl+G history,
-window and splitter sizes, dragged column widths.
+`order=name,modified,size` and `hidden=items,modified`; `[layout]` has
+`split=side-by-side|stacked` and `preview=borrow|third`. What the app
+records on its own goes to `~/.local/state/superfar/state.ini`: the
+session, the Ctrl+G history, window and splitter sizes, and the
+columns of each pane (order, hidden set, dragged widths).
+
+The columns in the config are a starting point: they apply until you
+change a pane's columns in the window, after which the state file's
+copy is what counts for that pane. Reset columns in the list drops
+that copy and the config (or the built-in order) applies again.
 
 ## Status
 

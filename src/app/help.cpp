@@ -70,6 +70,7 @@ QString describe(keymap::Command c)
     case Command::PreviewNext: return QStringLiteral("previewed PDF or video: next page, or forward 10 seconds");
     case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
     case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
+    case Command::Columns: return QStringLiteral("the pane's columns as a list: Space shows or hides one; also View in the F9 menu");
     case Command::None: return {};
     }
     return {};
@@ -125,6 +126,7 @@ QString text()
     lines << QString();
     lines << QCoreApplication::translate("help", "Type to filter the list; Backspace edits the filter, Esc clears it.");
     lines << QCoreApplication::translate("help", "Click a column header to sort by it; click again to reverse. Folders stay first.");
+    lines << QCoreApplication::translate("help", "Drag a header to move its column, its edge to resize it; a right click lists the columns.");
     lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
     return lines.join(QLatin1Char('\n'));
 }

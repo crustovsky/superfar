@@ -4,6 +4,7 @@
 #include "archivetext.h"
 #include "help.h"
 #include "keymap.h"
+#include "pane/columns.h"
 #include "pane/markstore.h"
 
 #include <QTest>
@@ -15,6 +16,7 @@ private Q_SLOTS:
     void oneCommandPerKey();
     void markStore();
     void archiveTree();
+    void columnLayout();
 };
 
 void AppTest::everyCommandIsComplete()
@@ -28,7 +30,10 @@ void AppTest::everyCommandIsComplete()
         const QString name = keymap::name(c);
         QVERIFY2(!name.isEmpty(), qPrintable(QStringLiteral("command %1 (%2) has no config name").arg(i).arg(keymap::label(c))));
         QCOMPARE(keymap::fromName(name), c);
-        QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
+        // Columns has no key on purpose: the header's right click and the
+        // menu reach it, a key is the user's to give.
+        if (c != Command::Columns)
+            QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
         QVERIFY2(help::text().contains(name.isEmpty() ? QString() : keymap::keysOf(c).isEmpty()
                                                        ? QStringLiteral("(unbound)")
                                                        : keymap::keysOf(c).first().toString(QKeySequence::NativeText)),
@@ -85,6 +90,36 @@ void AppTest::archiveTree()
     const QStringList cut = archivetext::tree(entries, 2).split(QLatin1Char('\n'));
     QCOMPARE(cut.size(), 3);
     QCOMPARE(cut.last(), QStringLiteral("and 4 more"));
+}
+
+void AppTest::columnLayout()
+{
+    using namespace columns;
+    // Nothing saved: the table's order, everything shown by default.
+    const Layout plain = Layout::from({}, {});
+    QCOMPARE(plain.order.size(), int(ColumnCount));
+    QCOMPARE(plain.order.first(), int(NameColumn));
+    QCOMPARE(plain.orderNames().mid(0, 4), QStringList({"name", "size", "items", "modified"}));
+    QCOMPARE(plain.hiddenNames(), QStringList());
+
+    // A saved order is kept; Name comes first wherever it was written,
+    // unknown names and repeats are dropped, the unlisted follow.
+    const Layout moved = Layout::from({"modified", "bogus", "name", "modified", "size"}, {"items", "name", "nope"});
+    QCOMPARE(moved.orderNames().mid(0, 4), QStringList({"name", "modified", "size", "items"}));
+    QCOMPARE(moved.hiddenNames(), QStringList({"items"}));  // Name cannot be hidden
+    QVERIFY(!moved.hidden[NameColumn]);
+
+    // Names and back: what the state stores reads as the same layout.
+    const Layout again = Layout::from(moved.orderNames(), moved.hiddenNames());
+    QCOMPARE(again.order, moved.order);
+    QCOMPARE(again.hidden, moved.hidden);
+
+    for (int c = 0; c < ColumnCount; ++c) {
+        QCOMPARE(fromName(name(c)), c);
+        QVERIFY(!label(c).isEmpty());
+        QCOMPARE(widest(c).isEmpty(), c == NameColumn);
+    }
+    QCOMPARE(fromName(QStringLiteral("Name")), -1);
 }
 
 QTEST_GUILESS_MAIN(AppTest)

@@ -9,6 +9,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QHeaderView>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -52,6 +53,7 @@ private Q_SLOTS:
     void finishedJobClearsWhileAway();
     void marksAcrossAnArchive();
     void cursorRowSpansTheList();
+    void columnsHideAndMove();
 
 private:
     // Runs go() and waits for the load it starts.
@@ -192,9 +194,63 @@ void TabTest::cursorRowSpansTheList()
     ListView* view = tab.view();
     const QModelIndex first = view->model()->index(0, 0);
     QCOMPARE(view->rowRect(first).width(), view->viewport()->width());
-    view->applyColumns({}, {QStringLiteral("modified")});
+    view->applyColumns(columns::Layout::from({}, {QStringLiteral("modified")}), {});
     QCOMPARE(view->rowRect(first).width(), view->viewport()->width());
     QCOMPARE(view->rowRect(first).height(), view->visualRect(first).height());
+}
+
+void TabTest::columnsHideAndMove()
+{
+    using namespace columns;
+    Tab tab(services_);
+    tab.resize(600, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    QHeaderView* h = view->header();
+    QSignalSpy changed(view, &ListView::columnsChanged);
+
+    // A saved arrangement: Modified before Size, Items hidden.
+    view->applyColumns(Layout::from({"name", "modified", "size"}, {"items"}), {{QStringLiteral("size"), 91}});
+    QVERIFY(changed.isEmpty());  // applying is not a change by the user
+    QCOMPARE(h->visualIndex(NameColumn), 0);
+    QCOMPARE(h->visualIndex(ModifiedColumn), 1);
+    QCOMPARE(h->visualIndex(SizeColumn), 2);
+    QVERIFY(view->isColumnHidden(ItemsColumn));
+    QVERIFY(!view->isColumnHidden(SizeColumn));
+    QCOMPARE(h->sectionSize(SizeColumn), 91);
+    QCOMPARE(view->columnLayout().orderNames().mid(0, 3), QStringList({"name", "modified", "size"}));
+    // The shown columns fill the list exactly, Name taking the rest.
+    QCOMPARE(h->sectionSize(NameColumn) + h->sectionSize(ModifiedColumn) + h->sectionSize(SizeColumn),
+             view->viewport()->width());
+
+    // From the header: hiding takes the column out of the view and
+    // reports the new arrangement; it comes back at its width.
+    view->setColumnShown(SizeColumn, false);
+    QCOMPARE(changed.size(), 1);
+    QVERIFY(view->isColumnHidden(SizeColumn));
+    QCOMPARE(view->columnLayout().hiddenNames(), QStringList({"size", "items"}));
+    QCOMPARE(h->sectionSize(NameColumn) + h->sectionSize(ModifiedColumn), view->viewport()->width());
+    view->setColumnShown(SizeColumn, true);
+    QCOMPARE(changed.size(), 2);
+    QCOMPARE(h->sectionSize(SizeColumn), 91);
+    view->setColumnShown(SizeColumn, true);  // nothing to do, nothing said
+    view->setColumnShown(NameColumn, false);  // Name stays
+    QCOMPARE(changed.size(), 2);
+    QVERIFY(!view->isColumnHidden(NameColumn));
+
+    // A drag of a header section, as the header reports it.
+    h->moveSection(h->visualIndex(SizeColumn), 1);
+    QCOMPARE(changed.size(), 3);
+    const auto layout = changed.last().first().value<columns::Layout>();
+    QCOMPARE(layout.orderNames().mid(0, 3), QStringList({"name", "size", "modified"}));
+    // Name cannot be dragged, and nothing can be dropped before it.
+    QVERIFY(!h->isFirstSectionMovable());
+
+    // The sort follows its column wherever the column sits.
+    tab.setSort(core::SortBy::Modified, false);
+    QCOMPARE(h->sortIndicatorSection(), int(ModifiedColumn));
+    QCOMPARE(tab.sortBy(), core::SortBy::Modified);
 }
 
 QTEST_MAIN(TabTest)

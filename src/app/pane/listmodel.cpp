@@ -487,7 +487,7 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
             return icon(e);
         return {};
     case Qt::TextAlignmentRole:
-        if (index.column() == SizeColumn || index.column() == ItemsColumn)
+        if (columns::spec(index.column()).rightAligned)
             return static_cast<int>(Qt::AlignRight | Qt::AlignVCenter);
         return {};
     case IsDirRole:
@@ -507,18 +507,7 @@ QVariant ListModel::headerData(int section, Qt::Orientation orientation, int rol
 {
     if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
         return {};
-    switch (section) {
-    case NameColumn:
-        return tr("Name");
-    case SizeColumn:
-        return tr("Size");
-    case ItemsColumn:
-        return tr("Items");
-    case ModifiedColumn:
-        return tr("Modified");
-    default:
-        return {};
-    }
+    return columns::label(section);
 }
 
 const core::Metadata* ListModel::metadata(const core::Entry& entry) const

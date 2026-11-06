@@ -7,6 +7,7 @@
 #include "core/jobs/job.h"
 #include "core/location.h"
 #include "keymap.h"
+#include "pane/columns.h"
 #include "pane/tab.h"
 
 #include <QWidget>
@@ -37,7 +38,13 @@ public:
     // Session: what to save, and how to come back.
     QList<Config::TabState> tabStates() const;
     void restore(const QList<Config::TabState>& states, int active);
+    // Columns are the pane's: every tab in it shows the same ones. A
+    // change made in one tab's header is kept here and reaches the
+    // others when they come to the front.
     void applyColumns(const Config::Columns& columns);
+    columns::Layout columnLayout() const;
+    void setColumnShown(int column, bool shown);
+    void resetColumns() { Q_EMIT columnsResetRequested(); }
 
     void setActive(bool active);
     bool isActive() const { return active_; }
@@ -68,6 +75,8 @@ Q_SIGNALS:
                        const core::Location& archive, const QByteArray& options);
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
+    void columnsChanged(const QStringList& order, const QStringList& hidden);
+    void columnsResetRequested();  // the owner of the config answers with applyColumns()
 
 protected:
     void paintEvent(QPaintEvent* event) override;

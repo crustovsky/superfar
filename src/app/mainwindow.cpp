@@ -112,6 +112,13 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
         connect(pane, &Pane::columnResized, this, [this, side](const QString& column, int width) {
             config_->setColumnWidth(side, column, width);
         });
+        connect(pane, &Pane::columnsChanged, this, [this, side](const QStringList& order, const QStringList& hidden) {
+            config_->setColumnLayout(side, order, hidden);
+        });
+        connect(pane, &Pane::columnsResetRequested, this, [this, pane, side] {
+            config_->resetColumns(side);  // back to the config's seed, or the defaults
+            pane->applyColumns(config_->columns(side));
+        });
         connect(pane, &Pane::sessionChanged, this, [this] { sessionTimer_->start(); });
         connect(pane, &Pane::runJobs, this, [this, pane](const std::vector<core::Job*>& jobs) {
             // Sync jobs: each refreshes both folders when done; the panel
@@ -360,6 +367,9 @@ void MainWindow::execute(keymap::Command command)
     case Command::OpenWith:
         openWith();
         return;
+    case Command::Columns:
+        chooseColumns();
+        return;
     case Command::Preview:
         togglePreview();
         return;
@@ -534,6 +544,32 @@ void MainWindow::promptGlob(bool on)
     connect(bar, &PromptBar::accepted, this, [guard, on](const QString& text) {
         if (guard && !text.trimmed().isEmpty())
             guard->markGlob(text.trimmed(), on);
+    });
+}
+
+void MainWindow::chooseColumns()
+{
+    // The header's right-click list, for the keyboard. Name is not in
+    // it: it stays, and first.
+    Pane* pane = active_;
+    CheckBar* bar = strip_->checks(pane == left_ ? tr("Columns of the left pane") : tr("Columns of the right pane"));
+    auto fill = [bar, pane] {
+        const columns::Layout layout = pane->columnLayout();
+        QStringList labels;
+        QList<bool> shown;
+        for (int c : layout.order.mid(1)) {
+            labels << columns::label(c);
+            shown << !layout.hidden.value(c);
+        }
+        bar->setItems(labels, shown, tr("Reset columns"));
+    };
+    fill();
+    connect(bar, &CheckBar::toggled, pane, [pane](int index, bool on) {
+        pane->setColumnShown(pane->columnLayout().order.value(index + 1, -1), on);
+    });
+    connect(bar, &CheckBar::actionChosen, pane, [pane, fill] {
+        pane->resetColumns();
+        fill();
     });
 }
 
