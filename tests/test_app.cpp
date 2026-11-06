@@ -13,6 +13,7 @@ class AppTest : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void everyCommandIsComplete();
+    void propertiesKeys();
     void oneCommandPerKey();
     void markStore();
     void archiveTree();
@@ -41,6 +42,24 @@ void AppTest::everyCommandIsComplete()
     }
     QCOMPARE(keymap::allCommands().size(), n);
     QCOMPARE(keymap::defaults().size(), n);
+}
+
+void AppTest::propertiesKeys()
+{
+    // On the function bar under Alt, and still where other managers have it.
+    using keymap::Command;
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::ALT | Qt::Key_F2)), Command::Properties);
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::ALT | Qt::Key_Return)), Command::Properties);
+    QCOMPARE(keymap::keysOf(Command::Properties).first(), QKeySequence(Qt::ALT | Qt::Key_F2));
+    // The line a 0.7 first run wrote is retired, so such a config gets
+    // the new key without anyone editing it.
+    bool retired = false;
+    for (const auto& [name, old] : keymap::retiredDefaults())
+        retired = retired || (name == QLatin1String("Properties") && old == QLatin1String("Alt+Return;Alt+Enter"));
+    QVERIFY(retired);
+    for (const auto& [name, keys] : keymap::defaults())
+        if (name == QLatin1String("Properties"))
+            QCOMPARE(keys, QStringList({"Alt+F2", "Alt+Return", "Alt+Enter"}));
 }
 
 void AppTest::oneCommandPerKey()

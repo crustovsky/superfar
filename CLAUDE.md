@@ -115,9 +115,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
 - Enter opens a file with its default app; Shift+Enter shows the in-window
-  open-with list; Alt+Enter the properties panel (mode and owner of the
-  marked items, down their folders if asked); Esc clears the filter, closes
-  the viewer or panel, then the preview, then the marks
+  open-with list; Alt+F2 (also Alt+Enter) the properties panel (mode and
+  owner of the marked items, down their folders if asked); Esc clears the
+  filter, closes the viewer or panel, then the preview, then the marks
 - Ctrl+D bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it

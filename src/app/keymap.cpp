@@ -64,7 +64,8 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
         {QKeySequence(Qt::CTRL | Qt::Key_G), Command::GoTo},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L), Command::LockTab},
-        {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},
+        {QKeySequence(Qt::ALT | Qt::Key_F2), Command::Properties},  // on the bar with the other panels
+        {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},  // what other file managers use
         {QKeySequence(Qt::ALT | Qt::Key_Enter), Command::Properties},
         {QKeySequence(Qt::CTRL | Qt::Key_D), Command::Bookmark},
         {QKeySequence(Qt::CTRL | Qt::Key_F4), Command::ToggleThumbnails},
@@ -245,7 +246,8 @@ QList<QPair<QString, QString>> retiredDefaults()
 {
     // As the first run wrote them (portable text: Insert is "Ins").
     return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)},  // 0.5: Shift+Down joined it
-            {QStringLiteral("About"), QString()}};  // 0.7: it got Shift+F1; an empty line unbinds
+            {QStringLiteral("About"), QString()},  // 0.7: it got Shift+F1; an empty line unbinds
+            {QStringLiteral("Properties"), QStringLiteral("Alt+Return;Alt+Enter")}};  // 0.8: Alt+F2 joined them
 }
 
 QList<QKeySequence> keysOf(Command command)

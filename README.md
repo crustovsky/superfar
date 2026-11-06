@@ -30,7 +30,7 @@ you can see in the bar at the bottom.
 | **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9. | always on screen |
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
 | **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | the header, `Columns` |
-| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+Enter |
+| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
 | **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+Q |
@@ -65,7 +65,7 @@ row's mode, which takes `rwxr-xr-x` or `0755`:
 
 ![Permissions](docs/screenshots/permissions.png)
 
-Properties on Alt+Enter over several marked items: a bit they differ in
+Properties on Alt+F2 over several marked items: a bit they differ in
 is half checked and stays as each item has it, and Apply changes only
 what you changed:
 
@@ -130,8 +130,9 @@ remapped. The defaults:
 | Shift+F1 | about: name, version and build date |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
+| Alt+F2 (also Alt+Enter) | properties, with permissions and owner for every marked item |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
-| Alt+F7, Alt+Enter | find in tree; properties, with permissions and owner for every marked item |
+| Alt+F7 | find in tree |
 | F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
@@ -216,7 +217,8 @@ takes the nine letters or octal, setuid, setgid and sticky included
 `:group`, names or numbers, and completes names as you type. A row over
 a link shows its target, and that is what an edit there changes.
 
-The properties panel (Alt+Enter) does the same for everything marked.
+The properties panel (Alt+F2, or Alt+Enter) does the same for everything
+marked.
 Apply runs as a job in the strip, with progress, Abort and a log of
 what was refused. With "the contents of folders too" checked it goes
 down the tree the careful way: folders take the bits as set, a file

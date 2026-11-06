@@ -78,4 +78,4 @@ shot find "Alt+F7;G;T;K;Return" 7000 /usr/share/icons/hicolor $D
 shot thumbnails "Ctrl+F4" 6000 /usr/share/icons/hicolor/256x256/apps $D
 CFG=$COLS AS=$AS_SAM shot permissions "Down;Down;Down;F2;Tab" 4500 $D/Projects $D
 CFG=$COLS AS=$AS_SAM shot columns "Ctrl+K;Down;Down" 4500 $D/Projects $D
-CFG=$COLS AS=$AS_SAM shot properties "Ctrl+A;Alt+Return;Tab" 5000 $D/Projects $D
+CFG=$COLS AS=$AS_SAM shot properties "Ctrl+A;Alt+F2;Tab" 5000 $D/Projects $D

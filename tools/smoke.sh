@@ -107,7 +107,7 @@ check "the column list left the config alone" test "$before" = "$(cat "$XDG_CONF
 # The properties panel on the one file in its folder: three Tabs reach
 # the owner's execute box, Space sets it, Alt+A applies through the job.
 chmod 600 "$T/r/B.zzqx"
-run permissions "Alt+Return;Tab;Tab;Tab;Space;Alt+A;Escape" 5000 "$T/r" "$T/b"
+run permissions "Alt+F2;Tab;Tab;Tab;Space;Alt+A;Escape" 5000 "$T/r" "$T/b"
 check "the panel set the owner's execute bit, and only that" test "$(stat -c %a "$T/r/B.zzqx")" = 700
 # The same from the list: the config shows the Permissions column, F2
 # and Tab reach its cell, the mode is typed.
