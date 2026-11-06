@@ -259,19 +259,28 @@ void TabTest::nameKeepsAFloor()
 {
     using namespace columns;
     Tab tab(services_);
-    tab.resize(900, 400);
     tab.show();
     load(tab, [&] { tab.navigate(loc(root_)); });
     ListView* view = tab.view();
     QHeaderView* h = view->header();
+    view->applyColumns(Layout::from({}, {}), {});  // the default columns, as a pane applies them
+    // Widths come from the font, which differs from machine to machine:
+    // the test sizes the tab from what the columns ask for.
+    int others = 0;
+    for (int c = NameColumn + 1; c < ColumnCount; ++c)
+        if (!view->isColumnHidden(c))
+            others += h->sectionSize(c);
+    const int roomy = others + view->nameFloor() + 300;
+
     // Room for everything: Name takes the rest, nothing to scroll.
-    QVERIFY(h->sectionSize(NameColumn) > view->nameFloor());
-    QCOMPARE(h->length(), view->viewport()->width());
-    QCOMPARE(view->horizontalScrollBar()->maximum(), 0);
+    tab.resize(roomy, 400);
+    QTRY_VERIFY(h->sectionSize(NameColumn) > view->nameFloor());
+    QTRY_COMPARE(h->length(), view->viewport()->width());
+    QTRY_COMPARE(view->horizontalScrollBar()->maximum(), 0);
 
     // A pane too narrow for its columns: Name keeps its floor and the
     // list scrolls sideways to the rest instead of cutting it off.
-    tab.resize(180, 400);
+    tab.resize(others / 2 + view->nameFloor(), 400);
     QTRY_COMPARE(h->sectionSize(NameColumn), view->nameFloor());
     QVERIFY(h->length() > view->viewport()->width());
     QTRY_VERIFY(view->horizontalScrollBar()->maximum() > 0);
@@ -279,7 +288,7 @@ void TabTest::nameKeepsAFloor()
     QCOMPARE(view->rowRect(view->model()->index(0, 0)).width(), view->viewport()->width());
 
     // Wide again: back to filling the pane exactly.
-    tab.resize(900, 400);
+    tab.resize(roomy, 400);
     QTRY_COMPARE(h->length(), view->viewport()->width());
     QTRY_COMPARE(view->horizontalScrollBar()->maximum(), 0);
 }
