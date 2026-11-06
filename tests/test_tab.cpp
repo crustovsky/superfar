@@ -18,6 +18,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QProcess>
+#include <QScrollBar>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -70,6 +71,7 @@ private Q_SLOTS:
     void marksAcrossAnArchive();
     void cursorRowSpansTheList();
     void columnsHideAndMove();
+    void nameKeepsAFloor();
     void attributeCells();
     void tabWalksTheRow();
     void ownerCompletion();
@@ -484,6 +486,35 @@ void TabTest::attributesEditor()
     editor.finish();
     QVERIFY(boxes[9]->isHidden());
     QCOMPARE(boxes[2]->isTristate(), false);
+}
+
+void TabTest::nameKeepsAFloor()
+{
+    using namespace columns;
+    Tab tab(services_);
+    tab.resize(900, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    QHeaderView* h = view->header();
+    // Room for everything: Name takes the rest, nothing to scroll.
+    QVERIFY(h->sectionSize(NameColumn) > view->nameFloor());
+    QCOMPARE(h->length(), view->viewport()->width());
+    QCOMPARE(view->horizontalScrollBar()->maximum(), 0);
+
+    // A pane too narrow for its columns: Name keeps its floor and the
+    // list scrolls sideways to the rest instead of cutting it off.
+    tab.resize(180, 400);
+    QTRY_COMPARE(h->sectionSize(NameColumn), view->nameFloor());
+    QVERIFY(h->length() > view->viewport()->width());
+    QTRY_VERIFY(view->horizontalScrollBar()->maximum() > 0);
+    // The cursor row is still outlined across what is in view.
+    QCOMPARE(view->rowRect(view->model()->index(0, 0)).width(), view->viewport()->width());
+
+    // Wide again: back to filling the pane exactly.
+    tab.resize(900, 400);
+    QTRY_COMPARE(h->length(), view->viewport()->width());
+    QTRY_COMPARE(view->horizontalScrollBar()->maximum(), 0);
 }
 
 QTEST_MAIN(TabTest)

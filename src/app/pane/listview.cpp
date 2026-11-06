@@ -28,7 +28,8 @@ ListView::ListView(QWidget* parent)
     setEditTriggers(NoEditTriggers);
     setSortingEnabled(false);
     setTabKeyNavigation(true);  // so Tab reaches keyPressEvent
-    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Only when Name's floor and the other columns do not fit the pane.
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     header()->setStretchLastSection(false);
     // Columns are dragged into place; Name stays first.
     header()->setSectionsMovable(true);
@@ -99,12 +100,17 @@ void ListView::fitName()
     for (int c = 1; c < ListModel::ColumnCount; ++c)
         if (!h->isSectionHidden(c))
             others += h->sectionSize(c);
-    const int width = std::max(h->minimumSectionSize(), viewport()->width() - others);
+    const int width = std::max(nameFloor(), viewport()->width() - others);
     if (h->sectionSize(ListModel::NameColumn) == width)
         return;
     applying_ = true;
     h->resizeSection(ListModel::NameColumn, width);
     applying_ = false;
+}
+
+int ListView::nameFloor() const
+{
+    return iconSize().width() + QFontMetrics(font()).horizontalAdvance(QLatin1Char('x')) * 12;
 }
 
 void ListView::resizeEvent(QResizeEvent* event)
