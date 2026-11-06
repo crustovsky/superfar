@@ -51,6 +51,7 @@ private Q_SLOTS:
     void vanishedNamesAreNotRestored();
     void finishedJobClearsWhileAway();
     void marksAcrossAnArchive();
+    void cursorRowSpansTheList();
 
 private:
     // Runs go() and waits for the load it starts.
@@ -178,6 +179,22 @@ void TabTest::marksAcrossAnArchive()
     QVERIFY(!tab.isArchive());
     QCOMPARE(markedNames(tab), QStringList({"a.txt"}));
     QCOMPARE(tab.currentName(), QByteArray("demo.zip"));
+}
+
+void TabTest::cursorRowSpansTheList()
+{
+    // The inactive pane outlines this rectangle; a hidden last column
+    // must not shrink it to the Name cell.
+    Tab tab(services_);
+    tab.resize(600, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    const QModelIndex first = view->model()->index(0, 0);
+    QCOMPARE(view->rowRect(first).width(), view->viewport()->width());
+    view->applyColumns({}, {QStringLiteral("modified")});
+    QCOMPARE(view->rowRect(first).width(), view->viewport()->width());
+    QCOMPARE(view->rowRect(first).height(), view->visualRect(first).height());
 }
 
 QTEST_MAIN(TabTest)

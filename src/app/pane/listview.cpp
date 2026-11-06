@@ -228,8 +228,10 @@ void ListView::keyPressEvent(QKeyEvent* event)
 
 QRect ListView::rowRect(const QModelIndex& index) const
 {
-    const int last = model()->columnCount() - 1;
-    return visualRect(index.siblingAtColumn(0)).united(visualRect(index.siblingAtColumn(last)));
+    // Name is always shown and gives the row; the columns fill the
+    // viewport, whichever of them are shown and in whatever order.
+    const QRect name = visualRect(index.siblingAtColumn(ListModel::NameColumn));
+    return QRect(0, name.top(), viewport()->width(), name.height());
 }
 
 void ListView::paintEvent(QPaintEvent* event)
