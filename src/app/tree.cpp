@@ -4,9 +4,11 @@
 
 #include "core/listing.h"
 #include "core/sort.h"
+#include "menu.h"
 #include "uris.h"
 
 #include <QHeaderView>
+#include <QContextMenuEvent>
 #include <QKeyEvent>
 #include <QSet>
 #include <algorithm>
@@ -457,6 +459,18 @@ void Tree::keyPressEvent(QKeyEvent* event)
         event->accept();
         Q_EMIT commandRequested(cmd);
     }
+}
+
+void Tree::contextMenuEvent(QContextMenuEvent* event)
+{
+    const QModelIndex index = event->reason() == QContextMenuEvent::Keyboard ? currentIndex() : indexAt(event->pos());
+    if (!index.isValid())
+        return;
+    setCurrentIndex(index);
+    setFocus();  // unmount is F8 with the tree focused
+    menu::popup(this, currentPlace() ? menu::Context::TreeMount : menu::Context::Tree, QString(), event->globalPos(),
+                [this](keymap::Command command) { Q_EMIT commandRequested(command); });
+    event->accept();
 }
 
 const TreeModel::Root* Tree::currentPlace() const

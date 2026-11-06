@@ -79,6 +79,13 @@ Pane::Pane(const Services& services, QWidget* parent)
     connect(tabBar_, &QTabBar::currentChanged, this, &Pane::onCurrentTab);
     connect(tabBar_, &TabBar::closeRequested, this, &Pane::closeTab);
     connect(tabBar_, &TabBar::newTabRequested, this, [this] { newTab(core::Location::home()); });
+    connect(tabBar_, &TabBar::commandRequested, this, [this](keymap::Command command) {
+        // This pane's tabs, whichever pane is active: the strip takes no
+        // focus, so the pane does it here.
+        if (Tab* tab = activeTab())
+            tab->setFocus();
+        execute(command);
+    });
     path_->installEventFilter(this);
 }
 
@@ -158,6 +165,12 @@ void Pane::applyColumns(const Config::Columns& columns)
     const columns::Layout layout = columnLayout();
     for (Tab* tab : tabs())
         tab->view()->applyColumns(layout, columns.widths);
+}
+
+void Pane::moveColumn(int column, int delta)
+{
+    if (Tab* tab = activeTab())
+        tab->view()->moveColumn(column, delta);  // comes back through columnsChanged
 }
 
 columns::Layout Pane::columnLayout() const

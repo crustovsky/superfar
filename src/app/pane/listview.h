@@ -23,6 +23,8 @@ public:
     // As the user would from the header: reported by columnsChanged().
     // Name stays; a hidden column keeps its width for its return.
     void setColumnShown(int column, bool shown);
+    // One place left (-1) or right (+1), as a drag of its header would.
+    void moveColumn(int column, int delta);
 
     // The header's sort indicator; the header flips it on a click and
     // sortChanged() reports both.
@@ -61,6 +63,9 @@ protected:
     void mouseMoveEvent(QMouseEvent* event) override;
     void startDrag(Qt::DropActions supportedActions) override;
     void currentChanged(const QModelIndex& current, const QModelIndex& previous) override;
+    // A right click: the cursor goes to the row under it and a menu
+    // offers the commands for it, or for the folder on empty space.
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint) override;
     void resizeEvent(QResizeEvent* event) override;
 

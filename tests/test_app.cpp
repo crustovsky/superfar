@@ -13,6 +13,8 @@ class AppTest : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void everyCommandIsComplete();
+    void propertiesKeys();
+    void functionKeyLayers();
     void oneCommandPerKey();
     void markStore();
     void archiveTree();
@@ -30,10 +32,7 @@ void AppTest::everyCommandIsComplete()
         const QString name = keymap::name(c);
         QVERIFY2(!name.isEmpty(), qPrintable(QStringLiteral("command %1 (%2) has no config name").arg(i).arg(keymap::label(c))));
         QCOMPARE(keymap::fromName(name), c);
-        // Columns has no key on purpose: the header's right click and the
-        // menu reach it, a key is the user's to give.
-        if (c != Command::Columns)
-            QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
+        QVERIFY2(!keymap::keysOf(c).isEmpty(), qPrintable(name + QStringLiteral(" has no default key")));
         QVERIFY2(help::text().contains(name.isEmpty() ? QString() : keymap::keysOf(c).isEmpty()
                                                        ? QStringLiteral("(unbound)")
                                                        : keymap::keysOf(c).first().toString(QKeySequence::NativeText)),
@@ -41,6 +40,60 @@ void AppTest::everyCommandIsComplete()
     }
     QCOMPARE(keymap::allCommands().size(), n);
     QCOMPARE(keymap::defaults().size(), n);
+}
+
+void AppTest::propertiesKeys()
+{
+    // On the function bar under Alt, and still where other managers have it.
+    using keymap::Command;
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::ALT | Qt::Key_F2)), Command::Properties);
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::ALT | Qt::Key_Return)), Command::Properties);
+    QCOMPARE(keymap::keysOf(Command::Properties).first(), QKeySequence(Qt::ALT | Qt::Key_F2));
+    // The line a 0.7 first run wrote is retired, so such a config gets
+    // the new key without anyone editing it.
+    bool retired = false;
+    for (const auto& [name, old] : keymap::retiredDefaults())
+        retired = retired || (name == QLatin1String("Properties") && old == QLatin1String("Alt+Return;Alt+Enter"));
+    QVERIFY(retired);
+    for (const auto& [name, keys] : keymap::defaults())
+        if (name == QLatin1String("Properties"))
+            QCOMPARE(keys, QStringList({"Alt+F2", "Alt+Return", "Alt+Enter"}));
+}
+
+void AppTest::functionKeyLayers()
+{
+    // What the bar shows with a modifier held, row by row. A dash is a
+    // free key.
+    using keymap::Command;
+    const struct { Qt::KeyboardModifier mod; QStringList row; } layers[] = {
+        {Qt::NoModifier, {"Help", "Rename", "View", "Edit", "Copy", "Move", "Mkdir", "Trash", "Menu", "Quit"}},
+        {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "-", "-"}},
+        {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleSizes", "ToggleThumbnails", "ToggleTree", "Columns",
+                               "ToggleHidden", "Preview", "-", "-"}},
+        {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "-", "-", "-"}},
+    };
+    for (const auto& layer : layers) {
+        QStringList row;
+        for (int i = 0; i < 10; ++i) {
+            const Command c = keymap::lookup(QKeySequence(QKeyCombination(layer.mod, Qt::Key(Qt::Key_F1 + i)).toCombined()));
+            row << (c == Command::None ? QStringLiteral("-") : keymap::name(c));
+        }
+        QCOMPARE(row, layer.row);
+    }
+    // The function key comes first (the help names it), the old chord
+    // stays, and a config still holding the old line gets both.
+    const QList<QPair<Command, QString>> moved = {
+        {Command::ToggleHidden, "Ctrl+H"}, {Command::Preview, "Ctrl+Q"}, {Command::OpenWith, "Shift+Return;Shift+Enter"},
+        {Command::GoTo, "Ctrl+G"}, {Command::Bookmark, "Ctrl+D"}};
+    for (const auto& [command, old] : moved) {
+        const auto keys = keymap::keysOf(command);
+        QVERIFY2(keys.first().toString().contains(QLatin1String("+F")), qPrintable(keymap::name(command)));
+        QCOMPARE(keys.mid(1).first().toString(QKeySequence::PortableText), old.section(QLatin1Char(';'), 0, 0));
+        bool retired = false;
+        for (const auto& [name, was] : keymap::retiredDefaults())
+            retired = retired || (name == keymap::name(command) && was == old);
+        QVERIFY2(retired, qPrintable(keymap::name(command)));
+    }
 }
 
 void AppTest::oneCommandPerKey()

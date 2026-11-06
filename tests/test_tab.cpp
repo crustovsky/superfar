@@ -5,6 +5,7 @@
 #include "core/dirsize.h"
 #include "core/thumbnails.h"
 #include "core/unixattrs.h"
+#include "menu.h"
 #include "ownercompletion.h"
 #include "pane/listmodel.h"
 #include "pane/listview.h"
@@ -16,6 +17,7 @@
 #include <QHeaderView>
 #include <QCheckBox>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPushButton>
 #include <QProcess>
 #include <QScrollBar>
@@ -76,6 +78,7 @@ private Q_SLOTS:
     void tabWalksTheRow();
     void ownerCompletion();
     void attributesEditor();
+    void contextMenus();
 
 private:
     // Runs go() and waits for the load it starts.
@@ -268,6 +271,27 @@ void TabTest::columnsHideAndMove()
     QCOMPARE(layout.orderNames().mid(0, 3), QStringList({"name", "size", "modified"}));
     // Name cannot be dragged, and nothing can be dropped before it.
     QVERIFY(!h->isFirstSectionMovable());
+
+    // The same one step at a time, as the column list's keys ask for it.
+    view->moveColumn(SizeColumn, 1);
+    QCOMPARE(changed.size(), 4);
+    QCOMPARE(view->columnLayout().orderNames().mid(0, 3), QStringList({"name", "modified", "size"}));
+    view->moveColumn(ModifiedColumn, -1);  // nothing goes before Name
+    view->moveColumn(NameColumn, 1);       // and Name does not move
+    QCOMPARE(changed.size(), 4);
+    QCOMPARE(h->visualIndex(NameColumn), 0);
+
+    // And with the mouse: a header section dragged past its neighbour.
+    const auto centre = [&](int column) {
+        return QPoint(h->sectionViewportPosition(column) + h->sectionSize(column) / 2, h->height() / 2);
+    };
+    const QPoint from = centre(ModifiedColumn), to = centre(SizeColumn) + QPoint(h->sectionSize(SizeColumn) / 3, 0);
+    QTest::mousePress(h->viewport(), Qt::LeftButton, Qt::NoModifier, from);
+    QTest::mouseMove(h->viewport(), (from + to) / 2);
+    QTest::mouseMove(h->viewport(), to);
+    QTest::mouseRelease(h->viewport(), Qt::LeftButton, Qt::NoModifier, to);
+    QCOMPARE(changed.size(), 5);
+    QCOMPARE(view->columnLayout().orderNames().mid(0, 3), QStringList({"name", "size", "modified"}));
 
     // The sort follows its column wherever the column sits.
     tab.setSort(core::SortBy::Modified, false);
@@ -524,6 +548,82 @@ void TabTest::nameKeepsAFloor()
     tab.resize(roomy, 400);
     QTRY_COMPARE(h->length(), view->viewport()->width());
     QTRY_COMPARE(view->horizontalScrollBar()->maximum(), 0);
+}
+
+void TabTest::contextMenus()
+{
+    using keymap::Command;
+    // Every entry of every menu is a command with words to show, once.
+    for (menu::Context context : {menu::Context::Item, menu::Context::Folder, menu::Context::Tabs,
+                                  menu::Context::Tree, menu::Context::TreeMount}) {
+        QSet<int> seen;
+        const auto& entries = menu::contextEntries(context);
+        QVERIFY(!entries.empty());
+        QVERIFY(entries.front().command != Command::None && entries.back().command != Command::None);
+        for (const menu::Entry& e : entries) {
+            if (e.command == Command::None)
+                continue;
+            QVERIFY2(!menu::entryText(e).isEmpty(), qPrintable(keymap::name(e.command)));
+            QVERIFY2(!seen.contains(int(e.command)), qPrintable(keymap::name(e.command)));
+            seen.insert(int(e.command));
+        }
+    }
+
+    Tab tab(services_);
+    tab.resize(600, 400);
+    tab.show();
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    ListView* view = tab.view();
+    QSignalSpy commands(&tab, &Tab::commandRequested);
+    auto rightClick = [&](const QPoint& at) {
+        QContextMenuEvent event(QContextMenuEvent::Mouse, at, view->viewport()->mapToGlobal(at));
+        QCoreApplication::sendEvent(view->viewport(), &event);
+        QMenu* menu = nullptr;
+        for (QMenu* m : view->findChildren<QMenu*>())
+            if (m->isVisible())
+                menu = m;
+        return menu;
+    };
+    auto commandsOf = [](QMenu* menu) {
+        QList<int> out;
+        for (QAction* a : menu->actions())
+            if (a->data().isValid())
+                out << a->data().toInt();
+        return out;
+    };
+
+    // On a row: the cursor goes there, the first line names it, and a
+    // choice comes out as the command the key would give.
+    const QModelIndex b = view->model()->index(2, 0);  // b.txt
+    QMenu* menu = rightClick(view->visualRect(b).center());
+    QVERIFY(menu);
+    QCOMPARE(tab.currentName(), QByteArray("b.txt"));
+    QCOMPARE(menu->actions().first()->text(), QStringLiteral("b.txt"));
+    QVERIFY(!menu->actions().first()->isEnabled());
+    QVERIFY(commandsOf(menu).contains(int(Command::Properties)));
+    QVERIFY(!commandsOf(menu).contains(int(Command::Mkdir)));
+    for (QAction* a : menu->actions())
+        if (a->data().toInt() == int(Command::Copy))
+            a->trigger();
+    QCOMPARE(commands.size(), 1);
+    QCOMPARE(commands.last().first().value<keymap::Command>(), Command::Copy);
+    menu->close();
+
+    // With marks, the commands are for them, and the menu says so even
+    // when the click is on an unmarked row.
+    view->setCurrentIndex(view->model()->index(0, 0));
+    markFirstRows(tab, 2);
+    menu = rightClick(view->visualRect(b).center());
+    QVERIFY(menu);
+    QVERIFY(menu->actions().first()->text().contains(QLatin1Char('2')));
+    menu->close();
+
+    // On empty space: the folder's own menu.
+    menu = rightClick(QPoint(20, view->viewport()->height() - 5));
+    QVERIFY(menu);
+    QVERIFY(commandsOf(menu).contains(int(Command::Mkdir)));
+    QVERIFY(!commandsOf(menu).contains(int(Command::Trash)));
+    menu->close();
 }
 
 QTEST_MAIN(TabTest)

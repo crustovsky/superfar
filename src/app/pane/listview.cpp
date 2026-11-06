@@ -1,12 +1,14 @@
 #include "pane/listview.h"
 
 #include "bench.h"
+#include "menu.h"
 #include "pane/delegate.h"
 #include "pane/listmodel.h"
 
 #include <QFontMetrics>
 #include <QHeaderView>
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QDrag>
 #include <QKeyEvent>
 #include <QMenu>
@@ -159,6 +161,16 @@ void ListView::setColumnShown(int column, bool shown)
     Q_EMIT columnsChanged(columnLayout());
 }
 
+void ListView::moveColumn(int column, int delta)
+{
+    QHeaderView* h = header();
+    const int from = h->visualIndex(column);
+    const int to = from + delta;
+    if (column <= ListModel::NameColumn || column >= ListModel::ColumnCount || to < 1 || to >= h->count())
+        return;  // Name stays, and stays first
+    h->moveSection(from, to);  // reported through sectionMoved, like a drag
+}
+
 void ListView::showColumnMenu(const QPoint& pos)
 {
     // The same list the Columns command shows in a bar, here as a menu.
@@ -294,6 +306,29 @@ void ListView::paintEvent(QPaintEvent* event)
         paintedRows_ = true;
         bench::mark("first-rows");
     }
+}
+
+void ListView::contextMenuEvent(QContextMenuEvent* event)
+{
+    const auto* m = qobject_cast<ListModel*>(model());
+    if (!m || isEditing())
+        return;
+    // From the menu key the event has no pointer: the cursor row stands in.
+    const bool byKey = event->reason() == QContextMenuEvent::Keyboard;
+    const QModelIndex index = byKey ? currentIndex() : indexAt(event->pos());
+    QString title;
+    if (index.isValid()) {
+        setCurrentIndex(index.siblingAtColumn(ListModel::NameColumn));
+        // The commands act on the marks when there are any, whichever
+        // row was clicked: the first line says so.
+        title = m->markedCount() > 0 ? tr("%n marked items", nullptr, m->markedCount())
+                                     : m->entryAt(index.row()).display;
+    }
+    const QPoint at = byKey && index.isValid() ? viewport()->mapToGlobal(visualRect(index).center())
+                                               : event->globalPos();
+    menu::popup(this, index.isValid() ? menu::Context::Item : menu::Context::Folder, title, at,
+                [this](keymap::Command command) { Q_EMIT commandRequested(command); });
+    event->accept();
 }
 
 void ListView::closeEditor(QWidget* editor, QAbstractItemDelegate::EndEditHint hint)

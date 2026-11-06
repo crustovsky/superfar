@@ -118,7 +118,28 @@ CheckBar::CheckBar(const QString& message, QWidget* parent)
         if (!(item->flags() & Qt::ItemIsUserCheckable))
             Q_EMIT actionChosen();
     });
+    list_->installEventFilter(this);  // the list would take Shift+arrows for itself
     setFocusProxy(list_);
+}
+
+void CheckBar::setCurrent(int index)
+{
+    list_->setCurrentRow(std::clamp(index, 0, std::max(0, list_->count() - 1)));
+}
+
+bool CheckBar::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == list_ && event->type() == QEvent::KeyPress) {
+        const auto* key = static_cast<QKeyEvent*>(event);
+        const bool up = key->key() == Qt::Key_Up, down = key->key() == Qt::Key_Down;
+        if ((up || down) && (key->modifiers() & Qt::ShiftModifier)) {
+            const QListWidgetItem* item = list_->currentItem();
+            if (item && (item->flags() & Qt::ItemIsUserCheckable))
+                Q_EMIT moveRequested(list_->currentRow(), up ? -1 : 1);
+            return true;
+        }
+    }
+    return QFrame::eventFilter(watched, event);
 }
 
 void CheckBar::setItems(const QStringList& labels, const QList<bool>& checked, const QString& action)

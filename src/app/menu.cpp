@@ -4,6 +4,7 @@
 #include <QKeySequence>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPoint>
 
 namespace menu {
 
@@ -68,7 +69,95 @@ const std::vector<Group>& groups()
     return g;
 }
 
+// An entry's words and, after a tab, its keys: text there paints in
+// the shortcut column without registering a shortcut.
+QString withKeys(const QString& text, keymap::Command command)
+{
+    QStringList keys;
+    for (const QKeySequence& k : keymap::keysOf(command))
+        keys << k.toString(QKeySequence::NativeText);
+    return text + QLatin1Char('\t') + keys.join(QStringLiteral(", "));
+}
+
 } // namespace
+
+const std::vector<Entry>& contextEntries(Context context)
+{
+    using keymap::Command;
+    static const std::vector<Entry> item = {
+        {Command::Activate}, {Command::OpenWith}, {Command::View}, {Command::Edit}, {Command::Preview},
+        {Command::None},
+        {Command::Copy}, {Command::Move}, {Command::Rename}, {Command::MultiRename}, {Command::Pack},
+        {Command::Trash}, {Command::DeletePermanent},
+        {Command::None},
+        {Command::CopyClip}, {Command::CutClip}, {Command::Paste},
+        {Command::None},
+        {Command::Properties},
+    };
+    static const std::vector<Entry> folder = {
+        {Command::Mkdir}, {Command::NewFile}, {Command::Paste},
+        {Command::None},
+        {Command::Reload}, {Command::ToggleHidden}, {Command::ToggleSizes}, {Command::ToggleThumbnails},
+        {Command::Columns},
+        {Command::None},
+        {Command::Find}, {Command::Bookmark},
+    };
+    static const std::vector<Entry> tabs = {
+        {Command::NewTab}, {Command::CloseTab}, {Command::LockTab},
+    };
+    // A click in the tree has already taken the active tab to the
+    // folder, so these act on it.
+    static const std::vector<Entry> tree = {
+        {Command::NewTab, "Open in a &new tab"}, {Command::Mkdir}, {Command::Find}, {Command::Bookmark},
+        {Command::Reload},
+    };
+    static const std::vector<Entry> treeMount = {
+        {Command::Trash, "&Unmount or eject"},
+        {Command::None},
+        {Command::NewTab, "Open in a &new tab"}, {Command::Find}, {Command::Reload},
+    };
+    switch (context) {
+    case Context::Item: return item;
+    case Context::Folder: return folder;
+    case Context::Tabs: return tabs;
+    case Context::Tree: return tree;
+    case Context::TreeMount: return treeMount;
+    }
+    return folder;
+}
+
+QString entryText(const Entry& entry)
+{
+    if (entry.text)
+        return QString::fromLatin1(entry.text);
+    for (const Group& g : groups())
+        for (const Item& item : g.items)
+            if (item.command == entry.command)
+                return QString::fromLatin1(item.text);
+    return {};
+}
+
+void popup(QWidget* parent, Context context, const QString& title, const QPoint& globalPos,
+           std::function<void(keymap::Command)> run)
+{
+    auto* m = new QMenu(parent);
+    m->setAttribute(Qt::WA_DeleteOnClose);
+    if (!title.isEmpty()) {
+        m->addAction(title)->setEnabled(false);  // what the commands act on
+        m->addSeparator();
+    }
+    for (const Entry& entry : contextEntries(context)) {
+        if (entry.command == keymap::Command::None) {
+            m->addSeparator();
+            continue;
+        }
+        QAction* a = m->addAction(withKeys(entryText(entry), entry.command));
+        a->setData(static_cast<int>(entry.command));
+        // parent as the context: the choice outlives the menu.
+        QObject::connect(a, &QAction::triggered, parent, [run, command = entry.command] { run(command); });
+    }
+    m->popup(globalPos);
+}
 
 void build(QMenuBar* bar, std::function<void(keymap::Command)> run)
 {
@@ -79,12 +168,7 @@ void build(QMenuBar* bar, std::function<void(keymap::Command)> run)
                 m->addSeparator();
                 continue;
             }
-            QStringList keys;
-            for (const QKeySequence& k : keymap::keysOf(item.command))
-                keys << k.toString(QKeySequence::NativeText);
-            // Text after a tab paints in the shortcut column without
-            // registering a shortcut.
-            QAction* a = m->addAction(QString::fromLatin1(item.text) + QLatin1Char('\t') + keys.join(QStringLiteral(", ")));
+            QAction* a = m->addAction(withKeys(QString::fromLatin1(item.text), item.command));
             QObject::connect(a, &QAction::triggered, bar, [run, command = item.command] { run(command); });
         }
     }

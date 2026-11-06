@@ -8,6 +8,10 @@ namespace keymap {
 
 namespace {
 
+// Every command has a key on a function key layer where one fits, so
+// the bar shows it while the modifier is held: Shift is a variant of
+// the plain key, Ctrl is what the pane shows, Alt is panels and tools.
+// Letter chords and the keys other file managers use come second.
 std::vector<std::pair<QKeySequence, Command>>& table()
 {
     static std::vector<std::pair<QKeySequence, Command>> t = {
@@ -34,6 +38,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_W), Command::CloseTab},
         {QKeySequence(Qt::CTRL | Qt::Key_Tab), Command::NextTab},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), Command::PrevTab},
+        {QKeySequence(Qt::CTRL | Qt::Key_F7), Command::ToggleHidden},
         {QKeySequence(Qt::CTRL | Qt::Key_H), Command::ToggleHidden},
         {QKeySequence(Qt::CTRL | Qt::Key_R), Command::Reload},
         {QKeySequence(Qt::Key_Insert), Command::Mark},
@@ -46,6 +51,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Backspace), Command::GoUp},
         {QKeySequence(Qt::Key_Left), Command::GoUp},
         {QKeySequence(Qt::Key_Right), Command::Activate},
+        {QKeySequence(Qt::CTRL | Qt::Key_F8), Command::Preview},
         {QKeySequence(Qt::CTRL | Qt::Key_Q), Command::Preview},
         {QKeySequence(Qt::Key_Return), Command::Activate},
         {QKeySequence(Qt::Key_Enter), Command::Activate},
@@ -55,6 +61,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_Minus), Command::UnmarkGlob},
         {QKeySequence(Qt::KeypadModifier | Qt::Key_Plus), Command::MarkGlob},  // keypads, where present
         {QKeySequence(Qt::KeypadModifier | Qt::Key_Minus), Command::UnmarkGlob},
+        {QKeySequence(Qt::SHIFT | Qt::Key_F3), Command::OpenWith},
         {QKeySequence(Qt::SHIFT | Qt::Key_Return), Command::OpenWith},
         {QKeySequence(Qt::SHIFT | Qt::Key_Enter), Command::OpenWith},
         {QKeySequence(Qt::CTRL | Qt::Key_Space), Command::FocusCommandLine},
@@ -62,15 +69,19 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_X), Command::CutClip},
         {QKeySequence(Qt::CTRL | Qt::Key_V), Command::Paste},
         {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
+        {QKeySequence(Qt::ALT | Qt::Key_F1), Command::GoTo},
         {QKeySequence(Qt::CTRL | Qt::Key_G), Command::GoTo},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L), Command::LockTab},
-        {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},
+        {QKeySequence(Qt::ALT | Qt::Key_F2), Command::Properties},  // on the bar with the other panels
+        {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},  // what other file managers use
         {QKeySequence(Qt::ALT | Qt::Key_Enter), Command::Properties},
+        {QKeySequence(Qt::ALT | Qt::Key_F6), Command::Bookmark},
         {QKeySequence(Qt::CTRL | Qt::Key_D), Command::Bookmark},
         {QKeySequence(Qt::CTRL | Qt::Key_F4), Command::ToggleThumbnails},
         {QKeySequence(Qt::SHIFT | Qt::Key_F2), Command::MultiRename},
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
         {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
+        {QKeySequence(Qt::CTRL | Qt::Key_F6), Command::Columns},
         {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
         {QKeySequence(Qt::CTRL | Qt::Key_Home), Command::PreviewFirst},
         {QKeySequence(Qt::CTRL | Qt::Key_PageUp), Command::PreviewPrev},
@@ -245,7 +256,14 @@ QList<QPair<QString, QString>> retiredDefaults()
 {
     // As the first run wrote them (portable text: Insert is "Ins").
     return {{QStringLiteral("Mark"), QKeySequence(Qt::Key_Insert).toString(QKeySequence::PortableText)},  // 0.5: Shift+Down joined it
-            {QStringLiteral("About"), QString()}};  // 0.7: it got Shift+F1; an empty line unbinds
+            {QStringLiteral("About"), QString()},  // 0.7: it got Shift+F1; an empty line unbinds
+            {QStringLiteral("Properties"), QStringLiteral("Alt+Return;Alt+Enter")},  // 0.8: Alt+F2 joined them
+            // 0.8: each got its place on a function key layer
+            {QStringLiteral("ToggleHidden"), QStringLiteral("Ctrl+H")},
+            {QStringLiteral("Preview"), QStringLiteral("Ctrl+Q")},
+            {QStringLiteral("OpenWith"), QStringLiteral("Shift+Return;Shift+Enter")},
+            {QStringLiteral("GoTo"), QStringLiteral("Ctrl+G")},
+            {QStringLiteral("Bookmark"), QStringLiteral("Ctrl+D")}};
 }
 
 QList<QKeySequence> keysOf(Command command)

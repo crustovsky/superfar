@@ -27,18 +27,18 @@ you can see in the bar at the bottom.
 | **Two panes** | Always open, each with its own path bar, tabs and status line; the active one is unmistakable. | Tab, Ctrl+F1, Ctrl+F2 |
 | **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+Shift+L |
 | **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
-| **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9. | always on screen |
+| **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9, and a right click offers the same commands for what is under the pointer. | always on screen |
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
-| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | the header, `Columns` |
-| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+Enter |
+| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F6, the header |
+| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
-| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+Q |
+| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
 | **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
-| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Ctrl+G, Ctrl+L |
+| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
 | **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space |
@@ -65,14 +65,15 @@ row's mode, which takes `rwxr-xr-x` or `0755`:
 
 ![Permissions](docs/screenshots/permissions.png)
 
-Properties on Alt+Enter over several marked items: a bit they differ in
+Properties on Alt+F2 over several marked items: a bit they differ in
 is half checked and stays as each item has it, and Apply changes only
 what you changed:
 
 ![Properties](docs/screenshots/properties.png)
 
-The column list, from the `Columns` command or as a menu from a right
-click on the header:
+The column list on Ctrl+F6 (a right click on the header shows the same
+as a menu). Space shows or hides a column, Shift+Up and Shift+Down
+move it:
 
 ![Columns](docs/screenshots/columns.png)
 
@@ -94,7 +95,7 @@ The F3 viewer on a binary file:
 
 ![Viewer](docs/screenshots/viewer.png)
 
-Folder history on Ctrl+G, ranked by frecency:
+Folder history on Alt+F1, ranked by frecency:
 
 ![Go to](docs/screenshots/go-to.png)
 
@@ -121,8 +122,21 @@ Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache:
 
 ## Keys
 
+Almost everything is on a function key, in four layers, and the bar at
+the bottom shows the layer of whatever modifier you hold. Shift is a
+variant of the plain key, Ctrl is what the pane shows, Alt is panels
+and tools:
+
+| | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plain | help | rename | view | edit | copy | move | new folder | trash | menu | quit |
+| Shift | about | multi-rename | open with | new file | sync | | | delete | | |
+| Ctrl | left pane | right pane | sizes | thumbnails | tree | columns | hidden files | preview | | |
+| Alt | go to | properties | | | pack | bookmark | find | | | |
+
 F1 shows the full table inside the window, with whatever you have
-remapped. The defaults:
+remapped. The defaults, with the keys other file managers use kept as
+second keys:
 
 | Key | Action |
 |-----|--------|
@@ -130,8 +144,9 @@ remapped. The defaults:
 | Shift+F1 | about: name, version and build date |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
+| Alt+F2 (also Alt+Enter) | properties, with permissions and owner for every marked item |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
-| Alt+F7, Alt+Enter | find in tree; properties, with permissions and owner for every marked item |
+| Alt+F7 | find in tree |
 | F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
@@ -141,19 +156,21 @@ remapped. The defaults:
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
-| (no key) `Columns` | the pane's column list as a bar: Space shows or hides a column; also under View in the F9 menu |
-| Ctrl+D | bookmark this folder, or remove the bookmark |
+| Ctrl+F6 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
+| Alt+F6, Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
 | Space, Ctrl+A, * | mark, mark all, invert |
 | Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
 | Ctrl+=, Ctrl+- | mark and unmark by pattern |
-| Enter, Shift+Enter | open with the default app, choose an app |
+| Enter | open with the default app |
+| Shift+F3, Shift+Enter | choose an app to open with |
 | Backspace, Left, Right | go up, go up, enter |
-| Ctrl+Q | preview the cursor item |
+| Ctrl+F8, Ctrl+Q | preview the cursor item |
 | Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End | previewed PDF: first, previous, next, last page; video: start, back 10 s, forward 10 s, end |
 | Ctrl+P | previewed video: play or pause |
-| Ctrl+L, Ctrl+G | type a path or URI, go to a folder from history |
-| Ctrl+H | show hidden files |
+| Ctrl+L | type a path or URI |
+| Alt+F1, Ctrl+G | go to a folder from history |
+| Ctrl+F7, Ctrl+H | show hidden files |
 | Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
 | Ctrl+Space | the command line: runs in the tab's folder in a terminal |
 | Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
@@ -164,15 +181,21 @@ function key does; hold Shift, Ctrl or Alt and it relabels, naming the
 modifier at its left end. F8 on a mount in the tree unmounts it, or
 ejects it when it is removable.
 
-With the mouse: middle click closes a tab, a double click on the empty
+With the mouse: a right click brings a short menu of what the keys do
+for the thing under it, each entry with its key beside it: an item of
+the list (the marked items when there are marks; the menu's first line
+says which), the list's empty space (new folder, paste, what the pane
+shows), a tab, a folder or a mount in the tree. Middle click closes a
+tab, a double click on the empty
 tab strip opens one at home, a double click on the path bar edits the
 path (the same as Ctrl+L, for a remote location), and files drag
 between panes, onto tree folders and to other apps. On a column header
 a click sorts by it and a second click reverses it (folders stay
 first), a drag moves the column, an edge resizes it, and a right click
 lists the columns with check marks to show or hide them, with Reset
-columns at the bottom. Name stays first and stays shown. Each pane
-keeps its own columns, and remembers them.
+columns at the bottom. Ctrl+F6 does all of it from the keyboard. Name
+stays first and stays shown. Each pane keeps its own columns, and
+remembers them.
 
 ## Build
 
@@ -216,7 +239,8 @@ takes the nine letters or octal, setuid, setgid and sticky included
 `:group`, names or numbers, and completes names as you type. A row over
 a link shows its target, and that is what an edit there changes.
 
-The properties panel (Alt+Enter) does the same for everything marked.
+The properties panel (Alt+F2, or Alt+Enter) does the same for everything
+marked.
 Apply runs as a job in the strip, with progress, Abort and a log of
 what was refused. With "the contents of folders too" checked it goes
 down the tree the careful way: folders take the bits as set, a file

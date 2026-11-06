@@ -72,6 +72,17 @@ run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F
 # Home first, so Return enters a folder instead of opening Z.
 run navigation "Home;Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F3;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
 run filter "t;w;Escape;p;Backspace" 3000 "$T/a" "$T/b"
+# The keys of the function key layers that have no other session:
+# hidden files on Ctrl+F7 (kept in the session), preview on Ctrl+F8, go
+# to on Alt+F1, open with on Shift+F3, bookmark on Alt+F6 (set, removed).
+run layers "Ctrl+F7;Ctrl+F8;Escape;Alt+F1;Escape;Shift+F3;Escape;Alt+F6;Alt+F6" 5500 "$T/a" "$T/b"
+check "Ctrl+F7 showed hidden files" grep -q '^left.1.hidden=true' "$XDG_STATE_HOME/superfar/state.ini"
+run layersback "Ctrl+H" 2000 "$T/a" "$T/b"
+check "and Ctrl+H still hides them" grep -q '^left.1.hidden=false' "$XDG_STATE_HOME/superfar/state.ini"
+# The tree takes the window's keys too: Tab comes back from it to the
+# pane, and a function key pressed in it acts on the active tab.
+run treekeys "Shift+Tab;Tab;F7;t;k;1;Return;Shift+Tab;F7;t;k;2;Return" 6500 "$T/a" "$T/b"
+check "Tab came back from the tree, F7 worked after it and in it" sh -c "test -d '$T/a/TK1' && test -d '$T/a/TK2'"
 run badargs "" 1200 /nonexistent/deeper foo://x
 run fileargs "" 1200 /etc/hostname /etc
 run viewer "Down;F3;Escape" 2000 "$T/a" "$T/b"
@@ -94,20 +105,20 @@ if command -v ffmpeg > /dev/null && [ -d /usr/share/mime ]; then
     XDG_DATA_DIRS=$T/data
 fi
 
-# The Columns command has no key of its own; the config gives it one.
-# Space on the first row hides Size, the last row resets.
-sed -i 's/^Columns=.*/Columns=Ctrl+K/' "$XDG_CONFIG_HOME/superfar/superfar.ini"
+# The column list on Ctrl+F6: Space on the first row hides Size,
+# Shift+Down moves it past Items, the last row resets.
 before=$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")
-run columns "Ctrl+K;Space;Escape" 2500 "$T/a" "$T/b"
+run columns "Ctrl+F6;Space;Shift+Down;Escape" 3000 "$T/a" "$T/b"
 check "the Columns bar hid Size, in the state" grep -q '^left.hidden=.*size' "$XDG_STATE_HOME/superfar/state.ini"
-run columnsreset "Ctrl+K;End;Return;Escape" 2500 "$T/a" "$T/b"
+check "and moved it after Items" grep -q '^left.order=.*items,size' "$XDG_STATE_HOME/superfar/state.ini"
+run columnsreset "Ctrl+F6;End;Return;Escape" 2500 "$T/a" "$T/b"
 check "Reset columns forgot it" sh -c "! grep -q '^left.hidden' '$XDG_STATE_HOME/superfar/state.ini'"
 check "the column list left the config alone" test "$before" = "$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")"
 
 # The properties panel on the one file in its folder: three Tabs reach
 # the owner's execute box, Space sets it, Alt+A applies through the job.
 chmod 600 "$T/r/B.zzqx"
-run permissions "Alt+Return;Tab;Tab;Tab;Space;Alt+A;Escape" 5000 "$T/r" "$T/b"
+run permissions "Alt+F2;Tab;Tab;Tab;Space;Alt+A;Escape" 5000 "$T/r" "$T/b"
 check "the panel set the owner's execute bit, and only that" test "$(stat -c %a "$T/r/B.zzqx")" = 700
 # The same from the list: the config shows the Permissions column, F2
 # and Tab reach its cell, the mode is typed.
