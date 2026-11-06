@@ -5,6 +5,7 @@
 #include "core/child.h"
 #include "core/compare.h"
 #include "core/dirsize.h"
+#include "core/fileops.h"
 #include "core/finder.h"
 #include "core/jobs/extract.h"
 #include "core/mounts.h"
@@ -14,6 +15,7 @@
 #include "core/reader.h"
 #include "core/rename.h"
 #include "core/thumbnails.h"
+#include "core/unixattrs.h"
 #include "core/video.h"
 #include "core/location.h"
 #include "core/metadata.h"
@@ -29,6 +31,7 @@
 #include <QTest>
 
 #include <cmath>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
 
@@ -87,6 +90,12 @@ private Q_SLOTS:
     void pdfPages();
     void videoFrames();
     void childRuns();
+    void modeKeepsSpecialBits();
+    void modeStrings();
+    void ownerText();
+    void listingModeAndOwner();
+    void sortByPermissionsAndOwner();
+    void ownerChanges();
 };
 
 namespace {
@@ -1638,6 +1647,245 @@ void CoreTest::childRuns()
     };
     chain.run(step, next);
     QTRY_COMPARE(steps, 3);
+}
+
+void CoreTest::modeKeepsSpecialBits()
+{
+    // The properties panel changes read, write and execute; a shared
+    // folder's setgid and sticky bits are not its to drop.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QByteArray path = QFile::encodeName(tmp.path() + "/shared");
+    QVERIFY(QDir().mkdir(QFile::decodeName(path)));
+    QCOMPARE(::chmod(path.constData(), 03775), 0);
+    const core::Location dir = core::Location::fromPath(path);
+    auto modeOf = [&] {
+        struct stat st {};
+        return ::stat(path.constData(), &st) == 0 ? quint32(st.st_mode & 07777) : 0u;
+    };
+    QCOMPARE(modeOf(), 03775u);
+
+    QString error = QStringLiteral("pending");
+    core::setMode(dir, 0750, 0777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(modeOf(), 03750u);
+
+    // The whole mode on purpose: the special bits are in the mask.
+    error = QStringLiteral("pending");
+    core::setMode(dir, 0755, 07777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QCOMPARE(modeOf(), 0755u);
+
+    // A file that is not there says so.
+    error = QStringLiteral("pending");
+    core::setMode(dir.child("gone"), 0644, 0777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QVERIFY(!error.isEmpty());
+
+    QCOMPARE(core::mergedMode(04755, 0640, 0777), 04640u);
+    QCOMPARE(core::mergedMode(0100644, 02775, 07777), 02775u);  // the type bits never go back
+}
+
+void CoreTest::modeStrings()
+{
+    QCOMPARE(core::modeString(0100644), QStringLiteral("-rw-r--r--"));
+    QCOMPARE(core::modeString(040755), QStringLiteral("drwxr-xr-x"));
+    QCOMPARE(core::modeString(0104755), QStringLiteral("-rwsr-xr-x"));
+    QCOMPARE(core::modeString(0104655), QStringLiteral("-rwSr-xr-x"));
+    QCOMPARE(core::modeString(042775), QStringLiteral("drwxrwsr-x"));
+    QCOMPARE(core::modeString(042765), QStringLiteral("drwxrwSr-x"));
+    QCOMPARE(core::modeString(041777), QStringLiteral("drwxrwxrwt"));
+    QCOMPARE(core::modeString(041776), QStringLiteral("drwxrwxrwT"));
+    QCOMPARE(core::modeString(0120777), QStringLiteral("lrwxrwxrwx"));
+    QCOMPARE(core::modeString(020620), QStringLiteral("crw--w----"));
+    QCOMPARE(core::modeString(0), QString());  // not known: nothing to show
+
+    QCOMPARE(core::parseMode(QStringLiteral("rwxr-xr-x")), std::optional<quint32>(0755));
+    QCOMPARE(core::parseMode(QStringLiteral("-rw-r--r--")), std::optional<quint32>(0644));
+    QCOMPARE(core::parseMode(QStringLiteral("drwxrwsr-t")), std::optional<quint32>(03775));
+    QCOMPARE(core::parseMode(QStringLiteral("rwSr--r--")), std::optional<quint32>(04644));
+    QCOMPARE(core::parseMode(QStringLiteral("755")), std::optional<quint32>(0755));
+    QCOMPARE(core::parseMode(QStringLiteral("0755")), std::optional<quint32>(0755));
+    QCOMPARE(core::parseMode(QStringLiteral("2755")), std::optional<quint32>(02755));
+    QCOMPARE(core::parseMode(QStringLiteral("  640\n")), std::optional<quint32>(0640));
+    QCOMPARE(core::parseMode(QStringLiteral("000")), std::optional<quint32>(0));
+
+    // Every permission value reads back from its own string.
+    for (quint32 m = 0; m <= 07777; ++m)
+        QCOMPARE(core::parseMode(core::modeString(0100000 | m)), std::optional<quint32>(m));
+
+    // What a hand can type wrong must come back as "not a mode", never
+    // as some mode.
+    const QStringList hostile = {
+        QString(), QStringLiteral(" "), QStringLiteral("rwx"), QStringLiteral("rwxrwxrwxx"), QStringLiteral("888"),
+        QStringLiteral("75"), QStringLiteral("7"), QStringLiteral("07555"), QStringLiteral("-755"),
+        QStringLiteral("0x1ff"), QStringLiteral("rwxrwxrwX"), QStringLiteral("wrxr-xr-x"), QStringLiteral("rwtr-xr-x"),
+        QStringLiteral("rwxr-xr-s"), QStringLiteral("rwxr-tr-x"), QStringLiteral("srwxrwxrw"),
+        QStringLiteral("xrwxr-xr-x"), QStringLiteral("rwx r-x r-x"), QStringLiteral("rw-r--r--\nrwxrwxrwx"),
+        QStringLiteral("u+x"), QStringLiteral("a=rwx"), QStringLiteral("\u0440wxr-xr-x"),  // a Cyrillic er
+        QStringLiteral("rwxr-xr-x\u0000"), QString(100000, QLatin1Char('r')), QString(9, QChar(0)),
+        QStringLiteral("７５５"),  // full-width digits
+    };
+    for (const QString& text : hostile)
+        QVERIFY2(!core::parseMode(text), qPrintable(text.left(40)));
+}
+
+void CoreTest::ownerText()
+{
+    core::IdNames names;
+    QCOMPARE(names.user(0), QStringLiteral("root"));
+    QCOMPARE(names.group(0), QStringLiteral("root"));
+    QCOMPARE(names.owner(0, 0), QStringLiteral("root:root"));
+    QCOMPARE(names.user(0), QStringLiteral("root"));  // from the cache now
+    // An id nobody has is shown as its number, as ls -l does.
+    QCOMPARE(names.owner(3999999991u, 3999999992u), QStringLiteral("3999999991:3999999992"));
+
+    const auto both = core::parseOwner(QStringLiteral("root:root"));
+    QVERIFY(both && both->uid == 0u && both->gid == 0u);
+    const auto user = core::parseOwner(QStringLiteral("root"));
+    QVERIFY(user && user->uid == 0u && !user->gid);
+    const auto alsoUser = core::parseOwner(QStringLiteral("root:"));
+    QVERIFY(alsoUser && alsoUser->uid == 0u && !alsoUser->gid);
+    const auto group = core::parseOwner(QStringLiteral(":root"));
+    QVERIFY(group && !group->uid && group->gid == 0u);
+    const auto numbers = core::parseOwner(QStringLiteral(" 1234 : 5678 "));
+    QVERIFY(numbers && numbers->uid == 1234u && numbers->gid == 5678u);
+
+    QString error;
+    QVERIFY(!core::parseOwner(QStringLiteral("no-such-user-zz:root"), &error));
+    QVERIFY(error.contains(QStringLiteral("no-such-user-zz")));
+    QVERIFY(!core::parseOwner(QStringLiteral("root:no-such-group-zz"), &error));
+    QVERIFY(error.contains(QStringLiteral("no-such-group-zz")));
+    for (const QString& text : {QString(), QStringLiteral(":"), QStringLiteral("  "), QStringLiteral("-1"),
+                                QStringLiteral("root:root:root"), QStringLiteral("ro\u0000ot"),
+                                QString(100000, QLatin1Char('x'))})
+        QVERIFY2(!core::parseOwner(text, &error), qPrintable(text.left(40)));
+
+    QVERIFY(core::userNames().contains(QStringLiteral("root")));
+    QVERIFY(core::groupNames().contains(QStringLiteral("root")));
+}
+
+void CoreTest::listingModeAndOwner()
+{
+    // Mode and owner come with the listing's own stat, like size and time.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    touch(tmp.path() + "/plain.txt", "x");
+    QVERIFY(QDir(tmp.path()).mkdir("dir"));
+    const QByteArray file = QFile::encodeName(tmp.path() + "/plain.txt");
+    QCOMPARE(::chmod(file.constData(), 0640), 0);
+    struct stat st {};
+    QCOMPARE(::stat(file.constData(), &st), 0);
+
+    auto entries = list(core::Location::fromPath(QFile::encodeName(tmp.path())));
+    QCOMPARE(entries.size(), 2u);
+    core::sortByName(entries);
+    QVERIFY(S_ISDIR(entries[0].mode));
+    QCOMPARE(core::modeString(entries[1].mode), QStringLiteral("-rw-r-----"));
+    QCOMPARE(entries[1].uid, quint32(st.st_uid));
+    QCOMPARE(entries[1].gid, quint32(st.st_gid));
+    QCOMPARE(sizeof(core::Entry), size_t(104));  // the budget: 8 bytes more than before the three fields
+}
+
+void CoreTest::sortByPermissionsAndOwner()
+{
+    auto make = [](const char* name, bool dir, quint32 mode, quint32 uid, quint32 gid) {
+        core::Entry e;
+        e.name = name;
+        e.display = QString::fromUtf8(name);
+        e.type = dir ? core::EntryType::Directory : core::EntryType::File;
+        e.mode = (dir ? 040000u : 0100000u) | mode;
+        e.uid = uid;
+        e.gid = gid;
+        core::computeSortKey(e);
+        return e;
+    };
+    std::vector<core::Entry> v = {make("b", false, 0644, 1, 0), make("a", false, 0755, 0, 1), make("c", false, 0600, 0, 0),
+                                  make("e", false, 0644, 0, 0), make("d2", true, 0755, 0, 0), make("d1", true, 0700, 1, 1)};
+    auto names = [&v] {
+        QStringList n;
+        for (const auto& e : v)
+            n << e.display;
+        return n;
+    };
+    // Folders first, then by the permission bits; equal bits by name.
+    core::sortEntries(v, core::SortBy::Permissions, true);
+    QCOMPARE(names(), QStringList({"d1", "d2", "c", "b", "e", "a"}));
+    core::sortEntries(v, core::SortBy::Permissions, false);
+    QCOMPARE(names(), QStringList({"d2", "d1", "a", "e", "b", "c"}));
+    // Owner without names: user id, then group id, then name.
+    core::sortEntries(v, core::SortBy::Owner, true);
+    QCOMPARE(names(), QStringList({"d2", "d1", "c", "e", "a", "b"}));
+    // With names it is the names that order: whatever uid 1 is called
+    // here (bin, daemon, or just "1") sorts before "root".
+    core::IdNames ids;
+    QVERIFY(ids.user(1) < ids.user(0));
+    core::sortEntries(v, core::SortBy::Owner, true, {}, &ids);
+    QCOMPARE(names().mid(0, 3), QStringList({"d1", "d2", "b"}));
+    core::sortEntries(v, core::SortBy::Owner, false, {}, &ids);
+    QCOMPARE(names().mid(0, 2), QStringList({"d2", "d1"}));
+    QCOMPARE(names().last(), QStringLiteral("b"));
+
+    QCOMPARE(core::sortFromName(QStringLiteral("permissions")), core::SortBy::Permissions);
+    QCOMPARE(core::sortFromName(QStringLiteral("owner")), core::SortBy::Owner);
+    QCOMPARE(QByteArray(core::sortName(core::SortBy::Owner)), QByteArray("owner"));
+}
+
+void CoreTest::ownerChanges()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    touch(tmp.path() + "/file", "x");
+    QVERIFY(QFile::link("file", tmp.path() + "/link"));
+    const QByteArray path = QFile::encodeName(tmp.path() + "/file");
+    const core::Location dir = core::Location::fromPath(QFile::encodeName(tmp.path()));
+    auto statOf = [&] {
+        struct stat st {};
+        ::stat(path.constData(), &st);
+        return st;
+    };
+    auto wait = [](auto start) {
+        QString error = QStringLiteral("pending");
+        start([&error](const QString& e) { error = e; });
+        while (error == QLatin1String("pending"))
+            QTest::qWait(5);
+        return error;
+    };
+
+    // A group this user may give a file to: another one of its own, or
+    // any at all for root.
+    const quint32 uid = ::geteuid();
+    std::optional<quint32> other;
+    if (uid == 0) {
+        other = 1;
+    } else {
+        std::vector<gid_t> groups(static_cast<size_t>(std::max(0, ::getgroups(0, nullptr))));
+        const int n = ::getgroups(static_cast<int>(groups.size()), groups.data());
+        for (int i = 0; i < n; ++i)
+            if (groups[static_cast<size_t>(i)] != statOf().st_gid)
+                other = groups[static_cast<size_t>(i)];
+    }
+    if (other) {
+        const QString error = wait([&](auto done) { core::setOwner(dir.child("file"), {std::nullopt, other}, done); });
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(quint32(statOf().st_gid), *other);
+        QCOMPARE(quint32(statOf().st_uid), uid);  // the half not named stays
+    }
+    if (uid != 0) {
+        // Giving a file away is root's: the refusal comes back as text.
+        const QString error = wait([&](auto done) { core::setOwner(dir.child("file"), {0u, std::nullopt}, done); });
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(quint32(statOf().st_uid), uid);
+    }
+
+    // A row over a link shows its target, so an edit there follows the
+    // link; anywhere else a link is refused, never followed.
+    QCOMPARE(::chmod(path.constData(), 0644), 0);
+    QVERIFY(!wait([&](auto done) { core::setMode(dir.child("link"), 0600, 07777, done); }).isEmpty());
+    QCOMPARE(quint32(statOf().st_mode & 07777), 0644u);
+    QVERIFY(wait([&](auto done) { core::setMode(dir.child("link"), 0600, 07777, done, true); }).isEmpty());
+    QCOMPARE(quint32(statOf().st_mode & 07777), 0600u);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

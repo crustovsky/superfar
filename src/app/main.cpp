@@ -50,8 +50,11 @@ int main(int argc, char** argv)
     }
 
     Config config;
+    // Read from the file as the user left it: adding a new command's
+    // line below makes QSettings write it back without what it dropped.
+    const QStringList unquoted = config.unquotedKeyLines();
     config.writeDefaultKeys(keymap::defaults(), keymap::retiredDefaults());
-    for (const QString& problem : keymap::applyBindings(config.keyBindings()))
+    for (const QString& problem : keymap::applyBindings(config.keyBindings()) + unquoted)
         fprintf(stderr, "superfar: config [keys]: %s\n", qPrintable(problem));
 
     const QStringList args = parser.positionalArguments();

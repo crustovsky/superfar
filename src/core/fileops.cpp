@@ -69,8 +69,31 @@ struct RenameRequest {
         req->done(errorMessage(err.get()), name, display);
     }
 };
+// Two steps: the mode as it is, then the merged one.
 struct ModeRequest {
+    quint32 mode;
+    quint32 mask;
+    GFileQueryInfoFlags flags;
     std::function<void(const QString&)> done;
+
+    static void onRead(GObject* source, GAsyncResult* result, gpointer data)
+    {
+        auto* req = static_cast<ModeRequest*>(data);
+        GError* error = nullptr;
+        GPtr<GFileInfo> info(g_file_query_info_finish(G_FILE(source), result, &error));
+        GErrorPtr err(error);
+        if (!info) {
+            req->done(errorMessage(err.get()));
+            delete req;
+            return;
+        }
+        const quint32 old = g_file_info_get_attribute_uint32(info.get(), G_FILE_ATTRIBUTE_UNIX_MODE);
+        GPtr<GFileInfo> change(g_file_info_new());
+        g_file_info_set_attribute_uint32(change.get(), G_FILE_ATTRIBUTE_UNIX_MODE,
+                                         mergedMode(old, req->mode, req->mask));
+        g_file_set_attributes_async(G_FILE(source), change.get(), req->flags, G_PRIORITY_DEFAULT, nullptr,
+                                    &ModeRequest::onDone, req);
+    }
 
     static void onDone(GObject* source, GAsyncResult* result, gpointer data)
     {
@@ -83,17 +106,36 @@ struct ModeRequest {
 };
 } // namespace
 
-void setMode(const Location& file, quint32 mode, std::function<void(const QString& error)> done)
+void setMode(const Location& file, quint32 mode, quint32 mask, std::function<void(const QString& error)> done,
+             bool followLinks)
 {
     if (!file.isValid()) {
         done(QStringLiteral("invalid location"));
         return;
     }
-    GPtr<GFileInfo> info(g_file_info_new());
-    g_file_info_set_attribute_uint32(info.get(), G_FILE_ATTRIBUTE_UNIX_MODE, mode);
-    auto* req = new ModeRequest{std::move(done)};
-    g_file_set_attributes_async(file.gfile(), info.get(), G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, G_PRIORITY_DEFAULT,
-                                nullptr, &ModeRequest::onDone, req);
+    const GFileQueryInfoFlags flags = followLinks ? G_FILE_QUERY_INFO_NONE : G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS;
+    auto* req = new ModeRequest{mode, mask, flags, std::move(done)};
+    g_file_query_info_async(file.gfile(), G_FILE_ATTRIBUTE_UNIX_MODE, flags, G_PRIORITY_DEFAULT, nullptr,
+                            &ModeRequest::onRead, req);
+}
+
+void setOwner(const Location& file, const OwnerChange& owner, std::function<void(const QString& error)> done,
+              bool followLinks)
+{
+    if (!file.isValid() || owner.isEmpty()) {
+        done(QStringLiteral("invalid location"));
+        return;
+    }
+    GPtr<GFileInfo> change(g_file_info_new());
+    if (owner.uid)
+        g_file_info_set_attribute_uint32(change.get(), G_FILE_ATTRIBUTE_UNIX_UID, *owner.uid);
+    if (owner.gid)
+        g_file_info_set_attribute_uint32(change.get(), G_FILE_ATTRIBUTE_UNIX_GID, *owner.gid);
+    // The completion is the mode's: one finish call, one message.
+    auto* req = new ModeRequest{0, 0, G_FILE_QUERY_INFO_NONE, std::move(done)};
+    g_file_set_attributes_async(file.gfile(), change.get(),
+                                followLinks ? G_FILE_QUERY_INFO_NONE : G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+                                G_PRIORITY_DEFAULT, nullptr, &ModeRequest::onDone, req);
 }
 
 void createFile(const Location& file, std::function<void(const QString& error)> done)

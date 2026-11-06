@@ -155,8 +155,20 @@ void Pane::restore(const QList<Config::TabState>& states, int active)
 void Pane::applyColumns(const Config::Columns& columns)
 {
     columns_ = columns;
+    const columns::Layout layout = columnLayout();
     for (Tab* tab : tabs())
-        tab->view()->applyColumns(columns.widths, columns.hidden);
+        tab->view()->applyColumns(layout, columns.widths);
+}
+
+columns::Layout Pane::columnLayout() const
+{
+    return columns::Layout::from(columns_.order, columns_.hidden);
+}
+
+void Pane::setColumnShown(int column, bool shown)
+{
+    if (Tab* tab = activeTab())
+        tab->view()->setColumnShown(column, shown);  // comes back through columnsChanged
 }
 
 void Pane::retitle(Tab* tab)
@@ -199,8 +211,17 @@ Tab* Pane::makeTab(const core::Location& dir)
     });
     connect(tab, &Tab::openInNewTab, this, [this](const core::Location& dir) { newTab(dir); });
     connect(tab, &Tab::sortChanged, this, &Pane::sessionChanged);
-    connect(tab->view(), &ListView::columnResized, this, &Pane::columnResized);
-    tab->view()->applyColumns(columns_.widths, columns_.hidden);
+    connect(tab->view(), &ListView::columnResized, this, [this](const QString& column, int width) {
+        columns_.widths.insert(column, width);
+        Q_EMIT columnResized(column, width);
+    });
+    connect(tab->view(), &ListView::columnsChanged, this, [this](const columns::Layout& layout) {
+        columns_.order = layout.orderNames();
+        columns_.hidden = layout.hiddenNames();
+        Q_EMIT columnsChanged(columns_.order, columns_.hidden);
+    });
+    connect(tab->view(), &ListView::columnsResetRequested, this, &Pane::columnsResetRequested);
+    tab->view()->applyColumns(columnLayout(), columns_.widths);
     connect(tab, &Tab::statusChanged, this, [this, tab](const QString& items, const QString& space) {
         if (stack_->indexOf(tab) == stack_->currentIndex())
             showStatus(items, space);
@@ -263,6 +284,7 @@ void Pane::onCurrentTab(int index)
     if (current_ && current_ != tab)
         current_->setCurrent(false);
     current_ = tab;
+    tab->view()->applyColumns(columnLayout(), columns_.widths);  // what another tab changed meanwhile
     tab->setCurrent(true);
     path_->setText(tab->displayPath());
     showStatus(QString(), QString());
@@ -335,6 +357,12 @@ void Pane::openPack(const core::Location& other)
     pack_->show(tab->selectionText(), stem, tab->location(), other);
     setOverlay(pack_);
     pack_->setFocus();
+}
+
+void Pane::refreshProperties()
+{
+    if (props_ && overlay_ == props_)
+        props_->reread();
 }
 
 void Pane::closeOwnOverlay()
@@ -449,10 +477,7 @@ bool Pane::execute(keymap::Command command)
             props_ = new PropertiesPanel(services_.sizes, this);
             connect(props_, &PropertiesPanel::closed, this, &Pane::closeOwnOverlay);
             connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
-            connect(props_, &PropertiesPanel::changed, this, [this] {
-                if (Tab* t = activeTab())
-                    t->reload();
-            });
+            connect(props_, &PropertiesPanel::applyRequested, this, &Pane::attributesRequested);
         }
         props_->show(items);
         setOverlay(props_);

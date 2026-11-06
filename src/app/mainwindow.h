@@ -55,6 +55,7 @@ private:
     void refreshAt(const core::Location& dir);
     void promptNewFile();
     void promptGlob(bool on);
+    void chooseColumns();
     void openWith();
     void togglePreview();
     void placePreview();

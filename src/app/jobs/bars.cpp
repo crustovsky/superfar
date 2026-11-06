@@ -101,6 +101,64 @@ void ChoiceBar::keyPressEvent(QKeyEvent* event)
     QFrame::keyPressEvent(event);
 }
 
+CheckBar::CheckBar(const QString& message, QWidget* parent)
+    : QFrame(parent)
+    , list_(new QListWidget(this))
+{
+    frame(this);
+    auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(6, 4, 6, 4);
+    layout->setSpacing(2);
+    layout->addWidget(new QLabel(message, this));
+    layout->addWidget(list_);
+    connect(list_, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
+        Q_EMIT toggled(list_->row(item), item->checkState() == Qt::Checked);
+    });
+    connect(list_, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        if (!(item->flags() & Qt::ItemIsUserCheckable))
+            Q_EMIT actionChosen();
+    });
+    setFocusProxy(list_);
+}
+
+void CheckBar::setItems(const QStringList& labels, const QList<bool>& checked, const QString& action)
+{
+    const int row = std::max(0, list_->currentRow());
+    const QSignalBlocker block(list_);
+    list_->clear();
+    for (int i = 0; i < labels.size(); ++i) {
+        auto* item = new QListWidgetItem(labels[i], list_);
+        item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+        item->setCheckState(checked.value(i) ? Qt::Checked : Qt::Unchecked);
+    }
+    if (!action.isEmpty())
+        (new QListWidgetItem(action, list_))->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    list_->setCurrentRow(std::min(row, list_->count() - 1));
+    list_->setFixedHeight(list_->sizeHintForRow(0) * std::min(list_->count(), 8) + 2 * list_->frameWidth());
+}
+
+void CheckBar::keyPressEvent(QKeyEvent* event)
+{
+    // The list leaves Enter to its parent; Space it handles itself.
+    QListWidgetItem* item = list_->currentItem();
+    switch (event->key()) {
+    case Qt::Key_Escape:
+        Q_EMIT closed();
+        return;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (!item)
+            return;
+        if (item->flags() & Qt::ItemIsUserCheckable)
+            item->setCheckState(item->checkState() == Qt::Checked ? Qt::Unchecked : Qt::Checked);
+        else
+            Q_EMIT actionChosen();
+        return;
+    default:
+        QFrame::keyPressEvent(event);
+    }
+}
+
 AuthBar::AuthBar(const QString& message, const QString& user, const QString& domain, bool needUser,
                  bool needDomain, bool needPassword, bool anonymousOk, QWidget* parent)
     : QFrame(parent)

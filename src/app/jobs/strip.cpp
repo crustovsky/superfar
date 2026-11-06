@@ -243,6 +243,14 @@ ChoiceBar* JobStrip::choose(const QString& message, const QStringList& items)
     return bar;
 }
 
+CheckBar* JobStrip::checks(const QString& message)
+{
+    auto* bar = new CheckBar(message, this);
+    connect(bar, &CheckBar::closed, this, [this, bar] { removeBar(bar); });
+    showBar(bar);
+    return bar;
+}
+
 AuthBar* JobStrip::auth(const QString& message, const QString& user, const QString& domain, bool needUser,
                         bool needDomain, bool needPassword, bool anonymousOk)
 {

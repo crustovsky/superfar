@@ -1,18 +1,18 @@
 // Alt+Enter: properties of the marked items or the cursor item, shown in
 // place of the pane's list (rule 10): names, type, size (recursive for
-// folders through the dirsize pool), dates, owner, and permissions that
-// can be changed and applied to every item.
+// folders through the dirsize pool), dates, and an editor for the
+// permissions and the owner of every item, optionally down the folders.
 #pragma once
 
 #include "core/dirsize.h"
+#include "core/jobs/attributes.h"
 #include "core/location.h"
 #include "core/metadata.h"
 
 #include <QWidget>
-#include <array>
 #include <vector>
 
-class QCheckBox;
+class AttributesEditor;
 class QLabel;
 
 class PropertiesPanel : public QWidget {
@@ -21,11 +21,14 @@ public:
     explicit PropertiesPanel(core::DirSizePool* sizes, QWidget* parent = nullptr);
 
     void show(const std::vector<core::Location>& items);
+    // The same items again, after a change to them.
+    void reread();
 
 Q_SIGNALS:
     void closed();
     void message(const QString& text);
-    void changed();  // permissions applied
+    // Apply: the window runs it as a job and calls reread() at its end.
+    void applyRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -33,8 +36,6 @@ protected:
 private:
     void onDetails(const core::Details& d);
     void refresh();
-    void apply();
-    quint32 modeFromBoxes() const;
 
     std::vector<core::Location> items_;
     quint64 generation_ = 0;
@@ -50,6 +51,5 @@ private:
 
     QLabel* title_;
     QLabel* info_;
-    std::array<QCheckBox*, 9> bits_{};
-    QLabel* modeLabel_;
+    AttributesEditor* editor_;
 };

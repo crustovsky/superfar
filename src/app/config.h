@@ -31,15 +31,25 @@ public:
     QHash<QString, QStringList> keyBindings() const;
     void writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults,
                           const QList<QPair<QString, QString>>& retired = {});
+    // [keys] lines typed without quotes around a semicolon: QSettings
+    // takes the semicolon for a comment and drops the keys after it.
+    // One message per such line, for the start-up report.
+    QStringList unquotedKeyLines() const;
 
-    // [columns/left] and [columns/right]: the hidden set from the config;
-    // widths by column name from the state, else from the config.
+    // [columns/left] and [columns/right]: order= and hidden= name the
+    // columns left to right and the ones not shown. The config's pair
+    // seeds a pane; once the window changes either, the state holds both
+    // and is what counts. Widths by column name: the state, else the
+    // config. Resetting forgets what the state holds for the pane.
     struct Columns {
         QHash<QString, int> widths;
+        QStringList order;
         QStringList hidden;
     };
     Columns columns(const QString& side) const;
     void setColumnWidth(const QString& side, const QString& column, int width);
+    void setColumnLayout(const QString& side, const QStringList& order, const QStringList& hidden);
+    void resetColumns(const QString& side);
 
     // [layout] in the config; the sizes in the state
     bool stackedSplit() const;       // panes one above the other

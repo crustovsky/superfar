@@ -64,6 +64,9 @@ Tab::Tab(const Services& services, QWidget* parent)
         updateStatus();  // the status line names the cursor item in full
     });
     connect(model_, &ListModel::renameRequested, this, &Tab::rename);
+    connect(model_, &ListModel::modeRequested, this, &Tab::changeMode);
+    connect(model_, &ListModel::ownerRequested, this, &Tab::changeOwner);
+    connect(model_, &ListModel::editRejected, this, &Tab::message);
     connect(view_, &ListView::sortChanged, this, &Tab::applySort);
     connect(model_, &ListModel::resortNeeded, this, &Tab::resort);
     connect(model_, &ListModel::dropRequested, this, &Tab::dropRequested);

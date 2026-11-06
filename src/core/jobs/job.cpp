@@ -51,6 +51,7 @@ QString Job::title() const
     case JobKind::Delete: return tr("Delete");
     case JobKind::Extract: return tr("Extract");
     case JobKind::Pack: return tr("Pack");
+    case JobKind::Attributes: return tr("Set attributes");
     }
     return {};
 }

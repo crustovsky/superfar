@@ -24,7 +24,9 @@ qt_add_library(superfar_core STATIC
   video.cpp
   jobs/extract.cpp
   jobs/pack.cpp
+  jobs/attributes.cpp
   fileops.cpp
+  unixattrs.cpp
   jobs/job.cpp
   jobs/transfer.cpp
   jobs/remove.cpp

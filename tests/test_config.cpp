@@ -21,6 +21,9 @@ private Q_SLOTS:
     void keysWrittenOnce();
     void historyRanking();
     void columns();
+    void handWrittenLists();
+    void columnLayout();
+    void keyLinesWithSeveralKeys();
     void stateSeparate();
     void abbreviationMatch();
 };
@@ -152,6 +155,110 @@ void ConfigTest::columns()
     Config again(tmp.path() + "/superfar.ini");
     QCOMPARE(again.columns(QStringLiteral("left")).widths.value(QStringLiteral("size")), 120);
     QCOMPARE(again.columns(QStringLiteral("right")).hidden, QStringList({QStringLiteral("items"), QStringLiteral("modified")}));
+}
+
+void ConfigTest::handWrittenLists()
+{
+    // As a person types them: QSettings reads an unquoted a,b as a list.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    {
+        QFile f(tmp.path() + "/superfar.ini");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[columns/left]\nhidden=items,modified\n"
+                "[columns/right]\nhidden=\"items, modified\"\n"
+                "[keys]\nCopy=Ctrl+,\nMove=F6\n");
+    }
+    Config c(tmp.path() + "/superfar.ini");
+    const QStringList both{QStringLiteral("items"), QStringLiteral("modified")};
+    QCOMPARE(c.columns(QStringLiteral("left")).hidden, both);
+    QCOMPARE(c.columns(QStringLiteral("right")).hidden, both);
+    QCOMPARE(c.keyBindings().value(QStringLiteral("Copy")), QStringList{QStringLiteral("Ctrl+,")});
+    QCOMPARE(c.keyBindings().value(QStringLiteral("Move")), QStringList{QStringLiteral("F6")});
+}
+
+void ConfigTest::columnLayout()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/superfar.ini";
+    const QString left = QStringLiteral("left"), right = QStringLiteral("right");
+    {
+        // The user's seed, typed by hand, and no state yet.
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[columns/left]\norder=name,modified,size\nhidden=items\n");
+    }
+    const QByteArray seed = [&] { QFile f(path); return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray(); }();
+    {
+        Config c(path);
+        QCOMPARE(c.columns(left).order, QStringList({"name", "modified", "size"}));
+        QCOMPARE(c.columns(left).hidden, QStringList{"items"});
+        QVERIFY(c.columns(right).order.isEmpty());
+        // A change from the window goes to the state, both lists at once.
+        c.setColumnLayout(left, {"name", "size", "items", "modified"}, {});
+        c.setColumnLayout(right, {"name", "items", "size", "modified"}, {"size", "modified"});
+        c.setColumnWidth(right, QStringLiteral("size"), 77);
+        c.sync();
+    }
+    {
+        Config c(path);
+        // The state wins as a whole: its empty hidden set, not the seed's.
+        QCOMPARE(c.columns(left).order, QStringList({"name", "size", "items", "modified"}));
+        QCOMPARE(c.columns(left).hidden, QStringList());
+        QCOMPARE(c.columns(right).order, QStringList({"name", "items", "size", "modified"}));
+        QCOMPARE(c.columns(right).hidden, QStringList({"size", "modified"}));
+        QCOMPARE(c.columns(right).widths.value(QStringLiteral("size")), 77);
+        // Reset forgets the state's part: the seed again, widths gone.
+        c.resetColumns(left);
+        c.resetColumns(right);
+        QCOMPARE(c.columns(left).order, QStringList({"name", "modified", "size"}));
+        QCOMPARE(c.columns(left).hidden, QStringList{"items"});
+        QVERIFY(c.columns(right).order.isEmpty());
+        QVERIFY(c.columns(right).hidden.isEmpty());
+        QVERIFY(c.columns(right).widths.isEmpty());
+        c.sync();
+    }
+    // The config is the user's: none of this wrote to it, and its
+    // order= did not migrate into the state as a width would.
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    QCOMPARE(f.readAll(), seed);
+}
+
+void ConfigTest::keyLinesWithSeveralKeys()
+{
+    // The form the docs give is the quoted one. Typed without quotes,
+    // QSettings takes the semicolon for a comment: only the first key
+    // arrives, and the start-up report says which line to quote.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    {
+        QFile f(tmp.path() + "/superfar.ini");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("; a comment line\n[keys]\nGoUp=\"Backspace;Left\"\nMark=Ins;Shift+Down\nCopy=F5\nQuit=\n"
+                "[layout]\nsplit=stacked;not a key line\n");
+    }
+    Config c(tmp.path() + "/superfar.ini");
+    const auto keys = c.keyBindings();
+    QCOMPARE(keys.value(QStringLiteral("GoUp")), QStringList({QStringLiteral("Backspace"), QStringLiteral("Left")}));
+    QCOMPARE(keys.value(QStringLiteral("Mark")), QStringList{QStringLiteral("Ins")});
+    const QStringList problems = c.unquotedKeyLines();
+    QCOMPARE(problems.size(), 1);
+    QVERIFY(problems.first().startsWith(QStringLiteral("Mark:")));
+    QVERIFY(problems.first().contains(QStringLiteral("Mark=\"Ins;Shift+Down\"")));
+    // Once a new command's line is added, QSettings writes the file
+    // back as it read it: the dropped keys are gone from it for good,
+    // which is why the report is made before that. What the app writes
+    // itself is quoted and raises nothing.
+    c.writeDefaultKeys({{QStringLiteral("Activate"), {QStringLiteral("Right"), QStringLiteral("Return")}}});
+    c.sync();
+    Config again(tmp.path() + "/superfar.ini");
+    QVERIFY(again.unquotedKeyLines().isEmpty());
+    QCOMPARE(again.keyBindings().value(QStringLiteral("Activate")),
+             QStringList({QStringLiteral("Right"), QStringLiteral("Return")}));
+    QCOMPARE(again.keyBindings().value(QStringLiteral("GoUp")),
+             QStringList({QStringLiteral("Backspace"), QStringLiteral("Left")}));
 }
 
 void ConfigTest::stateSeparate()

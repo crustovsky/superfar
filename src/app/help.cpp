@@ -14,7 +14,7 @@ QString describe(keymap::Command c)
     using keymap::Command;
     switch (c) {
     case Command::Help: return QStringLiteral("this help");
-    case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next name, Enter applies");
+    case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next row, Tab to the row's permissions and owner when shown, Enter applies");
     case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
     case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
     case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them");
@@ -57,7 +57,7 @@ QString describe(keymap::Command c)
     case Command::EditPath: return QStringLiteral("type a path or URI; remote ones are mounted");
     case Command::GoTo: return QStringLiteral("go to a folder from history, ranked by frecency");
     case Command::LockTab: return QStringLiteral("lock the tab: navigation opens a new tab");
-    case Command::Properties: return QStringLiteral("properties and permissions of the marked items or the cursor item");
+    case Command::Properties: return QStringLiteral("properties of the marked items or the cursor item; change their permissions and owner, down the folders if asked");
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
     case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
@@ -70,6 +70,7 @@ QString describe(keymap::Command c)
     case Command::PreviewNext: return QStringLiteral("previewed PDF or video: next page, or forward 10 seconds");
     case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
     case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
+    case Command::Columns: return QStringLiteral("the pane's columns as a list: Space shows or hides one; also View in the F9 menu");
     case Command::None: return {};
     }
     return {};
@@ -108,7 +109,8 @@ QString text()
     QStringList lines;
     lines << about();
     lines << QString();
-    lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys])");
+    lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys];");
+    lines << QCoreApplication::translate("help", "a line with several keys is quoted: GoUp=\"Backspace;Left\")");
     lines << QString();
     int width = 0;
     QList<QPair<QString, QString>> rows;
@@ -125,6 +127,7 @@ QString text()
     lines << QString();
     lines << QCoreApplication::translate("help", "Type to filter the list; Backspace edits the filter, Esc clears it.");
     lines << QCoreApplication::translate("help", "Click a column header to sort by it; click again to reverse. Folders stay first.");
+    lines << QCoreApplication::translate("help", "Drag a header to move its column, its edge to resize it; a right click lists the columns.");
     lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
     return lines.join(QLatin1Char('\n'));
 }
