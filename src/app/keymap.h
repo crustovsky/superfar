@@ -90,6 +90,10 @@ QList<QPair<QString, QStringList>> defaults();
 QList<QPair<QString, QString>> retiredDefaults();
 // Current keys of a command, for the help and the function bar.
 QList<QKeySequence> keysOf(Command command);
+// The one key a menu shows beside a command: its function key when it
+// has one, else Return where that is among its keys, else the first.
+// Empty when the command is unbound.
+QKeySequence shownKey(Command command);
 // Every command in table order, for the help.
 QList<Command> allCommands();
 // Replaces the bindings of the named commands; unknown names and

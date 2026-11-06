@@ -275,6 +275,18 @@ QList<QKeySequence> keysOf(Command command)
     return out;
 }
 
+QKeySequence shownKey(Command command)
+{
+    const QList<QKeySequence> keys = keysOf(command);
+    for (const QKeySequence& k : keys)
+        if (k[0].key() >= Qt::Key_F1 && k[0].key() <= Qt::Key_F35)
+            return k;
+    for (const QKeySequence& k : keys)
+        if (k[0].key() == Qt::Key_Return)
+            return k;
+    return keys.value(0);
+}
+
 QList<Command> allCommands()
 {
     QList<Command> out;

@@ -602,6 +602,10 @@ void TabTest::contextMenus()
     QVERIFY(!menu->actions().first()->isEnabled());
     QVERIFY(commandsOf(menu).contains(int(Command::Properties)));
     QVERIFY(!commandsOf(menu).contains(int(Command::Mkdir)));
+    // One key beside each entry, so the keys stay close to the words.
+    for (QAction* a : menu->actions())
+        if (a->data().isValid())
+            QVERIFY2(!a->text().section(QLatin1Char('\t'), 1).contains(QLatin1Char(',')), qPrintable(a->text()));
     for (QAction* a : menu->actions())
         if (a->data().toInt() == int(Command::Copy))
             a->trigger();

@@ -15,6 +15,7 @@ private Q_SLOTS:
     void everyCommandIsComplete();
     void propertiesKeys();
     void functionKeyLayers();
+    void keyShownInMenus();
     void oneCommandPerKey();
     void markStore();
     void archiveTree();
@@ -94,6 +95,23 @@ void AppTest::functionKeyLayers()
             retired = retired || (name == keymap::name(command) && was == old);
         QVERIFY2(retired, qPrintable(keymap::name(command)));
     }
+}
+
+void AppTest::keyShownInMenus()
+{
+    using keymap::Command;
+    // A function key where there is one, Return for what Enter does,
+    // the first key otherwise; always exactly one.
+    QCOMPARE(keymap::shownKey(Command::Properties), QKeySequence(Qt::ALT | Qt::Key_F2));
+    QCOMPARE(keymap::shownKey(Command::OpenWith), QKeySequence(Qt::SHIFT | Qt::Key_F3));
+    QCOMPARE(keymap::shownKey(Command::Activate), QKeySequence(Qt::Key_Return));
+    QCOMPARE(keymap::shownKey(Command::CopyClip), QKeySequence(Qt::CTRL | Qt::Key_C));
+    QCOMPARE(keymap::shownKey(Command::Mark), QKeySequence(Qt::Key_Insert));
+    for (Command c : keymap::allCommands()) {
+        QVERIFY(!keymap::shownKey(c).isEmpty());
+        QVERIFY(keymap::keysOf(c).contains(keymap::shownKey(c)));
+    }
+    QVERIFY(keymap::shownKey(Command::None).isEmpty());
 }
 
 void AppTest::oneCommandPerKey()
