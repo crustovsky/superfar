@@ -12,6 +12,11 @@ says is what it looks like.
 
 ![Dual pane with folder counts](docs/screenshots/dual-pane.png)
 
+[Install](#install) · [Features](#features) · [Screenshots](#screenshots) ·
+[Keys](#keys) · [Mouse](#mouse) · [Columns](#columns) ·
+[Permissions and owner](#permissions-and-owner) · [Config](#config) ·
+[Building](#building-from-source) · [Status](#status-and-limits)
+
 ## Why
 
 Thunar is light but slow to improve, and Linux has had no dual-pane
@@ -20,7 +25,39 @@ superfar keeps the Opus workflow (tree, two panes, tabs, preview,
 folder sizes) and the Thunar footprint, and puts every action on a key
 you can see in the bar at the bottom.
 
+## Install
+
+Each [release](https://github.com/crustovsky/superfar/releases) carries
+two files, both built on Arch and needing its library generation (Qt
+6.12, glib 2.90 and glycin 2 or newer):
+
+- a pacman package: `pacman -U superfar-*.pkg.tar.zst`
+- a binary tarball whose `install.sh` copies it under `~/.local` or a
+  prefix you name
+
+Anywhere else, [build it from source](#building-from-source). To make it
+the default for folders:
+
+```sh
+xdg-mime default superfar.desktop inode/directory
+```
+
+Some features lean on a tool that may not be installed. Without it the
+window says so when you reach the feature, or the preview keeps the
+thumbnail; nothing else changes.
+
+| Tool | Used for |
+|---|---|
+| bsdtar (libarchive) | archives: open, extract, pack |
+| tumbler | thumbnails |
+| pdftoppm and pdfinfo (poppler) | PDF pages in the preview |
+| ffmpeg and ffprobe | video in the preview |
+| gvfs | the trash, mounts and network shares |
+| xdg-terminal-exec or `$TERMINAL` | F4 and the command line |
+
 ## Features
+
+### The window
 
 | | What you get | Where |
 |---|---|---|
@@ -28,19 +65,34 @@ you can see in the bar at the bottom.
 | **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+Shift+L |
 | **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
 | **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9, and a right click offers the same commands for what is under the pointer. | always on screen |
-| **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
 | **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F6, the header |
-| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
-| **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
+
+### Working with files
+
+| | What you get | Where |
+|---|---|---|
+| **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
-| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
-| **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
+| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
-| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
+
+### Looking and finding
+
+| | What you get | Where |
+|---|---|---|
+| **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
+| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
+| **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
 | **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
+| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
+
+### How it behaves
+
+| | What you get | Where |
+|---|---|---|
 | **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space |
 | **Nothing pops up** | Progress, questions, passwords, the open-with list and errors are bars inside the one window. | |
 | **Your theme** | No colour of its own: what the platform theme says (qt6ct, Kvantum, Fusion) is what it looks like. | |
@@ -49,83 +101,28 @@ you can see in the bar at the bottom.
 Nothing decodes media or documents inside the process: images go
 through libglycin's sandbox, PDF pages through pdftoppm and video
 frames through ffmpeg in child processes (video plays without sound),
-archives through bsdtar, thumbnails through tumbler. In a previewed PDF
-or video, Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown and Ctrl+End page or seek
-and Ctrl+P plays and pauses; the strip under the details has the same
-buttons and a playhead.
+archives through bsdtar, thumbnails through tumbler.
 
 ## Screenshots
 
-Recursive folder sizes, computed in the background:
+Click one for its full size.
 
-![Folder sizes](docs/screenshots/folder-sizes.png)
-
-Permissions and owner as columns. F2 opens the name, Tab moves to the
-row's mode, which takes `rwxr-xr-x` or `0755`:
-
-![Permissions](docs/screenshots/permissions.png)
-
-Properties on Alt+F2 over several marked items: a bit they differ in
-is half checked and stays as each item has it, and Apply changes only
-what you changed:
-
-![Properties](docs/screenshots/properties.png)
-
-The column list on Ctrl+F6 (a right click on the header shows the same
-as a menu). Space shows or hides a column, Shift+Up and Shift+Down
-move it:
-
-![Columns](docs/screenshots/columns.png)
-
-The preview following the cursor:
-
-![Preview](docs/screenshots/preview.png)
-
-A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the
-buttons; pdftoppm renders each page in a child process:
-
-![PDF pages](docs/screenshots/pdf-pages.png)
-
-A video in the preview, playing after Ctrl+P, without sound, decoded by
-ffmpeg in a child process; the same keys seek:
-
-![Video](docs/screenshots/video.png)
-
-The F3 viewer on a binary file:
-
-![Viewer](docs/screenshots/viewer.png)
-
-Folder history on Alt+F1, ranked by frecency:
-
-![Go to](docs/screenshots/go-to.png)
-
-Multi-rename on Shift+F2, with the clashes called out before anything
-is renamed:
-
-![Multi-rename](docs/screenshots/multi-rename.png)
-
-Folder sync on Shift+F5, comparing the two panes:
-
-![Folder sync](docs/screenshots/folder-sync.png)
-
-An archive opened as a folder, with its tab named after it:
-
-![Archive](docs/screenshots/archive.png)
-
-Find in tree on Alt+F7, results in a tab:
-
-![Find](docs/screenshots/find.png)
-
-Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache:
-
-![Thumbnails](docs/screenshots/thumbnails.png)
+| | |
+|---|---|
+| ![Permissions](docs/screenshots/permissions.png)<br>Permissions and owner as columns; F2 opens the name, Tab moves to the row's mode | ![Properties](docs/screenshots/properties.png)<br>Properties on Alt+F2 over several marked items: bits they differ in are half checked and stay |
+| ![Columns](docs/screenshots/columns.png)<br>The column list on Ctrl+F6: Space shows or hides, Shift+Up and Shift+Down move | ![Folder sizes](docs/screenshots/folder-sizes.png)<br>Recursive folder sizes on Ctrl+F3, computed in the background |
+| ![Preview](docs/screenshots/preview.png)<br>The preview on Ctrl+F8, following the cursor | ![PDF pages](docs/screenshots/pdf-pages.png)<br>A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the buttons |
+| ![Video](docs/screenshots/video.png)<br>A video in the preview, playing after Ctrl+P, without sound; the same keys seek | ![Viewer](docs/screenshots/viewer.png)<br>The F3 viewer on a binary file |
+| ![Multi-rename](docs/screenshots/multi-rename.png)<br>Multi-rename on Shift+F2, the clashes called out before anything is renamed | ![Folder sync](docs/screenshots/folder-sync.png)<br>Folder sync on Shift+F5, comparing the two panes |
+| ![Archive](docs/screenshots/archive.png)<br>An archive opened as a folder, its tab named after it | ![Find](docs/screenshots/find.png)<br>Find in tree on Alt+F7, results in a tab |
+| ![Go to](docs/screenshots/go-to.png)<br>Folder history on Alt+F1, ranked by frecency | ![Thumbnails](docs/screenshots/thumbnails.png)<br>Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache |
 
 ## Keys
 
 Almost everything is on a function key, in four layers, and the bar at
-the bottom shows the layer of whatever modifier you hold. Shift is a
-variant of the plain key, Ctrl is what the pane shows, Alt is panels
-and tools:
+the bottom shows the layer of whatever modifier you hold, naming the
+modifier at its left end. Shift is a variant of the plain key, Ctrl is
+what the pane shows, Alt is panels and tools:
 
 | | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -135,99 +132,125 @@ and tools:
 | Alt | go to | properties | | | pack | bookmark | find | | | |
 
 F1 shows the full table inside the window, with whatever you have
-remapped. The defaults, with the keys other file managers use kept as
-second keys:
+remapped. The defaults by subject, with the keys other file managers
+use kept as second keys:
+
+### Files
 
 | Key | Action |
 |-----|--------|
-| F1 F2 F3 F4 | help, rename inline (Tab moves on to the row's permissions and owner when those columns are shown), view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
-| Shift+F1 | about: name, version and build date |
-| F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
-| Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
-| Alt+F2 (also Alt+Enter) | properties, with permissions and owner for every marked item |
+| Enter | open with the default app; on a folder or an archive, enter it |
+| Shift+F3, Shift+Enter | choose an app to open with |
+| F2 | rename inline; Tab moves on to the row's permissions and owner when those columns are shown |
+| Shift+F2 | multi-rename panel |
+| F3 | view; on a folder, compute its size |
+| F4 | edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
+| F5, F6 | copy, move to the other pane (F5 inside an archive extracts) |
+| Shift+F5 | folder sync panel |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
+| F7, Shift+F4 | new folder, new file |
+| F8, Shift+F8 | trash, delete permanently |
+| Alt+F2, Alt+Enter | properties, with permissions and owner for every marked item |
+| Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
+
+### Marks and filter
+
+| Key | Action |
+|-----|--------|
+| Insert, Shift+Down | mark and move down |
+| Shift+Up | mark and move up |
+| Space, Ctrl+A, * | mark, mark all, invert |
+| Ctrl+=, Ctrl+- | mark and unmark by pattern |
+| Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
+| any text | filters the current tab; Backspace edits the filter while one is set, Space appends to it |
+| Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
+
+### Moving around
+
+| Key | Action |
+|-----|--------|
+| Backspace, Left | go up |
+| Right | enter the folder |
+| Ctrl+L | type a path or URI |
+| Alt+F1, Ctrl+G | go to a folder from history |
 | Alt+F7 | find in tree |
-| F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
-| Shift+F4, Shift+F8 | new file, delete permanently |
-| Tab, Shift+Tab | switch panes, focus the tree |
-| Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+Shift+Tab | new tab, close tab, next tab, previous tab |
+| Alt+F6, Ctrl+D | bookmark this folder, or remove the bookmark |
 | Ctrl+R | reload the folder |
+| Tab, Shift+Tab | switch panes, focus the tree |
+| F8 in the tree | on a mount: unmount it, or eject it when it is removable |
+
+### Panes, tabs and what they show
+
+| Key | Action |
+|-----|--------|
+| Ctrl+T, Ctrl+W | new tab, close tab |
+| Ctrl+Tab, Ctrl+Shift+Tab | next tab, previous tab |
 | Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
 | Ctrl+F6 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
-| Alt+F6, Ctrl+D | bookmark this folder, or remove the bookmark |
-| Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
-| Space, Ctrl+A, * | mark, mark all, invert |
-| Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
-| Ctrl+=, Ctrl+- | mark and unmark by pattern |
-| Enter | open with the default app |
-| Shift+F3, Shift+Enter | choose an app to open with |
-| Backspace, Left, Right | go up, go up, enter |
+| Ctrl+F7, Ctrl+H | show hidden files |
+
+### Preview
+
+| Key | Action |
+|-----|--------|
 | Ctrl+F8, Ctrl+Q | preview the cursor item |
 | Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End | previewed PDF: first, previous, next, last page; video: start, back 10 s, forward 10 s, end |
 | Ctrl+P | previewed video: play or pause |
-| Ctrl+L | type a path or URI |
-| Alt+F1, Ctrl+G | go to a folder from history |
-| Ctrl+F7, Ctrl+H | show hidden files |
-| Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
+
+The strip under the preview's details has the same buttons and a
+playhead.
+
+### Help, menu and command line
+
+| Key | Action |
+|-----|--------|
+| F1, Shift+F1 | help; about: name, version and build date |
+| F9 | the menu bar until a choice or Esc |
+| F10 | quit, keeping the session |
 | Ctrl+Space | the command line: runs in the tab's folder in a terminal |
-| Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
 
-Typing filters the current tab. Backspace edits the filter while one is
-set, Space appends to it. The bar at the bottom shows what each
-function key does; hold Shift, Ctrl or Alt and it relabels, naming the
-modifier at its left end. F8 on a mount in the tree unmounts it, or
-ejects it when it is removable.
+## Mouse
 
-With the mouse: a right click brings a short menu of what the keys do
-for the thing under it, each entry with its key beside it: an item of
-the list (the marked items when there are marks; the menu's first line
-says which), the list's empty space (new folder, paste, what the pane
-shows), a tab, a folder or a mount in the tree. Middle click closes a
-tab, a double click on the empty
-tab strip opens one at home, a double click on the path bar edits the
-path (the same as Ctrl+L, for a remote location), and files drag
-between panes, onto tree folders and to other apps. On a column header
-a click sorts by it and a second click reverses it (folders stay
-first), a drag moves the column, an edge resizes it, and a right click
-lists the columns with check marks to show or hide them, with Reset
-columns at the bottom. Ctrl+F6 does all of it from the keyboard. Name
-stays first and stays shown. Each pane keeps its own columns, and
-remembers them.
+- **Right click** brings a short menu of what the keys do for the thing
+  under it, each entry with its key beside it: an item of the list (the
+  marked items when there are marks; the menu's first line says which),
+  the list's empty space (new folder, paste, what the pane shows), a
+  tab, a folder or a mount in the tree.
+- **Column headers:** a click sorts and a second click reverses it
+  (folders stay first), a drag moves the column, an edge resizes it, a
+  right click lists the columns.
+- **Tabs:** middle click closes one; a double click on the empty strip
+  opens one at home.
+- **Path bar:** a double click edits the path (the same as Ctrl+L, for a
+  remote location).
+- **Drag and drop:** files drag between panes, onto tree folders and to
+  other apps, and drops from other apps are accepted.
 
-## Build
+## Columns
 
-Dependencies: Qt 6 (Core, Gui, Widgets, DBus), GLib and GIO 2.74 or
-newer, libglycin 2, CMake 3.28, Ninja, a C++23 compiler. At run time,
-optional: bsdtar (libarchive) for archives, tumbler for thumbnails,
-pdftoppm and pdfinfo (poppler) for PDF pages in the preview, ffmpeg
-and ffprobe for video in the preview, gvfs for the trash, mounts and
-network shares, xdg-terminal-exec or $TERMINAL for F4 and the command
-line. Without one of them the window says so when you reach the
-feature, or the preview keeps the thumbnail; nothing else changes.
+Name, Size, Items, Modified, Permissions and Owner; the last two are
+off until you switch them on. Ctrl+F6 lists a pane's columns: Space
+shows or hides one, Shift+Up and Shift+Down move it, and Reset columns
+at the bottom goes back to the defaults. The header does the same with
+the mouse. Name stays first and stays shown; when a pane is too narrow
+for its columns the list scrolls sideways instead of cutting them off.
 
-```sh
-cmake -S . -B build -G Ninja
-cmake --build build
-ctest --test-dir build
-build/src/app/superfar [left-folder [right-folder]]
+Each pane keeps its own columns and remembers them in the state file.
+The config can give a pane a starting point, which applies until you
+change that pane's columns in the window (Reset columns brings it
+back):
+
+```ini
+[columns/left]
+order=name,permissions,owner,modified
+hidden=size,items
 ```
 
-`cmake --install build --prefix ~/.local` installs the binary, the
-desktop entry and the icon. To make it the default for folders:
-
-```sh
-xdg-mime default superfar.desktop inode/directory
-```
-
-Each [release](https://github.com/crustovsky/superfar/releases) carries
-a pacman package (`pacman -U superfar-*.pkg.tar.zst`) and a binary
-tarball whose `install.sh` copies it under `~/.local` or a prefix you
-name. Both are built on Arch and need its library generation: Qt 6.12,
-glib 2.90 and glycin 2 or newer. From a checkout, `tools/mkpkg.sh` and
-`tools/mktarball.sh` build the same two files.
+The names are `name`, `size`, `items`, `modified`, `permissions` and
+`owner`. Listing Permissions or Owner in `order=` switches it on.
 
 ## Permissions and owner
 
@@ -240,8 +263,7 @@ takes the nine letters or octal, setuid, setgid and sticky included
 a link shows its target, and that is what an edit there changes.
 
 The properties panel (Alt+F2, or Alt+Enter) does the same for everything
-marked.
-Apply runs as a job in the strip, with progress, Abort and a log of
+marked. Apply runs as a job in the strip, with progress, Abort and a log of
 what was refused. With "the contents of folders too" checked it goes
 down the tree the careful way: folders take the bits as set, a file
 takes execute only where it already has one, links are never followed
@@ -251,26 +273,48 @@ own.
 
 ## Config
 
-`~/.config/superfar/superfar.ini` is written with the default keys on
-first run and never touched again, so a dotfile manager can own it.
-`[keys]` has one line per command (`Copy=F5`, `GoUp="Backspace;Left"`,
-empty unbinds; a line with more than one key needs its quotes, since an
-unquoted semicolon starts a comment); `[columns/left]` and `[columns/right]` take
-`order=name,modified,size` and `hidden=items,modified`; `[layout]` has
-`split=side-by-side|stacked` and `preview=borrow|third`. What the app
-records on its own goes to `~/.local/state/superfar/state.ini`: the
-session, the Ctrl+G history, window and splitter sizes, and the
-columns of each pane (order, hidden set, dragged widths). The column
-names are `name`, `size`, `items`, `modified`, `permissions` and
-`owner`; the last two are off until `order=` lists them or the window
-switches them on.
+Two files, so a dotfile manager can own the first without seeing churn
+from the second:
 
-The columns in the config are a starting point: they apply until you
-change a pane's columns in the window, after which the state file's
-copy is what counts for that pane. Reset columns in the list drops
-that copy and the config (or the built-in order) applies again.
+| File | Holds | Written by |
+|---|---|---|
+| `~/.config/superfar/superfar.ini` | keys, a starting point for the columns, layout choices | you; the app writes the default keys on first run, adds a line when a version brings a new command, and updates a line still at an old default |
+| `~/.local/state/superfar/state.ini` | the session, the folder history, window and splitter sizes, each pane's columns | the app |
 
-## Status
+```ini
+[keys]
+Copy=F5
+GoUp="Backspace;Left"
+
+[layout]
+split=side-by-side
+preview=borrow
+```
+
+- `[keys]` has one line per command. A line with more than one key
+  needs its quotes, since an unquoted semicolon starts a comment; an
+  empty value unbinds the command.
+- `[layout]`: `split` is `side-by-side` or `stacked`; `preview` is
+  `borrow` (the other pane) or `third` (a slot of its own).
+- `[columns/left]` and `[columns/right]`: see [Columns](#columns).
+
+## Building from source
+
+Qt 6 (Core, Gui, Widgets, DBus), GLib and GIO 2.74 or newer, libglycin
+2, CMake 3.28, Ninja and a C++23 compiler:
+
+```sh
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --test-dir build
+build/src/app/superfar [left-folder [right-folder]]
+```
+
+`cmake --install build --prefix ~/.local` installs the binary, the
+desktop entry and the icon. `tools/mkpkg.sh` and `tools/mktarball.sh`
+build the two release files from a checkout.
+
+## Status and limits
 
 All twelve milestones of the plan are done; [CLAUDE.md](CLAUDE.md)
 holds the rules the code follows.
