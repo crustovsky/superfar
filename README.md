@@ -20,43 +20,61 @@ superfar keeps the Opus workflow (tree, two panes, tabs, preview,
 folder sizes) and the Thunar footprint, and puts every action on a key
 you can see in the bar at the bottom.
 
-- Two panes, always. Each has its own path bar, tabs and status line;
-  the active one is unmistakable.
-- Tabs own their folder, history, filter, marks and cursor, come back
-  on start, and can be locked.
-- Folder item counts by default; recursive sizes and counts per tab on
-  Ctrl+F3, Opus style, with partial totals while the walk runs.
-- Nothing pops up. Progress, conflicts, confirmations, passwords and
-  the open-with list are bars inside the window.
-- Previews are big: Ctrl+Q borrows the other pane (or a third slot)
-  and follows the cursor. Images decode in libglycin's sandbox.
-- Quick filter: just type. Marks are separate from the cursor.
-- Clipboard and drag and drop speak the same formats as other file
-  managers. Mounts, the trash, the network and your GTK bookmarks sit in
-  the tree.
-- Find in tree opens its results as a tab. Multi-rename and folder sync
-  are panels inside the pane, with live previews, presets and undo.
-- Archives open as read-only folders through bsdtar in a child process,
-  Alt+F5 packs the marked items into a new one through the same job
-  engine, and the preview of an archive says what is inside before you open it:
-  files, folders, sizes, whether it extracts into one folder or spills
-  into the current one, the newest member, and the top of its tree.
-  Thumbnails come from tumbler over D-Bus. A PDF shows its pages,
-  rendered at slot size by pdftoppm in a child process; a video shows
-  its first frame and plays on Ctrl+P, without sound, decoded at slot
-  size by ffmpeg in a child process.
-  Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown and Ctrl+End page or seek, Ctrl+P
-  plays and pauses, and the strip under the details has the same
-  buttons and a playhead.
-- One process, no indexer, no thumbnailer process, no daemon. About
-  5 MB of its own memory with an empty window, under 50 MB with a
-  100,000-entry folder open.
+## Features
+
+| | What you get | Where |
+|---|---|---|
+| **Two panes** | Always open, each with its own path bar, tabs and status line; the active one is unmistakable. | Tab, Ctrl+F1, Ctrl+F2 |
+| **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+Shift+L |
+| **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
+| **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9. | always on screen |
+| **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
+| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | the header, `Columns` |
+| **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+Enter |
+| **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
+| **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
+| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+Q |
+| **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
+| **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
+| **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
+| **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
+| **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Ctrl+G, Ctrl+L |
+| **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
+| **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
+| **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space |
+| **Nothing pops up** | Progress, questions, passwords, the open-with list and errors are bars inside the one window. | |
+| **Your theme** | No colour of its own: what the platform theme says (qt6ct, Kvantum, Fusion) is what it looks like. | |
+| **Light** | One process, no indexer, no daemon. About 5 MB of its own memory with an empty window, under 50 MB with a 100,000-entry folder open. | |
+
+Nothing decodes media or documents inside the process: images go
+through libglycin's sandbox, PDF pages through pdftoppm and video
+frames through ffmpeg in child processes (video plays without sound),
+archives through bsdtar, thumbnails through tumbler. In a previewed PDF
+or video, Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown and Ctrl+End page or seek
+and Ctrl+P plays and pauses; the strip under the details has the same
+buttons and a playhead.
 
 ## Screenshots
 
 Recursive folder sizes, computed in the background:
 
 ![Folder sizes](docs/screenshots/folder-sizes.png)
+
+Permissions and owner as columns. F2 opens the name, Tab moves to the
+row's mode, which takes `rwxr-xr-x` or `0755`:
+
+![Permissions](docs/screenshots/permissions.png)
+
+Properties on Alt+Enter over several marked items: a bit they differ in
+is half checked and stays as each item has it, and Apply changes only
+what you changed:
+
+![Properties](docs/screenshots/properties.png)
+
+The column list, from the `Columns` command or as a menu from a right
+click on the header:
+
+![Columns](docs/screenshots/columns.png)
 
 The preview following the cursor:
 
@@ -108,12 +126,12 @@ remapped. The defaults:
 
 | Key | Action |
 |-----|--------|
-| F1 F2 F3 F4 | help, rename inline, view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
+| F1 F2 F3 F4 | help, rename inline (Tab moves on to the row's permissions and owner when those columns are shown), view (folder: compute size), edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
 | Shift+F1 | about: name, version and build date |
 | F5 F6 F7 F8 | copy, move, new folder, trash (F5 inside an archive extracts) |
 | Shift+F2, Shift+F5 | multi-rename panel, folder sync panel |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
-| Alt+F7, Alt+Enter | find in tree, properties and permissions |
+| Alt+F7, Alt+Enter | find in tree; properties, with permissions and owner for every marked item |
 | F9, F10 | the menu bar until a choice or Esc; quit, keeping the session |
 | Shift+F4, Shift+F8 | new file, delete permanently |
 | Tab, Shift+Tab | switch panes, focus the tree |
@@ -188,6 +206,25 @@ name. Both are built on Arch and need its library generation: Qt 6.12,
 glib 2.90 and glycin 2 or newer. From a checkout, `tools/mkpkg.sh` and
 `tools/mktarball.sh` build the same two files.
 
+## Permissions and owner
+
+Switch the two columns on from the header's list. In a row, F2 opens
+the name and Tab moves to the mode and then the owner (Shift+Tab goes
+back, Up and Down move to the next row in the same column). The mode
+takes the nine letters or octal, setuid, setgid and sticky included
+(`rwsr-xr-x`, `2755`); the owner takes `user:group`, `user` or
+`:group`, names or numbers, and completes names as you type. A row over
+a link shows its target, and that is what an edit there changes.
+
+The properties panel (Alt+Enter) does the same for everything marked.
+Apply runs as a job in the strip, with progress, Abort and a log of
+what was refused. With "the contents of folders too" checked it goes
+down the tree the careful way: folders take the bits as set, a file
+takes execute only where it already has one, links are never followed
+and another filesystem mounted below is left alone. Only root can give
+a file to another user; anyone can change the group to one of their
+own.
+
 ## Config
 
 `~/.config/superfar/superfar.ini` is written with the default keys on
@@ -198,7 +235,10 @@ empty unbinds); `[columns/left]` and `[columns/right]` take
 `split=side-by-side|stacked` and `preview=borrow|third`. What the app
 records on its own goes to `~/.local/state/superfar/state.ini`: the
 session, the Ctrl+G history, window and splitter sizes, and the
-columns of each pane (order, hidden set, dragged widths).
+columns of each pane (order, hidden set, dragged widths). The column
+names are `name`, `size`, `items`, `modified`, `permissions` and
+`owner`; the last two are off until `order=` lists them or the window
+switches them on.
 
 The columns in the config are a starting point: they apply until you
 change a pane's columns in the window, after which the state file's

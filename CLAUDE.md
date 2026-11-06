@@ -91,8 +91,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
   cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
   as [name])
-- F1 help (Shift+F1 about), F2 rename inline, F3 view (folder: compute
-  size), F4 edit, F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- F1 help (Shift+F1 about), F2 rename inline (Tab: the row's mode and
+  owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
+  copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
 - Shift+F5 folder sync panel: compares the active tab with the other
@@ -113,10 +114,10 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Ctrl+A all; * invert; Ctrl+Shift+A clears. Selection is marks,
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
-- Enter opens a file with its default app; Shift+Enter shows the
-  in-window open-with list; Alt+Enter the properties panel; Esc clears
-  the filter, closes the viewer or panel, then the preview, then the
-  marks
+- Enter opens a file with its default app; Shift+Enter shows the in-window
+  open-with list; Alt+Enter the properties panel (mode and owner of the
+  marked items, down their folders if asked); Esc clears the filter, closes
+  the viewer or panel, then the preview, then the marks
 - Ctrl+D bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
@@ -176,10 +177,10 @@ QtWidgets; the linker enforces the split. `app` links core and Widgets.
 ```
 src/core/             no widgets, GIO only, tested headless with QtTest
   listing.cpp         GIO enumerate in batches, generation id, cancellable
-  entry.h             Entry: name as raw bytes, type, cached collation key,
-                      lazy metadata; no QObject per entry
-  sort.cpp            natural sort via GLib's filename collation key,
-                      computed once per entry, dirs first
+  entry.h             Entry: raw name, type, collation key and, from the
+                      listing's stat, size, mtime, mode, uid, gid
+  sort.cpp            natural sort by GLib collation key, dirs first
+  unixattrs.cpp       mode and owner as text and back, id names cached
   dirsize.cpp         recursive size and count walker (see rule 9)
   jobs/               copy, move, trash, delete, extract, pack: progress,
                       pause, skip, cancel, conflict policy, error log; one
@@ -189,20 +190,20 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       inside the callback, Skip cancels the per-file
                       cancellable. Move is g_file_move. Trash failure on
                       another volume offers permanent delete in the
-                      window. Extract and pack run bsdtar in a child
+                      window. Extract and pack run bsdtar in a child.
+                      Attributes: chmod and chown down a tree, chmod's X
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal launch
-  mounts.cpp          volumes, mount and unmount, GMountOperation that
-                      routes password and question prompts to the window
+  mounts.cpp          volumes, mount, unmount; prompts go to the window
   compare.cpp         folder sync engine (later): name, size, mtime, hash
 src/app/
   main.cpp
   mainwindow.cpp      tree, two panes, preview slot, active pane, keys
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
-  pane/tab.cpp        one folder view: location, history, filter, marks,
-                      cursor, its own list view
+  pane/tab.cpp        one folder view: location, history, filter, marks
   pane/listmodel.cpp  QAbstractTableModel over core's vector<Entry>
+  pane/columns.cpp    the column table: name, label, width, default, sort
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
   jobs/strip.cpp      collapsed job strip, conflict and confirm bars
@@ -211,8 +212,7 @@ src/app/
   preview.cpp         Ctrl+Q component, placed in whichever slot config says
   cmdline.cpp         command line
   keymap.cpp          FAR table, remappable from config
-  config.cpp          QSettings INI: keymap, columns, split, preview slot,
-                      session (tabs per pane, active tab, active pane)
+  config.cpp          QSettings INI: the config and the state file
 ```
 
 ### Rules
@@ -261,7 +261,7 @@ src/app/
 14. **Tree and pane never ping-pong.** Programmatic selection in either
     direction sets a guard; only user actions navigate.
 15. **Symlinks.** Enter follows; copy and move copy the link, not the
-    target; the list shows the target.
+    target; the list shows the target; attribute jobs never follow.
 16. **Lean by construction.** Bounded bytes per entry, no process for
     thumbnails or indexing, nothing runs while no pane is visible.
 
