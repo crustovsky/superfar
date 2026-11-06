@@ -229,8 +229,9 @@ own.
 
 `~/.config/superfar/superfar.ini` is written with the default keys on
 first run and never touched again, so a dotfile manager can own it.
-`[keys]` has one line per command (`Copy=F5`, `GoUp=Backspace;Left`,
-empty unbinds); `[columns/left]` and `[columns/right]` take
+`[keys]` has one line per command (`Copy=F5`, `GoUp="Backspace;Left"`,
+empty unbinds; a line with more than one key needs its quotes, since an
+unquoted semicolon starts a comment); `[columns/left]` and `[columns/right]` take
 `order=name,modified,size` and `hidden=items,modified`; `[layout]` has
 `split=side-by-side|stacked` and `preview=borrow|third`. What the app
 records on its own goes to `~/.local/state/superfar/state.ini`: the

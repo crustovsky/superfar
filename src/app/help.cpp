@@ -109,7 +109,8 @@ QString text()
     QStringList lines;
     lines << about();
     lines << QString();
-    lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys])");
+    lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys];");
+    lines << QCoreApplication::translate("help", "a line with several keys is quoted: GoUp=\"Backspace;Left\")");
     lines << QString();
     int width = 0;
     QList<QPair<QString, QString>> rows;

@@ -23,6 +23,7 @@ private Q_SLOTS:
     void columns();
     void handWrittenLists();
     void columnLayout();
+    void keyLinesWithSeveralKeys();
     void stateSeparate();
     void abbreviationMatch();
 };
@@ -223,6 +224,41 @@ void ConfigTest::columnLayout()
     QFile f(path);
     QVERIFY(f.open(QIODevice::ReadOnly));
     QCOMPARE(f.readAll(), seed);
+}
+
+void ConfigTest::keyLinesWithSeveralKeys()
+{
+    // The form the docs give is the quoted one. Typed without quotes,
+    // QSettings takes the semicolon for a comment: only the first key
+    // arrives, and the start-up report says which line to quote.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    {
+        QFile f(tmp.path() + "/superfar.ini");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("; a comment line\n[keys]\nGoUp=\"Backspace;Left\"\nMark=Ins;Shift+Down\nCopy=F5\nQuit=\n"
+                "[layout]\nsplit=stacked;not a key line\n");
+    }
+    Config c(tmp.path() + "/superfar.ini");
+    const auto keys = c.keyBindings();
+    QCOMPARE(keys.value(QStringLiteral("GoUp")), QStringList({QStringLiteral("Backspace"), QStringLiteral("Left")}));
+    QCOMPARE(keys.value(QStringLiteral("Mark")), QStringList{QStringLiteral("Ins")});
+    const QStringList problems = c.unquotedKeyLines();
+    QCOMPARE(problems.size(), 1);
+    QVERIFY(problems.first().startsWith(QStringLiteral("Mark:")));
+    QVERIFY(problems.first().contains(QStringLiteral("Mark=\"Ins;Shift+Down\"")));
+    // Once a new command's line is added, QSettings writes the file
+    // back as it read it: the dropped keys are gone from it for good,
+    // which is why the report is made before that. What the app writes
+    // itself is quoted and raises nothing.
+    c.writeDefaultKeys({{QStringLiteral("Activate"), {QStringLiteral("Right"), QStringLiteral("Return")}}});
+    c.sync();
+    Config again(tmp.path() + "/superfar.ini");
+    QVERIFY(again.unquotedKeyLines().isEmpty());
+    QCOMPARE(again.keyBindings().value(QStringLiteral("Activate")),
+             QStringList({QStringLiteral("Right"), QStringLiteral("Return")}));
+    QCOMPARE(again.keyBindings().value(QStringLiteral("GoUp")),
+             QStringList({QStringLiteral("Backspace"), QStringLiteral("Left")}));
 }
 
 void ConfigTest::stateSeparate()

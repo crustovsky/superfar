@@ -31,6 +31,10 @@ public:
     QHash<QString, QStringList> keyBindings() const;
     void writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults,
                           const QList<QPair<QString, QString>>& retired = {});
+    // [keys] lines typed without quotes around a semicolon: QSettings
+    // takes the semicolon for a comment and drops the keys after it.
+    // One message per such line, for the start-up report.
+    QStringList unquotedKeyLines() const;
 
     // [columns/left] and [columns/right]: order= and hidden= name the
     // columns left to right and the ones not shown. The config's pair

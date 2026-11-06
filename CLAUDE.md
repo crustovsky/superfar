@@ -141,7 +141,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 `~/.config/superfar/superfar.ini`, written with defaults on first run
 and never again: the user owns it (chezmoi and friends must see no
 churn). `[keys]` has one line per command (`Copy=F5`,
-`GoUp=Backspace;Left`; empty unbinds). `[columns/left]` and
+`GoUp="Backspace;Left"`; empty unbinds). `[columns/left]` and
 `[columns/right]` seed a pane: `order=name,modified,size`,
 `hidden=items`. `[layout]` has `split=side-by-side|stacked` and
 `preview=borrow|third`. `~/.local/state/superfar/state.ini` holds what

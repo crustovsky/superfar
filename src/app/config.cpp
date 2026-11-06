@@ -2,6 +2,7 @@
 
 #include "core/match.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <algorithm>
@@ -158,6 +159,32 @@ QHash<QString, QStringList> Config::keyBindings() const
         out.insert(key, value.isEmpty() ? QStringList() : value.split(QLatin1Char(';'), Qt::SkipEmptyParts));
     }
     settings_.endGroup();
+    return out;
+}
+
+QStringList Config::unquotedKeyLines() const
+{
+    // QSettings has already dropped what followed the semicolon; only
+    // the file itself still shows that something was there.
+    QStringList out;
+    QFile file(settings_.fileName());
+    if (!file.open(QIODevice::ReadOnly))
+        return out;
+    bool inKeys = false;
+    while (!file.atEnd()) {
+        const QByteArray line = file.readLine().trimmed();
+        if (line.startsWith('[')) {
+            inKeys = line == "[keys]";
+            continue;
+        }
+        const qsizetype eq = line.indexOf('=');
+        if (!inKeys || eq <= 0 || line.startsWith(';') || line.startsWith('#'))
+            continue;
+        const QByteArray value = line.mid(eq + 1).trimmed();
+        if (!value.startsWith('"') && value.contains(';'))
+            out << QStringLiteral("%1: only the first key of %2 is bound; quote the line: %1=\"%2\"")
+                       .arg(QString::fromUtf8(line.left(eq).trimmed()), QString::fromUtf8(value));
+    }
     return out;
 }
 
