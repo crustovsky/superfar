@@ -18,12 +18,15 @@ qt_add_library(superfar_core STATIC
   thumbnails.cpp
   rename.cpp
   compare.cpp
+  child.cpp
   archive.cpp
   pages.cpp
   video.cpp
   jobs/extract.cpp
   jobs/pack.cpp
+  jobs/attributes.cpp
   fileops.cpp
+  unixattrs.cpp
   jobs/job.cpp
   jobs/transfer.cpp
   jobs/remove.cpp

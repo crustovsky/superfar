@@ -15,6 +15,7 @@
 
 class JobPanel;
 class AuthBar;
+class CheckBar;
 class ChoiceBar;
 class GoToBar;
 class PromptBar;
@@ -71,6 +72,7 @@ public:
     // removes the bar afterwards and gives focus back.
     PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input);
     ChoiceBar* choose(const QString& message, const QStringList& items);
+    CheckBar* checks(const QString& message);  // the caller fills it
     AuthBar* auth(const QString& message, const QString& user, const QString& domain, bool needUser,
                   bool needDomain, bool needPassword, bool anonymousOk);
     GoToBar* goTo();

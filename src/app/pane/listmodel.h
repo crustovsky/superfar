@@ -11,6 +11,8 @@
 #include "core/location.h"
 #include "core/metadata.h"
 #include "core/sort.h"
+#include "core/unixattrs.h"
+#include "pane/columns.h"
 
 #include <QAbstractTableModel>
 #include <QHash>
@@ -23,7 +25,8 @@ class QTimer;
 class ListModel : public QAbstractTableModel {
     Q_OBJECT
 public:
-    enum Column { NameColumn, SizeColumn, ItemsColumn, ModifiedColumn, ColumnCount };
+    using Column = columns::Column;  // the table in columns.h
+    using enum columns::Column;
     enum Role { PartialRole = Qt::UserRole + 1, IsDirRole };  // PartialRole: a total still being walked
     static Column columnOf(core::SortBy by);
     static core::SortBy sortOf(int column);
@@ -87,6 +90,10 @@ public:
     std::vector<QByteArray> markedNamesInOrder() const;  // list order, hidden included
     void applyMarks(const QSet<QByteArray>& names);
 
+    // A mode or owner change that already happened on disk: the row
+    // shows it without a reload.
+    void updateAttributes(const QByteArray& name, std::optional<quint32> permissions, const core::OwnerChange& owner);
+
     // A rename that already happened on disk: the entry changes in place
     // and keeps its row until the next reload re-sorts, so an editor on
     // a neighbouring row survives.
@@ -103,7 +110,9 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
-    // Editing the name column asks for a rename; the tab performs it.
+    // Editing a name asks for a rename, a mode or owner cell for that
+    // change; the tab performs it. Text that is no mode or names nobody
+    // is turned down with editRejected().
     bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
     // Drag and drop: the marks travel, or the dragged row when nothing
@@ -123,6 +132,9 @@ Q_SIGNALS:
     void marksChanged();
     void resortNeeded();
     void renameRequested(const QByteArray& name, const QString& newName);
+    void modeRequested(const QByteArray& name, quint32 permissions);
+    void ownerRequested(const QByteArray& name, const core::OwnerChange& owner);
+    void editRejected(const QString& why);
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
 
 private:
@@ -140,6 +152,7 @@ private:
     QIcon icon(const core::Entry& entry) const;
     QIcon themeIcon(const QStringList& names) const;
     void onMetadata(quint64 generation, const QByteArray& name, const core::Metadata& meta);
+    QString attributeText(const core::Entry& entry, int column, bool forEdit) const;
 
     core::Location dir_;
     std::vector<core::Entry> entries_;
@@ -158,6 +171,7 @@ private:
     mutable QHash<QByteArray, core::Metadata> metaCache_;
     mutable QSet<QByteArray> metaPending_;
     mutable QHash<QString, QIcon> iconCache_;
+    mutable core::IdNames ids_;  // user and group names, for the Owner column and its order
 
     core::DirSizer* sizer_;
     core::Thumbnailer* thumbs_;

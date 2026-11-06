@@ -41,7 +41,7 @@ These are the product. When in doubt, they win.
    Unattended never stops: it applies the default policy, logs every skip
    and failure, and shows the list when the job ends.
 8. **Columns fit their content.** Size, count and date never truncate; each
-   pane keeps its own column set.
+   pane keeps its own set, order and widths, changed from its header.
 9. **Previews are big.** Ctrl+Q previews the cursor item. By default it
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
@@ -91,8 +91,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+T new tab (same folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab
   cycle; Ctrl+Shift+L locks a tab so navigation opens a new tab (shown
   as [name])
-- F1 help (Shift+F1 about), F2 rename inline, F3 view (folder: compute
-  size), F4 edit, F5 copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
+- F1 help (Shift+F1 about), F2 rename inline (Tab: the row's mode and
+  owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
+  copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
   find and replace, {n} numbering, case, presets, undo)
 - Shift+F5 folder sync panel: compares the active tab with the other
@@ -103,7 +104,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
   the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
-  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab
+  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab,
+  a drag moves the column, a right click (or Columns, unbound) lists them
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
@@ -112,10 +114,10 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Ctrl+A all; * invert; Ctrl+Shift+A clears. Selection is marks,
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
-- Enter opens a file with its default app; Shift+Enter shows the
-  in-window open-with list; Alt+Enter the properties panel; Esc clears
-  the filter, closes the viewer or panel, then the preview, then the
-  marks
+- Enter opens a file with its default app; Shift+Enter shows the in-window
+  open-with list; Alt+Enter the properties panel (mode and owner of the
+  marked items, down their folders if asked); Esc clears the filter, closes
+  the viewer or panel, then the preview, then the marks
 - Ctrl+D bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
@@ -139,14 +141,15 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 `~/.config/superfar/superfar.ini`, written with defaults on first run
 and never again: the user owns it (chezmoi and friends must see no
 churn). `[keys]` has one line per command (`Copy=F5`,
-`GoUp=Backspace;Left`; empty unbinds). `[columns/left]` and
-`[columns/right]` hold `hidden=items,modified`. `[layout]` has
-`split=side-by-side|stacked` and `preview=borrow|third`.
-`~/.local/state/superfar/state.ini` holds what the app writes on its
-own: `[session]` tabs per pane (hidden, locked, sizes, thumbs, sort,
-cursor), active tab and pane, tree shown or not; `[history]` the Ctrl+G
-folders by visit count and last time; `[window]` size; `[layout]` splitter
-sizes; `[columns/*]` dragged widths, moved out of the config after 0.5.
+`GoUp="Backspace;Left"`; empty unbinds). `[columns/left]` and
+`[columns/right]` seed a pane: `order=name,modified,size`,
+`hidden=items`. `[layout]` has `split=side-by-side|stacked` and
+`preview=borrow|third`. `~/.local/state/superfar/state.ini` holds what
+the app writes on its own: `[session]` tabs per pane (hidden, locked,
+sizes, thumbs, sort, cursor), active tab and pane, tree shown or not;
+`[history]` the Ctrl+G folders by visit count and last time; `[window]`
+size; `[layout]` splitter sizes; `[columns/*]` dragged widths, and the
+order and hidden set once the window changes them (they then win).
 
 ## Layout
 
@@ -174,10 +177,10 @@ QtWidgets; the linker enforces the split. `app` links core and Widgets.
 ```
 src/core/             no widgets, GIO only, tested headless with QtTest
   listing.cpp         GIO enumerate in batches, generation id, cancellable
-  entry.h             Entry: name as raw bytes, type, cached collation key,
-                      lazy metadata; no QObject per entry
-  sort.cpp            natural sort via GLib's filename collation key,
-                      computed once per entry, dirs first
+  entry.h             Entry: raw name, type, collation key and, from the
+                      listing's stat, size, mtime, mode, uid, gid
+  sort.cpp            natural sort by GLib collation key, dirs first
+  unixattrs.cpp       mode and owner as text and back, id names cached
   dirsize.cpp         recursive size and count walker (see rule 9)
   jobs/               copy, move, trash, delete, extract, pack: progress,
                       pause, skip, cancel, conflict policy, error log; one
@@ -187,20 +190,20 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       inside the callback, Skip cancels the per-file
                       cancellable. Move is g_file_move. Trash failure on
                       another volume offers permanent delete in the
-                      window. Extract and pack run bsdtar in a child
+                      window. Extract and pack run bsdtar in a child.
+                      Attributes: chmod and chown down a tree, chmod's X
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal launch
-  mounts.cpp          volumes, mount and unmount, GMountOperation that
-                      routes password and question prompts to the window
+  mounts.cpp          volumes, mount, unmount; prompts go to the window
   compare.cpp         folder sync engine (later): name, size, mtime, hash
 src/app/
   main.cpp
   mainwindow.cpp      tree, two panes, preview slot, active pane, keys
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
-  pane/tab.cpp        one folder view: location, history, filter, marks,
-                      cursor, its own list view
+  pane/tab.cpp        one folder view: location, history, filter, marks
   pane/listmodel.cpp  QAbstractTableModel over core's vector<Entry>
+  pane/columns.cpp    the column table: name, label, width, default, sort
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
   jobs/strip.cpp      collapsed job strip, conflict and confirm bars
@@ -209,8 +212,7 @@ src/app/
   preview.cpp         Ctrl+Q component, placed in whichever slot config says
   cmdline.cpp         command line
   keymap.cpp          FAR table, remappable from config
-  config.cpp          QSettings INI: keymap, columns, split, preview slot,
-                      session (tabs per pane, active tab, active pane)
+  config.cpp          QSettings INI: the config and the state file
 ```
 
 ### Rules
@@ -259,7 +261,7 @@ src/app/
 14. **Tree and pane never ping-pong.** Programmatic selection in either
     direction sets a guard; only user actions navigate.
 15. **Symlinks.** Enter follows; copy and move copy the link, not the
-    target; the list shows the target.
+    target; the list shows the target; attribute jobs never follow.
 16. **Lean by construction.** Bounded bytes per entry, no process for
     thumbnails or indexing, nothing runs while no pane is visible.
 
@@ -269,11 +271,10 @@ src/app/
 superfar and Thunar, warm cache by default and cold with `--cold`. It
 reports time to first frame (window mapped, measured from outside with
 hyprctl), superfar's own marks (first rows, loaded), and memory after the
-app settles: PSS for the whole footprint and anonymous memory for what
-the app itself allocates. PSS shares library pages with every process
-that maps them, so it drifts with whatever else is running; gates are on
-anonymous memory. Thunar is a different toolkit: shown for reference,
-never a gate.
+app settles: PSS for the whole footprint and anonymous memory for what the
+app itself allocates. PSS shares library pages with every process that maps
+them, so it drifts with whatever else is running; gates are on anonymous
+memory. Thunar is a different toolkit: shown for reference, never a gate.
 
 Gates, warm cache, against the milestone 2 build measured 2026-10-29:
 
@@ -291,10 +292,9 @@ Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
 folder open, depending on what else shares Qt's pages. Thunar 4.20 on
 the same machine: first frame about 340 ms, about 400 MB PSS.
 
-The 100k folder costs about 360 bytes per entry today (name, display
-string, collation key, row index, name hash). That is the number to
-shrink, not the gate to loosen. A milestone is not done while it misses
-a gate.
+The 100k folder costs about 360 bytes per entry today (name, display string,
+collation key, row index, name hash). That is the number to shrink, not the
+gate to loosen. A milestone is not done while it misses a gate.
 
 ## Milestones
 

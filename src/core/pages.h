@@ -5,14 +5,13 @@
 // is three numbers and whose body the app wraps in a QImage as it is.
 #pragma once
 
+#include "core/child.h"
 #include "core/location.h"
 
 #include <QByteArray>
 #include <QObject>
 #include <QString>
 
-typedef struct _GCancellable GCancellable;
-typedef struct _GSubprocess GSubprocess;
 
 namespace core {
 
@@ -62,15 +61,9 @@ Q_SIGNALS:
     void failed(quint64 generation, const QString& message, bool missing);
 
 private:
-    struct Call;
-    // One child of each kind at a time, held so that cancel can kill it:
-    // cancelling the GIO call alone lets the child run to the end.
-    struct Child {
-        GCancellable* cancellable = nullptr;
-        GSubprocess* process = nullptr;
-    };
-    void spawn(Child& child, const char* const* argv, Call* call, const char* tool, quint64 generation);
-    void cancelOne(Child& child);
+    // False, with failed() emitted, when the run did not give output.
+    bool succeeded(const Child::Result& r, const char* tool, quint64 generation);
+    // One child of each kind at a time, killed on cancel.
     Child info_;
     Child render_;
 };

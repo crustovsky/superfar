@@ -8,29 +8,21 @@
 
 ListModel::Column ListModel::columnOf(core::SortBy by)
 {
-    switch (by) {
-    case core::SortBy::Size: return SizeColumn;
-    case core::SortBy::Modified: return ModifiedColumn;
-    case core::SortBy::Items: return ItemsColumn;
-    case core::SortBy::Name: break;
-    }
+    for (int c = 0; c < ColumnCount; ++c)
+        if (columns::spec(c).sort == by)
+            return static_cast<Column>(c);
     return NameColumn;
 }
 
 core::SortBy ListModel::sortOf(int column)
 {
-    switch (column) {
-    case SizeColumn: return core::SortBy::Size;
-    case ModifiedColumn: return core::SortBy::Modified;
-    case ItemsColumn: return core::SortBy::Items;
-    default: return core::SortBy::Name;
-    }
+    return columns::spec(column).sort;
 }
 
 void ListModel::sortEntries()
 {
     core::sortEntries(entries_, sortBy_, sortAscending_,
-                      sortNeedsFolders() ? folderValues() : QHash<QByteArray, quint64>());
+                      sortNeedsFolders() ? folderValues() : QHash<QByteArray, quint64>(), &ids_);
 }
 
 bool ListModel::sortNeedsFolders() const

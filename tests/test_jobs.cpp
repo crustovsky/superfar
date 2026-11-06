@@ -1,6 +1,7 @@
 // Jobs and the monitor against a real temp directory.
 #include "core/archive.h"
 #include "core/fileops.h"
+#include "core/jobs/attributes.h"
 #include "core/jobs/pack.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -15,6 +16,7 @@
 #include <QTest>
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace {
@@ -65,6 +67,8 @@ private Q_SLOTS:
     void createAndRename();
     void copyTree();
     void packArchive();
+    void attributesOfATree();
+    void attributesRefusedAndLogged();
     void copyIntoItself();
     void moveSameFilesystem();
     void conflictAnswers();
@@ -322,7 +326,7 @@ void JobsTest::createAndRename()
     QVERIFY(QFile::exists(tmp.path() + "/renamed.txt"));
 
     error = QStringLiteral("pending");
-    core::setMode(dir.child("renamed.txt"), 0600, [&](const QString& e) { error = e; });
+    core::setMode(dir.child("renamed.txt"), 0600, 0777, [&](const QString& e) { error = e; });
     while (error == QStringLiteral("pending"))
         QTest::qWait(5);
     QVERIFY2(error.isEmpty(), qPrintable(error));
@@ -422,6 +426,162 @@ void JobsTest::packArchive()
         runJob(job);
         QCOMPARE(job.log().size(), 1u);
         QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Failed);
+    }
+}
+
+void JobsTest::attributesOfATree()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString root = tmp.path() + "/tree";
+    makeTree(root);  // a.txt, sub/b.txt, sub/deep/c.txt, link -> a.txt
+    write(tmp.path() + "/outside.txt", "o");
+    write(root + "/sub/run.sh", "#!/bin/sh\n");
+    QVERIFY(QFile::link("../../outside.txt", root + "/sub/escape"));
+    auto mode = [&](const QString& rel) {
+        struct stat st {};
+        return ::lstat(QFile::encodeName(tmp.path() + rel).constData(), &st) == 0 ? quint32(st.st_mode & 07777) : ~0u;
+    };
+    auto chmodTo = [&](const QString& rel, quint32 m) { QCOMPARE(::chmod(QFile::encodeName(tmp.path() + rel).constData(), m), 0); };
+    chmodTo("/tree", 02700);
+    chmodTo("/tree/sub", 0700);
+    chmodTo("/tree/sub/deep", 0700);
+    chmodTo("/tree/a.txt", 0600);
+    chmodTo("/tree/sub/b.txt", 0600);
+    chmodTo("/tree/sub/run.sh", 0700);
+    chmodTo("/outside.txt", 0600);
+
+    // Not recursive: the folder alone, its nine bits; setgid stays.
+    {
+        core::AttributeChange change;
+        change.mode = 0750;
+        core::AttributesJob job({loc(root)}, change);
+        runJob(job);
+        QVERIFY(job.log().empty());
+    }
+    QCOMPARE(mode("/tree"), 02750u);
+    QCOMPARE(mode("/tree/sub"), 0700u);
+    QCOMPARE(mode("/tree/a.txt"), 0600u);
+
+    // Recursive rwxr-xr-x: folders take it, files take execute only
+    // where they had it, a link below is neither changed nor followed.
+    {
+        core::AttributeChange change;
+        change.mode = 0755;
+        change.recursive = true;
+        core::AttributesJob job({loc(root)}, change);
+        QSignalSpy progress(&job, &core::Job::progress);
+        runJob(job);
+        QVERIFY(job.log().empty());
+        const auto last = progress.last().first().value<core::JobProgress>();
+        QCOMPARE(last.itemsTotal, 9u);  // tree, a.txt, link, sub, b.txt, run.sh, escape, deep, c.txt
+        QCOMPARE(last.itemsDone, 9u);
+    }
+    QCOMPARE(mode("/tree"), 02755u);
+    QCOMPARE(mode("/tree/sub"), 0755u);
+    QCOMPARE(mode("/tree/sub/deep"), 0755u);
+    QCOMPARE(mode("/tree/a.txt"), 0644u);
+    QCOMPARE(mode("/tree/sub/b.txt"), 0644u);
+    QCOMPARE(mode("/tree/sub/run.sh"), 0755u);
+    QCOMPARE(mode("/outside.txt"), 0600u);
+
+    // Only the bits the mask names: others lose read, the rest stays.
+    {
+        core::AttributeChange change;
+        change.mode = 0;
+        change.modeMask = 0004;
+        change.recursive = true;
+        core::AttributesJob job({loc(root + "/sub")}, change);
+        runJob(job);
+    }
+    QCOMPARE(mode("/tree/sub"), 0751u);
+    QCOMPARE(mode("/tree/sub/b.txt"), 0640u);
+    QCOMPARE(mode("/tree/sub/run.sh"), 0751u);
+    QCOMPARE(mode("/tree/a.txt"), 0644u);  // not below sub
+
+    // A link named itself: its mode means nothing, so it is skipped and
+    // the log says so; the target is not touched.
+    {
+        core::AttributeChange change;
+        change.mode = 0777;
+        core::AttributesJob job({loc(root + "/link"), loc(root + "/gone")}, change);
+        runJob(job);
+        QCOMPARE(job.log().size(), 2u);  // the link skipped, the missing item failed
+    }
+    QCOMPARE(mode("/tree/a.txt"), 0644u);
+
+    // The group, down the tree, to another group of this user (or any
+    // group for root); the links change hands themselves.
+    std::optional<quint32> other;
+    struct stat st {};
+    QCOMPARE(::stat(QFile::encodeName(root).constData(), &st), 0);
+    if (::geteuid() == 0) {
+        other = st.st_gid == 1 ? 2 : 1;
+    } else {
+        std::vector<gid_t> groups(static_cast<size_t>(std::max(0, ::getgroups(0, nullptr))));
+        const int n = ::getgroups(static_cast<int>(groups.size()), groups.data());
+        for (int i = 0; i < n; ++i)
+            if (groups[static_cast<size_t>(i)] != st.st_gid)
+                other = groups[static_cast<size_t>(i)];
+    }
+    if (!other)
+        QSKIP("this user has one group only: nothing to change the group to");
+    core::AttributeChange change;
+    change.owner.gid = other;
+    change.recursive = true;
+    core::AttributesJob job({loc(root)}, change);
+    runJob(job);
+    QVERIFY(job.log().empty());
+    for (const char* rel : {"/tree", "/tree/a.txt", "/tree/link", "/tree/sub/deep/c.txt", "/tree/sub/escape"}) {
+        QCOMPARE(::lstat(QFile::encodeName(tmp.path() + rel).constData(), &st), 0);
+        QCOMPARE(quint32(st.st_gid), *other);
+    }
+    QCOMPARE(::stat(QFile::encodeName(tmp.path() + "/outside.txt").constData(), &st), 0);
+    QVERIFY(quint32(st.st_gid) != *other);  // the link's target stays whose it was
+    QCOMPARE(mode("/tree"), 02755u);  // a group change alone leaves the mode
+}
+
+void JobsTest::attributesRefusedAndLogged()
+{
+    if (::geteuid() == 0)
+        QSKIP("root is refused nothing");
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    makeTree(tmp.path() + "/tree");
+    core::AttributeChange change;
+    change.owner.uid = 0;  // giving files to root is root's to do
+    change.recursive = true;
+
+    // Asked: the first refusal comes as a question; Skip for all ends
+    // the job with every item in the log.
+    {
+        core::AttributesJob job({loc(tmp.path() + "/tree")}, change);
+        int asked = 0;
+        connect(&job, &core::Job::failure, &job, [&](const core::Failure& f) {
+            ++asked;
+            QVERIFY(!f.message.isEmpty());
+            job.answerError(core::ErrorAction::Skip, true);
+        });
+        runJob(job);
+        QCOMPARE(asked, 1);
+        QCOMPARE(job.log().size(), 7u);  // tree, a.txt, link, sub, b.txt, deep, c.txt
+    }
+    // Unattended: no question at all, the same log.
+    {
+        core::AttributesJob job({loc(tmp.path() + "/tree")}, change);
+        job.setUnattended(true);
+        QSignalSpy asked(&job, &core::Job::failure);
+        runJob(job);
+        QVERIFY(asked.isEmpty());
+        QCOMPARE(job.log().size(), 7u);
+        QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Failed);
+    }
+    // Abort at the first question stops there.
+    {
+        core::AttributesJob job({loc(tmp.path() + "/tree")}, change);
+        connect(&job, &core::Job::failure, &job, [&] { job.answerError(core::ErrorAction::Abort, false); });
+        runJob(job);
+        QVERIFY(job.aborted());
     }
 }
 

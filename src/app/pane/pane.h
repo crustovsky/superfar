@@ -4,9 +4,11 @@
 #pragma once
 
 #include "config.h"
+#include "core/jobs/attributes.h"
 #include "core/jobs/job.h"
 #include "core/location.h"
 #include "keymap.h"
+#include "pane/columns.h"
 #include "pane/tab.h"
 
 #include <QWidget>
@@ -37,7 +39,13 @@ public:
     // Session: what to save, and how to come back.
     QList<Config::TabState> tabStates() const;
     void restore(const QList<Config::TabState>& states, int active);
+    // Columns are the pane's: every tab in it shows the same ones. A
+    // change made in one tab's header is kept here and reaches the
+    // others when they come to the front.
     void applyColumns(const Config::Columns& columns);
+    columns::Layout columnLayout() const;
+    void setColumnShown(int column, bool shown);
+    void resetColumns() { Q_EMIT columnsResetRequested(); }
 
     void setActive(bool active);
     bool isActive() const { return active_; }
@@ -56,6 +64,8 @@ public:
     // Alt+F5: pack the marked items into an archive here or in other.
     void openPack(const core::Location& other);
     bool hasOverlay() const { return overlay_ != nullptr; }
+    // A job changed what the properties panel shows: it reads again.
+    void refreshProperties();
 
 Q_SIGNALS:
     void locationChanged(const core::Location& dir);  // of the active tab
@@ -66,8 +76,12 @@ Q_SIGNALS:
     // From the pack panel: names in parent go into archive.
     void packRequested(const core::Location& parent, const std::vector<QByteArray>& names,
                        const core::Location& archive, const QByteArray& options);
+    // From the properties panel: permissions and owner for the items.
+    void attributesRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
+    void columnsChanged(const QStringList& order, const QStringList& hidden);
+    void columnsResetRequested();  // the owner of the config answers with applyColumns()
 
 protected:
     void paintEvent(QPaintEvent* event) override;

@@ -46,6 +46,30 @@ private:
     QListWidget* list_;
 };
 
+// A list of switches, and an action as its last row: Space or Enter
+// flips the row under the cursor, Enter on the action runs it, Esc
+// closes. What a switch does happens at once; there is nothing to
+// accept.
+class CheckBar : public QFrame {
+    Q_OBJECT
+public:
+    explicit CheckBar(const QString& message, QWidget* parent = nullptr);
+
+    // Replaces the rows, keeping the cursor where it was.
+    void setItems(const QStringList& labels, const QList<bool>& checked, const QString& action);
+
+Q_SIGNALS:
+    void toggled(int index, bool on);
+    void actionChosen();
+    void closed();
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
+private:
+    QListWidget* list_;
+};
+
 // A mount asking for credentials.
 class AuthBar : public QFrame {
     Q_OBJECT

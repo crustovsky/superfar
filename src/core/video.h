@@ -6,6 +6,7 @@
 // nothing; seeking restarts the child at the new time.
 #pragma once
 
+#include "core/child.h"
 #include "core/location.h"
 
 #include <QByteArray>
@@ -67,11 +68,11 @@ Q_SIGNALS:
     void failed(quint64 generation, const QString& message, bool missing);
 
 private:
-    struct ProbeCall;
     struct ReadCall;
 
-    GCancellable* probeCancellable_ = nullptr;
-    GSubprocess* probeProcess_ = nullptr;
+    Child probe_;  // ffprobe, run to its end
+    // The stream is read frame by frame while ffmpeg runs, so it is
+    // held here rather than in a Child.
     GCancellable* cancellable_ = nullptr;
     GSubprocess* process_ = nullptr;
     GInputStream* stdout_ = nullptr;  // owned by process_

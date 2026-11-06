@@ -4,7 +4,6 @@
 
 #include <QDate>
 #include <QDateTime>
-#include <QPointer>
 #include <QSet>
 #include <algorithm>
 
@@ -100,10 +99,17 @@ QByteArray unescapeName(const QByteArray& text)
     return out;
 }
 
+namespace {
+QString notInstalled()
+{
+    return QStringLiteral("bsdtar is not installed (package libarchive); archives cannot be opened");
+}
+} // namespace
+
 QString bsdtarError(const GError* error)
 {
     if (g_error_matches(error, G_SPAWN_ERROR, G_SPAWN_ERROR_NOENT))
-        return QStringLiteral("bsdtar is not installed (package libarchive); archives cannot be opened");
+        return notInstalled();
     return errorMessage(error);
 }
 
@@ -198,47 +204,6 @@ std::vector<ArchiveEntry> parseArchiveListing(const QByteArray& output, int curr
     return out;
 }
 
-struct ArchiveLister::Call {
-    QPointer<ArchiveLister> owner;
-    quint64 generation = 0;
-
-    static void onDone(GObject* source, GAsyncResult* result, gpointer data)
-    {
-        std::unique_ptr<Call> call(static_cast<Call*>(data));
-        GError* error = nullptr;
-        GBytes* out = nullptr;
-        GBytes* err = nullptr;
-        g_subprocess_communicate_finish(G_SUBPROCESS(source), result, &out, &err, &error);
-        GErrorPtr gerr(error);
-        GPtr<GSubprocess> proc(G_SUBPROCESS(g_object_ref(source)));
-        std::unique_ptr<GBytes, void (*)(GBytes*)> outGuard(out, [](GBytes* b) { if (b) g_bytes_unref(b); });
-        std::unique_ptr<GBytes, void (*)(GBytes*)> errGuard(err, [](GBytes* b) { if (b) g_bytes_unref(b); });
-        if (!call->owner || isCancelled(gerr.get()))
-            return;
-        if (call->owner->process_ == proc.get()) {  // done: nothing to kill later
-            g_object_unref(call->owner->process_);
-            g_object_unref(call->owner->cancellable_);
-            call->owner->process_ = nullptr;
-            call->owner->cancellable_ = nullptr;
-        }
-        if (gerr || !g_subprocess_get_successful(proc.get())) {
-            gsize n = 0;
-            const char* text = err ? static_cast<const char*>(g_bytes_get_data(err, &n)) : nullptr;
-            QString message = text && n ? QString::fromUtf8(text, static_cast<int>(n)).trimmed() : errorMessage(gerr.get());
-            if (message.isEmpty())
-                message = QStringLiteral("bsdtar failed");
-            Q_EMIT call->owner->failed(call->generation, message);
-            return;
-        }
-        gsize n = 0;
-        const char* text = out ? static_cast<const char*>(g_bytes_get_data(out, &n)) : nullptr;
-        ArchiveDropped dropped;
-        std::vector<ArchiveEntry> entries =
-            parseArchiveListing(QByteArray(text, static_cast<qsizetype>(n)), QDate::currentDate().year(), &dropped);
-        Q_EMIT call->owner->listed(call->generation, std::move(entries), dropped);
-    }
-};
-
 ArchiveLister::ArchiveLister(QObject* parent)
     : QObject(parent)
 {
@@ -257,34 +222,25 @@ void ArchiveLister::start(const Location& archive, quint64 generation)
         Q_EMIT failed(generation, QStringLiteral("archives open from local files only"));
         return;
     }
-    GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(
-        static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE)));
-    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C.UTF-8", TRUE);
     const char* argv[] = {"bsdtar", "-tvf", path.constData(), nullptr};
-    GError* error = nullptr;
-    GPtr<GSubprocess> proc(g_subprocess_launcher_spawnv(launcher.get(), argv, &error));
-    if (!proc) {
-        GErrorPtr err(error);
-        Q_EMIT failed(generation, bsdtarError(err.get()));
-        return;
-    }
-    cancellable_ = g_cancellable_new();
-    process_ = proc.release();
-    auto* call = new Call{this, generation};
-    g_subprocess_communicate_async(process_, nullptr, cancellable_, &Call::onDone, call);
+    child_.run(argv, [this, generation](const Child::Result& r) {
+        if (!r.spawned) {
+            Q_EMIT failed(generation, r.missing ? notInstalled() : r.error);
+            return;
+        }
+        if (!r.ok) {
+            Q_EMIT failed(generation, r.why("bsdtar"));
+            return;
+        }
+        ArchiveDropped dropped;
+        std::vector<ArchiveEntry> entries = parseArchiveListing(r.out, QDate::currentDate().year(), &dropped);
+        Q_EMIT listed(generation, std::move(entries), dropped);
+    });
 }
 
 void ArchiveLister::cancel()
 {
-    if (!cancellable_)
-        return;
-    // Cancelling the read does not stop the child (rule 16).
-    g_cancellable_cancel(cancellable_);
-    g_subprocess_force_exit(process_);
-    g_object_unref(process_);
-    g_object_unref(cancellable_);
-    process_ = nullptr;
-    cancellable_ = nullptr;
+    child_.cancel();
 }
 
 } // namespace core

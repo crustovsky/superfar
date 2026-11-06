@@ -1,6 +1,7 @@
 #include "core/sort.h"
 
 #include "core/gobject.h"
+#include "core/unixattrs.h"
 
 #include <QString>
 
@@ -43,7 +44,7 @@ namespace {
 // Folders without a value compare after those with one, whatever the
 // direction, so the unknown ones do not jump to the top on a reverse.
 template <typename Value>
-int compareValue(Value a, Value b, bool ascending)
+int compareValue(const Value& a, const Value& b, bool ascending)
 {
     if (a == b)
         return 0;
@@ -53,7 +54,7 @@ int compareValue(Value a, Value b, bool ascending)
 } // namespace
 
 void sortEntries(std::vector<Entry>& entries, SortBy by, bool ascending,
-                 const QHash<QByteArray, quint64>& folderValues)
+                 const QHash<QByteArray, quint64>& folderValues, IdNames* names)
 {
     if (by == SortBy::Name) {
         sortByName(entries, ascending);
@@ -72,6 +73,17 @@ void sortEntries(std::vector<Entry>& entries, SortBy by, bool ascending,
         int c = 0;
         if (by == SortBy::Modified) {
             c = compareValue(a.modified, b.modified, ascending);
+        } else if (by == SortBy::Permissions) {
+            c = compareValue(a.mode & 07777u, b.mode & 07777u, ascending);
+        } else if (by == SortBy::Owner) {
+            // Most rows share an owner: the names are asked for only
+            // where the ids differ.
+            if (a.uid != b.uid)
+                c = names ? compareValue(names->user(a.uid), names->user(b.uid), ascending)
+                          : compareValue(a.uid, b.uid, ascending);
+            if (c == 0 && a.gid != b.gid)
+                c = names ? compareValue(names->group(a.gid), names->group(b.gid), ascending)
+                          : compareValue(a.gid, b.gid, ascending);
         } else if (a.isDir()) {
             quint64 va = 0, vb = 0;
             const bool ha = folderValue(a, &va), hb = folderValue(b, &vb);
@@ -94,6 +106,8 @@ const char* sortName(SortBy by)
     case SortBy::Size: return "size";
     case SortBy::Modified: return "modified";
     case SortBy::Items: return "items";
+    case SortBy::Permissions: return "permissions";
+    case SortBy::Owner: return "owner";
     case SortBy::Name: break;
     }
     return "name";
@@ -101,7 +115,7 @@ const char* sortName(SortBy by)
 
 SortBy sortFromName(const QString& name)
 {
-    for (SortBy by : {SortBy::Size, SortBy::Modified, SortBy::Items})
+    for (SortBy by : {SortBy::Size, SortBy::Modified, SortBy::Items, SortBy::Permissions, SortBy::Owner})
         if (name == QLatin1String(sortName(by)))
             return by;
     return SortBy::Name;

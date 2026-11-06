@@ -2,6 +2,7 @@
 
 #include "core/match.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <algorithm>
@@ -60,7 +61,22 @@ bool isState(const QString& key)
         return true;
     if (key == QLatin1String("layout/tree") || key == QLatin1String("layout/panes"))
         return true;
-    return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"));
+    // Dragged widths; the arrangement in the config is the user's seed.
+    return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"))
+        && !key.endsWith(QLatin1String("/order"));
+}
+
+// A line written by hand as a,b reads as a list; the same value set
+// through QSettings is quoted and reads as one string. Either way: the
+// names.
+QStringList names(const QVariant& value)
+{
+    QStringList out;
+    for (const QString& part : value.toStringList())
+        for (const QString& name : part.split(QLatin1Char(','), Qt::SkipEmptyParts))
+            if (!name.trimmed().isEmpty())
+                out << name.trimmed();
+    return out;
 }
 
 QSettings openConfig(const QString& path)
@@ -138,10 +154,37 @@ QHash<QString, QStringList> Config::keyBindings() const
     QHash<QString, QStringList> out;
     settings_.beginGroup(QStringLiteral("keys"));
     for (const QString& key : settings_.childKeys()) {
-        const QString value = settings_.value(key).toString();
+        // A key that is a comma (Ctrl+,) splits the line into a list.
+        const QString value = settings_.value(key).toStringList().join(QLatin1Char(','));
         out.insert(key, value.isEmpty() ? QStringList() : value.split(QLatin1Char(';'), Qt::SkipEmptyParts));
     }
     settings_.endGroup();
+    return out;
+}
+
+QStringList Config::unquotedKeyLines() const
+{
+    // QSettings has already dropped what followed the semicolon; only
+    // the file itself still shows that something was there.
+    QStringList out;
+    QFile file(settings_.fileName());
+    if (!file.open(QIODevice::ReadOnly))
+        return out;
+    bool inKeys = false;
+    while (!file.atEnd()) {
+        const QByteArray line = file.readLine().trimmed();
+        if (line.startsWith('[')) {
+            inKeys = line == "[keys]";
+            continue;
+        }
+        const qsizetype eq = line.indexOf('=');
+        if (!inKeys || eq <= 0 || line.startsWith(';') || line.startsWith('#'))
+            continue;
+        const QByteArray value = line.mid(eq + 1).trimmed();
+        if (!value.startsWith('"') && value.contains(';'))
+            out << QStringLiteral("%1: only the first key of %2 is bound; quote the line: %1=\"%2\"")
+                       .arg(QString::fromUtf8(line.left(eq).trimmed()), QString::fromUtf8(value));
+    }
     return out;
 }
 
@@ -168,16 +211,19 @@ void Config::writeDefaultKeys(const QList<QPair<QString, QStringList>>& defaults
 Config::Columns Config::columns(const QString& side) const
 {
     Columns c;
+    const QString group = QStringLiteral("columns/") + side;
+    const QString order = group + QStringLiteral("/order");
+    const QString hidden = group + QStringLiteral("/hidden");
+    // The arrangement is one thing: all of it from the state once the
+    // window has changed it, else all of it from the config.
+    QSettings& from = state_.contains(order) || state_.contains(hidden) ? state_ : settings_;
+    c.order = names(from.value(order));
+    c.hidden = names(from.value(hidden));
     for (QSettings* s : {&settings_, &state_}) {
-        s->beginGroup(QStringLiteral("columns/") + side);
-        for (const QString& key : s->childKeys()) {
-            if (key == QLatin1String("hidden")) {
-                if (s == &settings_)
-                    c.hidden = s->value(key).toString().split(QLatin1Char(','), Qt::SkipEmptyParts);
-            } else {
+        s->beginGroup(group);
+        for (const QString& key : s->childKeys())
+            if (key != QLatin1String("order") && key != QLatin1String("hidden"))
                 c.widths.insert(key, s->value(key).toInt());  // the state, read last, wins
-            }
-        }
         s->endGroup();
     }
     return c;
@@ -186,6 +232,17 @@ Config::Columns Config::columns(const QString& side) const
 void Config::setColumnWidth(const QString& side, const QString& column, int width)
 {
     state_.setValue(QStringLiteral("columns/%1/%2").arg(side, column), width);
+}
+
+void Config::setColumnLayout(const QString& side, const QStringList& order, const QStringList& hidden)
+{
+    state_.setValue(QStringLiteral("columns/%1/order").arg(side), order.join(QLatin1Char(',')));
+    state_.setValue(QStringLiteral("columns/%1/hidden").arg(side), hidden.join(QLatin1Char(',')));
+}
+
+void Config::resetColumns(const QString& side)
+{
+    state_.remove(QStringLiteral("columns/") + side);
 }
 
 bool Config::stackedSplit() const

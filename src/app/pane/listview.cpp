@@ -5,11 +5,11 @@
 #include "pane/listmodel.h"
 
 #include <QFontMetrics>
-#include <QLocale>
 #include <QHeaderView>
 #include <QApplication>
 #include <QDrag>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QStyle>
@@ -28,9 +28,18 @@ ListView::ListView(QWidget* parent)
     setEditTriggers(NoEditTriggers);
     setSortingEnabled(false);
     setTabKeyNavigation(true);  // so Tab reaches keyPressEvent
-    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // Only when Name's floor and the other columns do not fit the pane.
+    setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     header()->setStretchLastSection(false);
-    header()->setSectionsMovable(false);
+    // Columns are dragged into place; Name stays first.
+    header()->setSectionsMovable(true);
+    header()->setFirstSectionMovable(false);
+    header()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(header(), &QWidget::customContextMenuRequested, this, &ListView::showColumnMenu);
+    connect(header(), &QHeaderView::sectionMoved, this, [this] {
+        if (!applying_)
+            Q_EMIT columnsChanged(columnLayout());
+    });
     // Sorting stays ours (the model orders its vector); the header only
     // keeps the indicator: a click flips it and reports the new order.
     header()->setSectionsClickable(true);
@@ -59,7 +68,8 @@ void ListView::onSectionResized(int column, int, int newSize)
         // drag as absolute sizes, so the next column is computed from the
         // width Name asks for, not from a delta that would compound.
         int next = -1, rest = 0;
-        for (int c = column + 1; c < ListModel::ColumnCount; ++c) {
+        for (int v = h->visualIndex(column) + 1; v < h->count(); ++v) {
+            const int c = h->logicalIndex(v);
             if (h->isSectionHidden(c))
                 continue;
             if (next < 0)
@@ -73,10 +83,10 @@ void ListView::onSectionResized(int column, int, int newSize)
             h->resizeSection(next, width);
             applying_ = false;
             if (isVisible())
-                Q_EMIT columnResized(columnName(next), width);
+                Q_EMIT columnResized(columns::name(next), width);
         }
     } else if (isVisible()) {
-        Q_EMIT columnResized(columnName(column), newSize);
+        Q_EMIT columnResized(columns::name(column), newSize);
     }
     fitName();
 }
@@ -90,12 +100,17 @@ void ListView::fitName()
     for (int c = 1; c < ListModel::ColumnCount; ++c)
         if (!h->isSectionHidden(c))
             others += h->sectionSize(c);
-    const int width = std::max(h->minimumSectionSize(), viewport()->width() - others);
+    const int width = std::max(nameFloor(), viewport()->width() - others);
     if (h->sectionSize(ListModel::NameColumn) == width)
         return;
     applying_ = true;
     h->resizeSection(ListModel::NameColumn, width);
     applying_ = false;
+}
+
+int ListView::nameFloor() const
+{
+    return iconSize().width() + QFontMetrics(font()).horizontalAdvance(QLatin1Char('x')) * 8;
 }
 
 void ListView::resizeEvent(QResizeEvent* event)
@@ -104,28 +119,63 @@ void ListView::resizeEvent(QResizeEvent* event)
     fitName();
 }
 
-QString ListView::columnName(int column)
+void ListView::applyColumns(const columns::Layout& layout, const QHash<QString, int>& widths)
 {
-    switch (column) {
-    case ListModel::NameColumn: return QStringLiteral("name");
-    case ListModel::SizeColumn: return QStringLiteral("size");
-    case ListModel::ItemsColumn: return QStringLiteral("items");
-    case ListModel::ModifiedColumn: return QStringLiteral("modified");
-    default: return {};
-    }
-}
-
-void ListView::applyColumns(const QHash<QString, int>& widths, const QStringList& hidden)
-{
+    QHeaderView* h = header();
+    if (!model() || h->count() < ListModel::ColumnCount)
+        return;
+    sizeColumns();  // the font-metric widths, under whatever was saved
     applying_ = true;
-    for (int c = 0; c < ListModel::ColumnCount; ++c) {
-        const QString name = columnName(c);
-        setColumnHidden(c, hidden.contains(name) && c != ListModel::NameColumn);
-        if (const auto it = widths.constFind(name); it != widths.cend() && it.value() > 0 && c != ListModel::NameColumn)
-            header()->resizeSection(c, it.value());
+    for (int v = 0; v < layout.order.size(); ++v)
+        h->moveSection(h->visualIndex(layout.order[v]), v);
+    for (int c = ListModel::NameColumn + 1; c < ListModel::ColumnCount; ++c) {
+        setColumnHidden(c, layout.hidden.value(c));
+        if (const int width = widths.value(columns::name(c)); width > 0)
+            h->resizeSection(c, width);  // a hidden one keeps it for its return
     }
     applying_ = false;
     fitName();
+}
+
+columns::Layout ListView::columnLayout() const
+{
+    columns::Layout l;
+    const QHeaderView* h = header();
+    for (int v = 0; v < h->count(); ++v)
+        l.order.append(h->logicalIndex(v));
+    for (int c = 0; c < h->count(); ++c)
+        l.hidden.append(h->isSectionHidden(c));
+    return l;
+}
+
+void ListView::setColumnShown(int column, bool shown)
+{
+    if (column <= ListModel::NameColumn || column >= ListModel::ColumnCount || isColumnHidden(column) != shown)
+        return;
+    applying_ = true;
+    setColumnHidden(column, !shown);
+    applying_ = false;
+    fitName();
+    Q_EMIT columnsChanged(columnLayout());
+}
+
+void ListView::showColumnMenu(const QPoint& pos)
+{
+    // The same list the Columns command shows in a bar, here as a menu.
+    auto* menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    const columns::Layout layout = columnLayout();
+    for (int c : layout.order) {
+        if (c == ListModel::NameColumn)
+            continue;
+        QAction* a = menu->addAction(columns::label(c));
+        a->setCheckable(true);
+        a->setChecked(!layout.hidden.value(c));
+        connect(a, &QAction::toggled, this, [this, c](bool on) { setColumnShown(c, on); });
+    }
+    menu->addSeparator();
+    connect(menu->addAction(tr("Reset columns")), &QAction::triggered, this, &ListView::columnsResetRequested);
+    menu->popup(header()->mapToGlobal(pos));
 }
 
 void ListView::mousePressEvent(QMouseEvent* event)
@@ -173,10 +223,8 @@ void ListView::sizeColumns()
     // dragged at either edge; Name takes what is left (fitName).
     h->setSectionResizeMode(QHeaderView::Interactive);
     applying_ = true;
-    h->resizeSection(ListModel::SizeColumn, fm.horizontalAdvance(QStringLiteral("8888.8 MiB")) + pad);
-    h->resizeSection(ListModel::ItemsColumn, fm.horizontalAdvance(QLocale().toString(88888888)) + pad);
-    h->resizeSection(ListModel::ModifiedColumn,
-                     fm.horizontalAdvance(QStringLiteral("8888-88-88 88:88")) + pad);
+    for (int c = ListModel::NameColumn + 1; c < ListModel::ColumnCount; ++c)
+        h->resizeSection(c, fm.horizontalAdvance(columns::widest(c)) + pad);
     applying_ = false;
     fitName();
 }
@@ -228,8 +276,10 @@ void ListView::keyPressEvent(QKeyEvent* event)
 
 QRect ListView::rowRect(const QModelIndex& index) const
 {
-    const int last = model()->columnCount() - 1;
-    return visualRect(index.siblingAtColumn(0)).united(visualRect(index.siblingAtColumn(last)));
+    // Name is always shown and gives the row; the columns fill the
+    // viewport, whichever of them are shown and in whatever order.
+    const QRect name = visualRect(index.siblingAtColumn(ListModel::NameColumn));
+    return QRect(0, name.top(), viewport()->width(), name.height());
 }
 
 void ListView::paintEvent(QPaintEvent* event)

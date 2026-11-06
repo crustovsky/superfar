@@ -176,6 +176,7 @@ QString label(Command command)
     case Command::PreviewNext: return QStringLiteral("Next page");
     case Command::PreviewLast: return QStringLiteral("Last page");
     case Command::PreviewPlay: return QStringLiteral("Play");
+    case Command::Columns: return QStringLiteral("Columns");
     case Command::None: return {};
     }
     return {};
@@ -205,7 +206,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::ToggleTree, "ToggleTree"}, {Command::Pack, "Pack"},
         {Command::PreviewFirst, "PreviewFirst"}, {Command::PreviewPrev, "PreviewPrev"},
         {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
-        {Command::PreviewPlay, "PreviewPlay"},
+        {Command::PreviewPlay, "PreviewPlay"}, {Command::Columns, "Columns"},
     };
     return n;
 }

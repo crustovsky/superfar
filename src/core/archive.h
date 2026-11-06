@@ -3,6 +3,7 @@
 // "bsdtar -tvf" run under LC_ALL=C.UTF-8; a tab turns it into a folder view.
 #pragma once
 
+#include "core/child.h"
 #include "core/location.h"
 
 #include <QByteArray>
@@ -11,9 +12,7 @@
 #include <memory>
 #include <vector>
 
-typedef struct _GCancellable GCancellable;
 typedef struct _GError GError;
-typedef struct _GSubprocess GSubprocess;
 
 namespace core {
 
@@ -75,11 +74,7 @@ Q_SIGNALS:
     void failed(quint64 generation, const QString& message);
 
 private:
-    struct Call;
-    // The child is held so that cancel can kill it: cancelling the GIO
-    // call alone lets bsdtar list to the end for nobody.
-    GCancellable* cancellable_ = nullptr;
-    GSubprocess* process_ = nullptr;
+    Child child_;  // bsdtar, killed on cancel
 };
 
 } // namespace core

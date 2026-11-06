@@ -15,12 +15,19 @@ public:
 
     void paint(QPainter* painter, const QStyleOptionViewItem& option,
                const QModelIndex& index) const override;
+    // The owner cell's line edit completes user and group names.
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+                          const QModelIndex& index) const override;
     // The rename editor: a line edit with the stem selected, so typing
     // replaces the name and keeps the extension.
     void setEditorData(QWidget* editor, const QModelIndex& index) const override;
-    // Up and Down commit the edit and open the row above or below.
+    // Up and Down commit the edit and open the row above or below; Tab
+    // and Shift+Tab open the row's next cell that can be edited (name,
+    // permissions, owner, as far as they are shown).
     bool eventFilter(QObject* editor, QEvent* event) override;
 
 private:
+    QModelIndex nextEditable(const QModelIndex& index, bool forward) const;
+
     ListView* view_;
 };

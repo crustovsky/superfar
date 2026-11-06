@@ -105,48 +105,6 @@ void release(GSubprocess*& process, GCancellable*& cancellable)
 
 } // namespace
 
-struct FrameStreamer::ProbeCall {
-    QPointer<FrameStreamer> owner;
-    quint64 generation = 0;
-
-    static void onDone(GObject* source, GAsyncResult* result, gpointer data)
-    {
-        std::unique_ptr<ProbeCall> call(static_cast<ProbeCall*>(data));
-        GError* error = nullptr;
-        GBytes* out = nullptr;
-        GBytes* err = nullptr;
-        g_subprocess_communicate_finish(G_SUBPROCESS(source), result, &out, &err, &error);
-        GErrorPtr gerr(error);
-        GPtr<GSubprocess> proc(G_SUBPROCESS(g_object_ref(source)));
-        std::unique_ptr<GBytes, void (*)(GBytes*)> outGuard(out, [](GBytes* b) { if (b) g_bytes_unref(b); });
-        std::unique_ptr<GBytes, void (*)(GBytes*)> errGuard(err, [](GBytes* b) { if (b) g_bytes_unref(b); });
-        if (!call->owner || isCancelled(gerr.get()))
-            return;
-        FrameStreamer* owner = call->owner;
-        if (owner->probeProcess_ == proc.get())
-            release(owner->probeProcess_, owner->probeCancellable_);
-        if (gerr || !g_subprocess_get_successful(proc.get())) {
-            gsize n = 0;
-            const char* text = err ? static_cast<const char*>(g_bytes_get_data(err, &n)) : nullptr;
-            QString message = text && n ? QString::fromUtf8(text, static_cast<int>(n)).trimmed() : errorMessage(gerr.get());
-            if (const int nl = message.lastIndexOf(QLatin1Char('\n')); nl >= 0)
-                message = message.mid(nl + 1).trimmed();
-            if (message.isEmpty())
-                message = QStringLiteral("ffprobe failed");
-            Q_EMIT owner->failed(call->generation, message, false);
-            return;
-        }
-        gsize n = 0;
-        const char* text = out ? static_cast<const char*>(g_bytes_get_data(out, &n)) : nullptr;
-        const VideoInfo info = parseVideoInfo(QByteArray(text, static_cast<qsizetype>(n)));
-        if (info.width == 0) {
-            Q_EMIT owner->failed(call->generation, QStringLiteral("No video stream"), false);
-            return;
-        }
-        Q_EMIT owner->infoReady(call->generation, info);
-    }
-};
-
 struct FrameStreamer::ReadCall {
     QPointer<FrameStreamer> owner;
     quint64 generation = 0;
@@ -195,42 +153,36 @@ FrameStreamer::FrameStreamer(QObject* parent)
 FrameStreamer::~FrameStreamer()
 {
     stop();
-    if (probeCancellable_) {
-        g_cancellable_cancel(probeCancellable_);
-        g_subprocess_force_exit(probeProcess_);
-        release(probeProcess_, probeCancellable_);
-    }
 }
 
 void FrameStreamer::probe(const Location& file, quint64 generation)
 {
-    if (probeCancellable_) {
-        g_cancellable_cancel(probeCancellable_);
-        g_subprocess_force_exit(probeProcess_);
-        release(probeProcess_, probeCancellable_);
-    }
+    probe_.cancel();
     const QByteArray path = file.path();
     if (path.isEmpty()) {
         Q_EMIT failed(generation, QStringLiteral("video plays from local files only"), true);
         return;
     }
-    GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(
-        static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE)));
-    g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C.UTF-8", TRUE);
     const char* argv[] = {"ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                           "stream=width,height,r_frame_rate,avg_frame_rate,duration:stream_side_data=rotation"
                           ":stream_tags=rotate:format=duration",
                           "-of", "json", path.constData(), nullptr};
-    GError* error = nullptr;
-    GSubprocess* proc = g_subprocess_launcher_spawnv(launcher.get(), argv, &error);
-    if (!proc) {
-        GErrorPtr err(error);
-        Q_EMIT failed(generation, toolError("ffprobe", err.get()), notInstalled(err.get()));
-        return;
-    }
-    probeProcess_ = proc;
-    probeCancellable_ = g_cancellable_new();
-    g_subprocess_communicate_async(proc, nullptr, probeCancellable_, &ProbeCall::onDone, new ProbeCall{this, generation});
+    probe_.run(argv, [this, generation](const Child::Result& r) {
+        if (!r.spawned) {
+            Q_EMIT failed(generation, r.missing ? QStringLiteral("ffprobe is not installed (package ffmpeg)") : r.error,
+                          r.missing);
+            return;
+        }
+        if (!r.ok) {
+            Q_EMIT failed(generation, r.why("ffprobe", true), false);
+            return;
+        }
+        const VideoInfo info = parseVideoInfo(r.out);
+        if (info.width == 0)
+            Q_EMIT failed(generation, QStringLiteral("No video stream"), false);
+        else
+            Q_EMIT infoReady(generation, info);
+    });
 }
 
 void FrameStreamer::start(const Location& file, double seconds, FrameSize size, double frameRate, quint64 generation)
