@@ -72,6 +72,13 @@ AttributesEditor::AttributesEditor(QWidget* parent)
     buttons->addWidget(closeBtn);
     buttons->addStretch(1);
     layout->addLayout(buttons);
+    // Tab goes the way the panel reads, not the way it was built.
+    for (size_t i = 0; i + 1 < bits_.size(); ++i)
+        setTabOrder(bits_[i], bits_[i + 1]);
+    setTabOrder(bits_.back(), owner_);
+    setTabOrder(owner_, recursive_);
+    setTabOrder(recursive_, applyBtn);
+    setTabOrder(applyBtn, closeBtn);
     connect(applyBtn, &QPushButton::clicked, this, &AttributesEditor::apply);
     connect(owner_, &QLineEdit::returnPressed, this, &AttributesEditor::apply);
     connect(closeBtn, &QPushButton::clicked, this, &AttributesEditor::closeRequested);
