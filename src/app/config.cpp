@@ -63,6 +63,19 @@ bool isState(const QString& key)
     return key.startsWith(QLatin1String("columns/")) && !key.endsWith(QLatin1String("/hidden"));
 }
 
+// A line written by hand as a,b reads as a list; the same value set
+// through QSettings is quoted and reads as one string. Either way: the
+// names.
+QStringList names(const QVariant& value)
+{
+    QStringList out;
+    for (const QString& part : value.toStringList())
+        for (const QString& name : part.split(QLatin1Char(','), Qt::SkipEmptyParts))
+            if (!name.trimmed().isEmpty())
+                out << name.trimmed();
+    return out;
+}
+
 QSettings openConfig(const QString& path)
 {
     return path.isEmpty() ? QSettings(QSettings::IniFormat, QSettings::UserScope,
@@ -138,7 +151,8 @@ QHash<QString, QStringList> Config::keyBindings() const
     QHash<QString, QStringList> out;
     settings_.beginGroup(QStringLiteral("keys"));
     for (const QString& key : settings_.childKeys()) {
-        const QString value = settings_.value(key).toString();
+        // A key that is a comma (Ctrl+,) splits the line into a list.
+        const QString value = settings_.value(key).toStringList().join(QLatin1Char(','));
         out.insert(key, value.isEmpty() ? QStringList() : value.split(QLatin1Char(';'), Qt::SkipEmptyParts));
     }
     settings_.endGroup();
@@ -173,7 +187,7 @@ Config::Columns Config::columns(const QString& side) const
         for (const QString& key : s->childKeys()) {
             if (key == QLatin1String("hidden")) {
                 if (s == &settings_)
-                    c.hidden = s->value(key).toString().split(QLatin1Char(','), Qt::SkipEmptyParts);
+                    c.hidden = names(s->value(key));
             } else {
                 c.widths.insert(key, s->value(key).toInt());  // the state, read last, wins
             }

@@ -21,6 +21,7 @@ private Q_SLOTS:
     void keysWrittenOnce();
     void historyRanking();
     void columns();
+    void handWrittenLists();
     void stateSeparate();
     void abbreviationMatch();
 };
@@ -152,6 +153,26 @@ void ConfigTest::columns()
     Config again(tmp.path() + "/superfar.ini");
     QCOMPARE(again.columns(QStringLiteral("left")).widths.value(QStringLiteral("size")), 120);
     QCOMPARE(again.columns(QStringLiteral("right")).hidden, QStringList({QStringLiteral("items"), QStringLiteral("modified")}));
+}
+
+void ConfigTest::handWrittenLists()
+{
+    // As a person types them: QSettings reads an unquoted a,b as a list.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    {
+        QFile f(tmp.path() + "/superfar.ini");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[columns/left]\nhidden=items,modified\n"
+                "[columns/right]\nhidden=\"items, modified\"\n"
+                "[keys]\nCopy=Ctrl+,\nMove=F6\n");
+    }
+    Config c(tmp.path() + "/superfar.ini");
+    const QStringList both{QStringLiteral("items"), QStringLiteral("modified")};
+    QCOMPARE(c.columns(QStringLiteral("left")).hidden, both);
+    QCOMPARE(c.columns(QStringLiteral("right")).hidden, both);
+    QCOMPARE(c.keyBindings().value(QStringLiteral("Copy")), QStringList{QStringLiteral("Ctrl+,")});
+    QCOMPARE(c.keyBindings().value(QStringLiteral("Move")), QStringList{QStringLiteral("F6")});
 }
 
 void ConfigTest::stateSeparate()
