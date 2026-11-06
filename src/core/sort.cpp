@@ -44,7 +44,7 @@ namespace {
 // Folders without a value compare after those with one, whatever the
 // direction, so the unknown ones do not jump to the top on a reverse.
 template <typename Value>
-int compareValue(Value a, Value b, bool ascending)
+int compareValue(const Value& a, const Value& b, bool ascending)
 {
     if (a == b)
         return 0;
