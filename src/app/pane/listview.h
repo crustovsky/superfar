@@ -28,6 +28,8 @@ public:
     // Only the first tab of the first pane reports bench marks.
     void setBenchReporter(bool on) { benchReporter_ = on; }
     bool activePane() const { return active_; }
+    // The cursor row across the whole list, for its outline and repaint.
+    QRect rowRect(const QModelIndex& index) const;
     bool isEditing() const { return state() == EditingState; }
 
 Q_SIGNALS:
@@ -51,7 +53,6 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
 
 private:
-    QRect rowRect(const QModelIndex& index) const;
     void fitName();  // Name takes the width the other columns leave
     void onSectionResized(int column, int oldSize, int newSize);
 
