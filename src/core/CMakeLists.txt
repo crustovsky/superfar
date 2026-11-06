@@ -18,6 +18,7 @@ qt_add_library(superfar_core STATIC
   thumbnails.cpp
   rename.cpp
   compare.cpp
+  child.cpp
   archive.cpp
   pages.cpp
   video.cpp

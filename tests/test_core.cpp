@@ -2,6 +2,7 @@
 #include "core/apps.h"
 #include "core/archive.h"
 #include "core/bookmarks.h"
+#include "core/child.h"
 #include "core/compare.h"
 #include "core/dirsize.h"
 #include "core/finder.h"
@@ -85,6 +86,7 @@ private Q_SLOTS:
     void archiveListing();
     void pdfPages();
     void videoFrames();
+    void childRuns();
 };
 
 namespace {
@@ -1561,6 +1563,81 @@ void CoreTest::videoFrames()
     QVERIFY(ended);
     QVERIFY(frames >= 30 && frames <= 34);
     streamer.stop();
+}
+
+void CoreTest::childRuns()
+{
+    using core::Child;
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QByteArray marker = QFile::encodeName(tmp.path() + "/marker");
+    int calls = 0;
+    Child::Result last;
+    auto done = [&](const Child::Result& r) { last = r; ++calls; };
+
+    // Output and the exit status, both streams kept apart.
+    {
+        Child child;
+        const char* ok[] = {"sh", "-c", "printf out; printf 'first\\nlast\\n' >&2", nullptr};
+        child.run(ok, done);
+        QVERIFY(child.running());
+        QTRY_COMPARE(calls, 1);
+        QVERIFY(!child.running());
+        QVERIFY(last.spawned && last.ok && !last.missing);
+        QCOMPARE(last.out, QByteArray("out"));
+        QCOMPARE(last.err, QByteArray("first\nlast\n"));
+
+        const char* bad[] = {"sh", "-c", "printf 'first\\nlast\\n' >&2; exit 3", nullptr};
+        child.run(bad, done);
+        QTRY_COMPARE(calls, 2);
+        QVERIFY(last.spawned && !last.ok);
+        QCOMPARE(last.why("tool"), QStringLiteral("first\nlast"));
+        QCOMPARE(last.why("tool", true), QStringLiteral("last"));
+        const char* quiet[] = {"false", nullptr};
+        child.run(quiet, done);
+        QTRY_COMPARE(calls, 3);
+        QCOMPARE(last.why("tool"), QStringLiteral("tool failed"));
+    }
+
+    // A program that is not there: said at once, as missing.
+    {
+        Child child;
+        const char* none[] = {"superfar-no-such-program", nullptr};
+        child.run(none, done);
+        QCOMPARE(calls, 4);
+        QVERIFY(!last.spawned && last.missing && !last.error.isEmpty());
+        QVERIFY(!child.running());
+    }
+
+    // Cancelled, replaced or destroyed while running: the child is
+    // killed (it never gets to write its marker) and nothing is called.
+    const QByteArray slow = "sleep 0.4; touch '" + marker + "'";
+    const char* later[] = {"sh", "-c", slow.constData(), nullptr};
+    {
+        Child child;
+        child.run(later, done);
+        child.cancel();
+        QVERIFY(!child.running());
+        child.run(later, done);
+        const char* quick[] = {"true", nullptr};
+        child.run(quick, done);  // takes the place of the slow one
+        QTRY_COMPARE(calls, 5);
+        child.run(later, done);
+    }  // destroyed with a run in flight
+    QTest::qWait(700);
+    QCOMPARE(calls, 5);
+    QVERIFY(!QFile::exists(QFile::decodeName(marker)));
+
+    // done may start the next run on the same Child.
+    Child chain;
+    int steps = 0;
+    const char* step[] = {"true", nullptr};
+    std::function<void(const Child::Result&)> next = [&](const Child::Result&) {
+        if (++steps < 3)
+            chain.run(step, next);
+    };
+    chain.run(step, next);
+    QTRY_COMPARE(steps, 3);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)
