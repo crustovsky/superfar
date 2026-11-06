@@ -179,7 +179,8 @@ void PropertiesPanel::apply()
     QPointer<PropertiesPanel> guard(this);
     auto remaining = std::make_shared<int>(static_cast<int>(items_.size()));
     for (const core::Location& item : items_) {
-        core::setMode(item, mode, [guard, remaining](const QString& error) {
+        // The nine bits the boxes show; setuid, setgid and sticky stay.
+        core::setMode(item, mode, 0777, [guard, remaining](const QString& error) {
             if (!guard)
                 return;
             if (!error.isEmpty())

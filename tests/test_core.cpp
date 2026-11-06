@@ -4,6 +4,7 @@
 #include "core/bookmarks.h"
 #include "core/compare.h"
 #include "core/dirsize.h"
+#include "core/fileops.h"
 #include "core/finder.h"
 #include "core/jobs/extract.h"
 #include "core/mounts.h"
@@ -28,6 +29,7 @@
 #include <QTest>
 
 #include <cmath>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <utime.h>
 
@@ -85,6 +87,7 @@ private Q_SLOTS:
     void archiveListing();
     void pdfPages();
     void videoFrames();
+    void modeKeepsSpecialBits();
 };
 
 namespace {
@@ -1561,6 +1564,44 @@ void CoreTest::videoFrames()
     QVERIFY(ended);
     QVERIFY(frames >= 30 && frames <= 34);
     streamer.stop();
+}
+
+void CoreTest::modeKeepsSpecialBits()
+{
+    // The properties panel changes read, write and execute; a shared
+    // folder's setgid and sticky bits are not its to drop.
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QByteArray path = QFile::encodeName(tmp.path() + "/shared");
+    QVERIFY(QDir().mkdir(QFile::decodeName(path)));
+    QCOMPARE(::chmod(path.constData(), 03775), 0);
+    const core::Location dir = core::Location::fromPath(path);
+    auto modeOf = [&] {
+        struct stat st {};
+        return ::stat(path.constData(), &st) == 0 ? quint32(st.st_mode & 07777) : 0u;
+    };
+    QCOMPARE(modeOf(), 03775u);
+
+    QString error = QStringLiteral("pending");
+    core::setMode(dir, 0750, 0777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(modeOf(), 03750u);
+
+    // The whole mode on purpose: the special bits are in the mask.
+    error = QStringLiteral("pending");
+    core::setMode(dir, 0755, 07777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QCOMPARE(modeOf(), 0755u);
+
+    // A file that is not there says so.
+    error = QStringLiteral("pending");
+    core::setMode(dir.child("gone"), 0644, 0777, [&](const QString& e) { error = e; });
+    QTRY_VERIFY(error != QLatin1String("pending"));
+    QVERIFY(!error.isEmpty());
+
+    QCOMPARE(core::mergedMode(04755, 0640, 0777), 04640u);
+    QCOMPARE(core::mergedMode(0100644, 02775, 07777), 02775u);  // the type bits never go back
 }
 
 QTEST_GUILESS_MAIN(CoreTest)
