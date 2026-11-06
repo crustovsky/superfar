@@ -1,5 +1,6 @@
-qt_add_executable(superfar
-  main.cpp
+# Everything but main() is a library, so that the window can be built
+# into a test as well as into the program.
+qt_add_library(superfar_app STATIC
   bench.cpp
   mainwindow.cpp
   tree.cpp
@@ -40,7 +41,12 @@ qt_add_executable(superfar
   pane/listmodel_attrs.cpp
   ownercompletion.cpp
 )
-target_include_directories(superfar PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(superfar_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(superfar_app PUBLIC superfar_core Qt6::Widgets Qt6::DBus)
+string(TIMESTAMP SUPERFAR_BUILD_DATE "%Y-%m-%d" UTC)
+target_compile_definitions(superfar_app PUBLIC SUPERFAR_VERSION="${PROJECT_VERSION}" SUPERFAR_BUILD_DATE="${SUPERFAR_BUILD_DATE}")
+
+qt_add_executable(superfar main.cpp)
 
 # The window icon for a build that is not installed (the theme lookup
 # finds nothing then); the installed hicolor set is what launchers use.
@@ -51,9 +57,7 @@ foreach(size IN LISTS ICON_SIZES)
   list(APPEND ICON_FILES ${ICON_DIR}/${size}x${size}/apps/superfar.png)
 endforeach()
 qt_add_resources(superfar "icons" PREFIX "/icons" BASE ${ICON_DIR} FILES ${ICON_FILES})
-target_link_libraries(superfar PRIVATE superfar_core Qt6::Widgets Qt6::DBus)
-string(TIMESTAMP SUPERFAR_BUILD_DATE "%Y-%m-%d" UTC)
-target_compile_definitions(superfar PRIVATE SUPERFAR_VERSION="${PROJECT_VERSION}" SUPERFAR_BUILD_DATE="${SUPERFAR_BUILD_DATE}")
+target_link_libraries(superfar PRIVATE superfar_app)
 
 # The desktop entry gives the window its app id for the compositor and the
 # portal; without it installed Qt logs a portal registration failure.

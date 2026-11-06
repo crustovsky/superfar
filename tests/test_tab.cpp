@@ -346,10 +346,32 @@ void TabTest::attributeCells()
     QVERIFY(!m->setData(cell(OwnerColumn), cell(OwnerColumn).data(Qt::EditRole), Qt::EditRole));
     QVERIFY(!m->setData(cell(PermissionsColumn), QStringLiteral("rw----r--"), Qt::EditRole));
     QCOMPARE(messages.size(), 2);
+    // The group alone, to another of this user's groups (any group for
+    // root): typed as :group, the owner stays as it is.
+    std::optional<quint32> other;
+    if (::geteuid() == 0) {
+        other = st.st_gid == 1 ? 2 : 1;
+    } else {
+        std::vector<gid_t> groups(static_cast<size_t>(std::max(0, ::getgroups(0, nullptr))));
+        const int n = ::getgroups(static_cast<int>(groups.size()), groups.data());
+        for (int i = 0; i < n; ++i)
+            if (groups[static_cast<size_t>(i)] != st.st_gid)
+                other = groups[static_cast<size_t>(i)];
+    }
+    if (other) {
+        const int before = int(messages.size());
+        QVERIFY(m->setData(cell(OwnerColumn), QStringLiteral(":%1").arg(*other), Qt::EditRole));
+        struct stat now {};
+        QTRY_VERIFY(::stat(QFile::encodeName(root_ + "/a.txt").constData(), &now) == 0 && now.st_gid == *other);
+        QCOMPARE(now.st_uid, st.st_uid);
+        QTRY_COMPARE(cell(OwnerColumn).data().toString(), ids.owner(st.st_uid, *other));
+        QCOMPARE(int(messages.size()), before);
+    }
     if (::geteuid() != 0) {
         // Giving the file to root is refused by the system: its words, in the pane.
+        const int before = int(messages.size());
         QVERIFY(m->setData(cell(OwnerColumn), QStringLiteral("root"), Qt::EditRole));
-        QTRY_COMPARE(messages.size(), 3);
+        QTRY_COMPARE(int(messages.size()), before + 1);
     }
 
     // A header click on Permissions orders by the bits, folders first.

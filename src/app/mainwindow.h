@@ -6,6 +6,7 @@
 #include "services.h"
 
 #include <QMainWindow>
+#include <QPointer>
 
 namespace core {
 class DirSizePool;
@@ -51,7 +52,10 @@ private:
     void startTransfer(bool move);
     void promptMkdir();
     void confirmRemove(bool permanent);
-    void runJob(core::Job* job, Tab* sourceTab, const core::Location& destination);
+    // source is the tab whose marks the job spends, if it is still there
+    // when the job ends; sourceDir is the folder they were in.
+    void runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
+                const core::Location& destination);
     void refreshAt(const core::Location& dir);
     void promptNewFile();
     void promptGlob(bool on);
