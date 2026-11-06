@@ -1,10 +1,12 @@
 // Two INI files through QSettings. The config
 // (~/.config/superfar/superfar.ini) holds what the user edits: key
-// bindings, hidden columns, layout choices, rename presets; the app
-// writes it once, with the default keys, and never again. The state
-// file (~/.local/state/superfar/state.ini) holds what the app writes on
-// its own: the session, the folder history behind Ctrl+G, window and
-// splitter sizes, dragged column widths. A dotfile manager can own the
+// bindings, a starting point for the columns, layout choices, rename
+// presets. The app writes it on the first run, with the default keys,
+// and afterwards only to add the line of a command a new version
+// brings or to update a line still at an old default. The state file
+// (~/.local/state/superfar/state.ini) holds what the app writes on its
+// own: the session, the folder history behind Ctrl+G, window and
+// splitter sizes, each pane's columns. A dotfile manager can own the
 // first without seeing churn from the second.
 #pragma once
 
