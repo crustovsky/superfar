@@ -180,6 +180,10 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
+    // The tree's keys are the window's commands (Tab back to the pane,
+    // F8 on a mount), and a drop on a folder there is a transfer.
+    connect(tree_, &Tree::commandRequested, this, &MainWindow::execute);
+    connect(tree_, &Tree::dropRequested, this, &MainWindow::transfer);
     places_ = new Places(tree_, strip_, this);
     connect(places_, &Places::openFolder, this, [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
     connect(places_, &Places::message, this, [this](const QString& text) { active_->showMessage(text); });
