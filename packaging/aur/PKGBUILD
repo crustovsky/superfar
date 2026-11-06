@@ -16,7 +16,7 @@ optdepends=('gvfs: trash, mounts, network shares'
             'xdg-terminal-exec: F4 and the command line in your terminal')
 options=('!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('7c54c0d70fba6b6819b25ddb34f338907e0fd75a584be664f70c3b7660434c01')
+sha256sums=('072bac2b0493e3e97b948638caac17de3af447e6235acbffcaa029554b3c5573')
 
 build() {
   cmake -S "$pkgname-$pkgver" -B build -G Ninja \
