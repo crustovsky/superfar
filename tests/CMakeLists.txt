@@ -37,3 +37,12 @@ target_include_directories(test_tab PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_
 target_link_libraries(test_tab PRIVATE superfar_core Qt6::Widgets Qt6::Test)
 add_test(NAME tab COMMAND test_tab)
 set_tests_properties(tab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# The whole window over temp folders, on the offscreen platform: what
+# only works when the tree, the panes, the strip and the bar are wired
+# together (the tree's keys and drops, the tab strip's and the tree's
+# menus, the column list, the function bar's layers).
+qt_add_executable(test_window test_window.cpp)
+target_link_libraries(test_window PRIVATE superfar_app Qt6::Test)
+add_test(NAME window COMMAND test_window)
+set_tests_properties(window PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
