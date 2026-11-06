@@ -69,14 +69,14 @@ const std::vector<Group>& groups()
     return g;
 }
 
-// An entry's words and, after a tab, its keys: text there paints in
-// the shortcut column without registering a shortcut.
+// An entry's words and, after a tab, its key: text there paints in the
+// shortcut column without registering a shortcut. One key only: the
+// menu sizes that column by its longest text and Qt adds the width
+// once more, so a list of every key pushes the keys far from the words.
 QString withKeys(const QString& text, keymap::Command command)
 {
-    QStringList keys;
-    for (const QKeySequence& k : keymap::keysOf(command))
-        keys << k.toString(QKeySequence::NativeText);
-    return text + QLatin1Char('\t') + keys.join(QStringLiteral(", "));
+    const QKeySequence key = keymap::shownKey(command);
+    return key.isEmpty() ? text : text + QLatin1Char('\t') + key.toString(QKeySequence::NativeText);
 }
 
 } // namespace
