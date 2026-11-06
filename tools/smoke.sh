@@ -72,6 +72,10 @@ run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F
 # Home first, so Return enters a folder instead of opening Z.
 run navigation "Home;Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F3;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
 run filter "t;w;Escape;p;Backspace" 3000 "$T/a" "$T/b"
+# The tree takes the window's keys too: Tab comes back from it to the
+# pane, and a function key pressed in it acts on the active tab.
+run treekeys "Shift+Tab;Tab;F7;t;k;1;Return;Shift+Tab;F7;t;k;2;Return" 6500 "$T/a" "$T/b"
+check "Tab came back from the tree, F7 worked after it and in it" sh -c "test -d '$T/a/TK1' && test -d '$T/a/TK2'"
 run badargs "" 1200 /nonexistent/deeper foo://x
 run fileargs "" 1200 /etc/hostname /etc
 run viewer "Down;F3;Escape" 2000 "$T/a" "$T/b"
