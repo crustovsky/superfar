@@ -300,8 +300,8 @@ not the gate to loosen. A milestone is not done while it misses a gate.
 
 ## Milestones
 
-All twelve are done and tagged m1 to m12 (2026-10-29, 30); the commit on
-each tag carries the rationale. Since then: issues. Later: multi-folder
+All twelve are done (tags m1 to m12 carry the rationale). Since then work is
+GitHub issues, released as 0.x.y. Next: the AUR package. Later: multi-folder
 create, Opus style (F7 takes one folder per line, a/b/c makes the path,
 cursor on the first); inline folder expanders; translations after 1.0.
 
@@ -326,9 +326,9 @@ tabs opening and closing while memory is sampled: it must plateau. `unshare
 
 ## Non-goals
 
-Plugins, theming beyond the platform theme, an embedded terminal, a
-search index (the launcher's job), translations before 1.0. Media and
-PDF previews via tumbler or a child (pdftoppm, ffmpeg), never a linked decoder.
+Plugins, theming beyond the platform theme, an embedded terminal, a search
+index (the launcher's job), translations before 1.0, dialogs (rule 10), a
+decoder linked into the process (rule 8), sound or autoplay for video.
 
 ## Conventions
 
