@@ -29,7 +29,7 @@ you can see in the bar at the bottom.
 | **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
 | **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9. | always on screen |
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
-| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | the header, `Columns` |
+| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F6, the header |
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
@@ -71,8 +71,9 @@ what you changed:
 
 ![Properties](docs/screenshots/properties.png)
 
-The column list, from the `Columns` command or as a menu from a right
-click on the header:
+The column list on Ctrl+F6 (a right click on the header shows the same
+as a menu). Space shows or hides a column, Shift+Up and Shift+Down
+move it:
 
 ![Columns](docs/screenshots/columns.png)
 
@@ -142,7 +143,7 @@ remapped. The defaults:
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
 | Ctrl+F5 | hide or show the folder tree |
 | Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
-| (no key) `Columns` | the pane's column list as a bar: Space shows or hides a column; also under View in the F9 menu |
+| Ctrl+F6 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
 | Ctrl+D | bookmark this folder, or remove the bookmark |
 | Insert, Shift+Down, Shift+Up | mark and move down, the same, mark and move up |
 | Space, Ctrl+A, * | mark, mark all, invert |
@@ -172,8 +173,9 @@ between panes, onto tree folders and to other apps. On a column header
 a click sorts by it and a second click reverses it (folders stay
 first), a drag moves the column, an edge resizes it, and a right click
 lists the columns with check marks to show or hide them, with Reset
-columns at the bottom. Name stays first and stays shown. Each pane
-keeps its own columns, and remembers them.
+columns at the bottom. Ctrl+F6 does all of it from the keyboard. Name
+stays first and stays shown. Each pane keeps its own columns, and
+remembers them.
 
 ## Build
 

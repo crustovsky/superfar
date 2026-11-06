@@ -72,6 +72,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_F2), Command::MultiRename},
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
         {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
+        {QKeySequence(Qt::CTRL | Qt::Key_F6), Command::Columns},
         {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
         {QKeySequence(Qt::CTRL | Qt::Key_Home), Command::PreviewFirst},
         {QKeySequence(Qt::CTRL | Qt::Key_PageUp), Command::PreviewPrev},

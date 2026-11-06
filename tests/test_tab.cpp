@@ -269,6 +269,27 @@ void TabTest::columnsHideAndMove()
     // Name cannot be dragged, and nothing can be dropped before it.
     QVERIFY(!h->isFirstSectionMovable());
 
+    // The same one step at a time, as the column list's keys ask for it.
+    view->moveColumn(SizeColumn, 1);
+    QCOMPARE(changed.size(), 4);
+    QCOMPARE(view->columnLayout().orderNames().mid(0, 3), QStringList({"name", "modified", "size"}));
+    view->moveColumn(ModifiedColumn, -1);  // nothing goes before Name
+    view->moveColumn(NameColumn, 1);       // and Name does not move
+    QCOMPARE(changed.size(), 4);
+    QCOMPARE(h->visualIndex(NameColumn), 0);
+
+    // And with the mouse: a header section dragged past its neighbour.
+    const auto centre = [&](int column) {
+        return QPoint(h->sectionViewportPosition(column) + h->sectionSize(column) / 2, h->height() / 2);
+    };
+    const QPoint from = centre(ModifiedColumn), to = centre(SizeColumn) + QPoint(h->sectionSize(SizeColumn) / 3, 0);
+    QTest::mousePress(h->viewport(), Qt::LeftButton, Qt::NoModifier, from);
+    QTest::mouseMove(h->viewport(), (from + to) / 2);
+    QTest::mouseMove(h->viewport(), to);
+    QTest::mouseRelease(h->viewport(), Qt::LeftButton, Qt::NoModifier, to);
+    QCOMPARE(changed.size(), 5);
+    QCOMPARE(view->columnLayout().orderNames().mid(0, 3), QStringList({"name", "size", "modified"}));
+
     // The sort follows its column wherever the column sits.
     tab.setSort(core::SortBy::Modified, false);
     QCOMPARE(h->sortIndicatorSection(), int(ModifiedColumn));

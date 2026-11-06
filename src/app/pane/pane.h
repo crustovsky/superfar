@@ -45,6 +45,7 @@ public:
     void applyColumns(const Config::Columns& columns);
     columns::Layout columnLayout() const;
     void setColumnShown(int column, bool shown);
+    void moveColumn(int column, int delta);
     void resetColumns() { Q_EMIT columnsResetRequested(); }
 
     void setActive(bool active);

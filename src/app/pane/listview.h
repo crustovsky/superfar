@@ -23,6 +23,8 @@ public:
     // As the user would from the header: reported by columnsChanged().
     // Name stays; a hidden column keeps its width for its return.
     void setColumnShown(int column, bool shown);
+    // One place left (-1) or right (+1), as a drag of its header would.
+    void moveColumn(int column, int delta);
 
     // The header's sort indicator; the header flips it on a click and
     // sortChanged() reports both.

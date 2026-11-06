@@ -563,10 +563,12 @@ void MainWindow::promptGlob(bool on)
 
 void MainWindow::chooseColumns()
 {
-    // The header's right-click list, for the keyboard. Name is not in
-    // it: it stays, and first.
+    // The header's right-click list and its drag, for the keyboard: the
+    // rows are the columns left to right. Name is not among them: it
+    // stays, and first.
     Pane* pane = active_;
-    CheckBar* bar = strip_->checks(pane == left_ ? tr("Columns of the left pane") : tr("Columns of the right pane"));
+    CheckBar* bar = strip_->checks((pane == left_ ? tr("Columns of the left pane") : tr("Columns of the right pane"))
+                                   + tr(": Space shows or hides, Shift+Up and Shift+Down move, Esc closes"));
     auto fill = [bar, pane] {
         const columns::Layout layout = pane->columnLayout();
         QStringList labels;
@@ -580,6 +582,14 @@ void MainWindow::chooseColumns()
     fill();
     connect(bar, &CheckBar::toggled, pane, [pane](int index, bool on) {
         pane->setColumnShown(pane->columnLayout().order.value(index + 1, -1), on);
+    });
+    connect(bar, &CheckBar::moveRequested, pane, [bar, pane, fill](int index, int delta) {
+        const QList<int> before = pane->columnLayout().order;
+        pane->moveColumn(before.value(index + 1, -1), delta);
+        if (pane->columnLayout().order == before)
+            return;  // at an end already
+        fill();
+        bar->setCurrent(index + delta);  // the cursor goes with its column
     });
     connect(bar, &CheckBar::actionChosen, pane, [pane, fill] {
         pane->resetColumns();

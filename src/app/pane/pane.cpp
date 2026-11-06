@@ -160,6 +160,12 @@ void Pane::applyColumns(const Config::Columns& columns)
         tab->view()->applyColumns(layout, columns.widths);
 }
 
+void Pane::moveColumn(int column, int delta)
+{
+    if (Tab* tab = activeTab())
+        tab->view()->moveColumn(column, delta);  // comes back through columnsChanged
+}
+
 columns::Layout Pane::columnLayout() const
 {
     return columns::Layout::from(columns_.order, columns_.hidden);

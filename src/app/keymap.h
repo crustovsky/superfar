@@ -73,7 +73,7 @@ enum class Command {
     PreviewNext,
     PreviewLast,
     PreviewPlay,       // a previewed video: play or pause
-    Columns,           // the pane's column list; no key by default
+    Columns,           // Ctrl+F6: the pane's column list
 };
 
 Command lookup(const QKeySequence& key);

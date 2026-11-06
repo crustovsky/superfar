@@ -104,8 +104,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows
   the direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus,
-  taller rows); Ctrl+F5 hides the tree; a header click sorts the tab,
-  a drag moves the column, a right click (or Columns, unbound) lists them
+  taller rows); Ctrl+F5 hides the tree; Ctrl+F6 lists the columns to
+  show, hide or move; a header click sorts, a drag moves, a right click lists
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and

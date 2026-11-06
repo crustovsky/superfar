@@ -159,6 +159,16 @@ void ListView::setColumnShown(int column, bool shown)
     Q_EMIT columnsChanged(columnLayout());
 }
 
+void ListView::moveColumn(int column, int delta)
+{
+    QHeaderView* h = header();
+    const int from = h->visualIndex(column);
+    const int to = from + delta;
+    if (column <= ListModel::NameColumn || column >= ListModel::ColumnCount || to < 1 || to >= h->count())
+        return;  // Name stays, and stays first
+    h->moveSection(from, to);  // reported through sectionMoved, like a drag
+}
+
 void ListView::showColumnMenu(const QPoint& pos)
 {
     // The same list the Columns command shows in a bar, here as a menu.

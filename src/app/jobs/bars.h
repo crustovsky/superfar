@@ -47,9 +47,9 @@ private:
 };
 
 // A list of switches, and an action as its last row: Space or Enter
-// flips the row under the cursor, Enter on the action runs it, Esc
-// closes. What a switch does happens at once; there is nothing to
-// accept.
+// flips the row under the cursor, Shift+Up and Shift+Down ask to move
+// it, Enter on the action runs it, Esc closes. What a key does happens
+// at once; there is nothing to accept.
 class CheckBar : public QFrame {
     Q_OBJECT
 public:
@@ -57,14 +57,17 @@ public:
 
     // Replaces the rows, keeping the cursor where it was.
     void setItems(const QStringList& labels, const QList<bool>& checked, const QString& action);
+    void setCurrent(int index);
 
 Q_SIGNALS:
     void toggled(int index, bool on);
+    void moveRequested(int index, int delta);  // -1 up, +1 down; the owner refills
     void actionChosen();
     void closed();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     QListWidget* list_;

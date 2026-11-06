@@ -53,7 +53,7 @@ printf 'root:x:0:\nsam:x:1000:\n' > /tmp/group
 mount --bind /tmp/passwd /etc/passwd
 mount --bind /tmp/group /etc/group
 AS_SAM="unshare -U --map-user=1000 --map-group=1000"
-COLS='\n[columns/left]\norder=name,permissions,owner,modified\nhidden=size,items\n\n[keys]\nColumns=Ctrl+K\n'
+COLS='\n[columns/left]\norder=name,permissions,owner,modified\nhidden=size,items\n'
 shot() {
     name=$1; keys=$2; ms=$3; shift 3
     [ -z "${ONLY:-}" ] || [ "$ONLY" = "$name" ] || return 0
@@ -77,5 +77,5 @@ shot archive "Down;Return;Return" 5000 $D/Downloads $D
 shot find "Alt+F7;G;T;K;Return" 7000 /usr/share/icons/hicolor $D
 shot thumbnails "Ctrl+F4" 6000 /usr/share/icons/hicolor/256x256/apps $D
 CFG=$COLS AS=$AS_SAM shot permissions "Down;Down;Down;F2;Tab" 4500 $D/Projects $D
-CFG=$COLS AS=$AS_SAM shot columns "Ctrl+K;Down;Down" 4500 $D/Projects $D
+CFG=$COLS AS=$AS_SAM shot columns "Ctrl+F6;Down;Down" 4500 $D/Projects $D
 CFG=$COLS AS=$AS_SAM shot properties "Ctrl+A;Alt+F2;Tab" 5000 $D/Projects $D
