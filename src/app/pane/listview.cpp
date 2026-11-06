@@ -110,7 +110,7 @@ void ListView::fitName()
 
 int ListView::nameFloor() const
 {
-    return iconSize().width() + QFontMetrics(font()).horizontalAdvance(QLatin1Char('x')) * 12;
+    return iconSize().width() + QFontMetrics(font()).horizontalAdvance(QLatin1Char('x')) * 8;
 }
 
 void ListView::resizeEvent(QResizeEvent* event)
