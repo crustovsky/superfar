@@ -42,14 +42,14 @@ These are the product. When in doubt, they win.
    and failure, and shows the list when the job ends.
 8. **Columns fit their content.** Size, count and date never truncate; each
    pane keeps its own set, order and widths, changed from its header.
-9. **Previews are big.** Ctrl+Q previews the cursor item. By default it
+9. **Previews are big.** Ctrl+F8 previews the cursor item. By default it
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
    style. Same component, same key, different slot. Images fit the slot,
-   text shows its head, folders show count and recursive size, archives
-   show a summary (counts, sizes, one folder or a tarbomb, newest member,
-   dropped paths) and the top of their tree from bsdtar's listing,
-   anything else shows type, size, dates and permissions.
+   text shows its head, a PDF its pages, a video plays, folders show count
+   and recursive size, archives a summary (counts, sizes, one folder or a
+   tarbomb, newest member, dropped paths) and the top of their tree,
+   anything else type, size, dates and permissions.
 10. **It follows the OS theme.** The app never defines a colour. Whatever
     the platform theme says (Kvantum, qt6ct, Fusion) is what it looks like.
 
@@ -171,8 +171,9 @@ Optional third slot for the preview right of both panes. Split orientation
 
 ## Architecture
 
-Two CMake targets. `core` links QtCore and GIO only, never QtGui or
-QtWidgets; the linker enforces the split. `app` links core and Widgets.
+Three CMake targets. `core` links QtCore and GIO only, never QtGui or
+QtWidgets; the linker enforces the split. `app` is a static library (all but
+main) over core and Widgets, linked by the program and by the window test.
 
 ```
 src/core/             no widgets, GIO only, tested headless with QtTest
@@ -182,22 +183,22 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   sort.cpp            natural sort by GLib collation key, dirs first
   unixattrs.cpp       mode and owner as text and back, id names cached
   dirsize.cpp         recursive size and count walker (see rule 9)
-  jobs/               copy, move, trash, delete, extract, pack: progress,
-                      pause, skip, cancel, conflict policy, error log; one
-                      worker thread per job. Copy is g_file_copy with a
+  jobs/               copy, move, trash, delete, extract, pack, attributes:
+                      one worker thread each, progress, pause, skip, cancel,
+                      conflict policy, error log. Copy is g_file_copy with a
                       progress callback (reflinks, splice, metadata and
-                      server-side remote copy for free): Pause blocks
-                      inside the callback, Skip cancels the per-file
-                      cancellable. Move is g_file_move. Trash failure on
-                      another volume offers permanent delete in the
-                      window. Extract and pack run bsdtar in a child.
-                      Attributes: chmod and chown down a tree, chmod's X
+                      server-side copy for free): Pause blocks in the
+                      callback, Skip cancels the per-file cancellable. Move
+                      is g_file_move. A trash failure on another volume
+                      offers permanent delete. Extract and pack run bsdtar;
+                      attributes is chmod and chown down a tree with chmod's
+                      X
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal launch
   mounts.cpp          volumes, mount, unmount; prompts go to the window
-  compare.cpp         folder sync engine (later): name, size, mtime, hash
+  compare.cpp         folder sync engine: name, size, mtime, hash
+  child.cpp           a program run for its output, killed on cancel
 src/app/
-  main.cpp
   mainwindow.cpp      tree, two panes, preview slot, active pane, keys
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
@@ -206,10 +207,11 @@ src/app/
   pane/columns.cpp    the column table: name, label, width, default, sort
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
+  menu.cpp            the F9 menus and the right-click menus, one table
   jobs/strip.cpp      collapsed job strip, conflict and confirm bars
   jobs/panel.cpp      expanded job panel; throughput graph via QPainter
   viewer.cpp          F3 viewer, in-window, windowed reads, Esc closes
-  preview.cpp         Ctrl+Q component, placed in whichever slot config says
+  preview.cpp         the preview, placed in whichever slot config says
   cmdline.cpp         command line
   keymap.cpp          FAR table, remappable from config
   config.cpp          QSettings INI: the config and the state file
@@ -217,11 +219,11 @@ src/app/
 
 ### Rules
 
-1. **Per-file work stays in the viewport.** Size, date, icon, content type
-   and folder counts are queried when a row is painted, with a small cache.
-   Sorting by size or date runs one background stat pass, then re-sorts.
-   Measure first: GIO's local enumerator stats each entry for most
-   attribute sets, so the minimal listing mainly pays off on remotes.
+1. **Per-file work stays in the viewport.** Icon, content type and folder
+   counts are queried when a row is painted, with a small cache. Size, date,
+   mode and owner come with the listing: GIO's local enumerator stats each
+   entry anyway, so a sort by them needs no extra pass. Measure before
+   adding an attribute.
 2. **The model is not a list of objects.** `listmodel.cpp` wraps a plain
    vector<Entry>. Sorting and filtering change the vector and emit one
    reset. No QObject, no QStandardItem per row.
@@ -239,8 +241,8 @@ src/app/
 8. **Untrusted content is not decoded in-process.** Images go through
    libglycin or a child process. The preview reads text as plain bytes,
    capped at 1 MiB. The F3 viewer has no cap: it reads windows through a
-   seekable stream. Nothing is parsed. Thumbnails, when they come, use the
-   freedesktop cache and tumbler over D-Bus. No other decoders.
+   seekable stream. Nothing is parsed. Thumbnails use the freedesktop
+   cache and tumbler over D-Bus. No other decoders in the process.
 9. **Recursive sizes are opt-in background work.** One worker pool, visible
    rows first, results cached by (device, inode, mtime), cancelled on
    navigation. Local filesystems only by default. Never follow symlinks,
@@ -253,8 +255,8 @@ src/app/
     option; stylesheets, if any, set spacing only. The acceptance test is
     switching the system theme while the app runs.
 12. **Columns are sized from font metrics.** Size, count and date get a
-    fixed width from their widest possible string; Name takes the rest.
-    Never resize-to-contents on a virtualized view.
+    fixed width from their widest string; Name takes the rest, down to a floor,
+    then the list scrolls. Never resize-to-contents on a virtualized view.
 13. **Inactive tabs do nothing.** A change seen by an inactive tab's
     monitor only marks it dirty; walks are cancelled; a dirty tab reloads
     when it becomes current.
@@ -276,34 +278,32 @@ app itself allocates. PSS shares library pages with every process that maps
 them, so it drifts with whatever else is running; gates are on anonymous
 memory. Thunar is a different toolkit: shown for reference, never a gate.
 
-Gates, warm cache, against the milestone 2 build measured 2026-10-29:
+Gates, warm cache; measured on v0.8.2, 2026-11-06, on a quiet machine:
 
 | measure                            | gate     | measured |
 |------------------------------------|----------|----------|
 | first frame, empty window          | < 80 ms  | 30 ms    |
-| first rows, 100k folder            | < 100 ms | 40 ms    |
-| loaded, 100k folder                | < 1 s    | 0.5 s    |
-| anonymous memory, empty window     | < 8 MB   | 4.4 MB   |
-| anonymous memory, 2k folder open   | < 16 MB  | 12 MB    |
-| anonymous memory, 100k folder open | < 60 MB  | 48 MB    |
-| anonymous memory after leaving it  | < 24 MB  | 17 MB    |
+| first rows, 100k folder            | < 100 ms | 70 ms    |
+| loaded, 100k folder                | < 1 s    | 0.55 s   |
+| anonymous memory, empty window     | < 8 MB   | 5.0 MB   |
+| anonymous memory, 2k folder open   | < 16 MB  | 9.5 MB   |
+| anonymous memory, 100k folder open | < 60 MB  | 46 MB    |
+| anonymous memory after leaving it  | < 24 MB  | 14 MB    |
 
-Whole-footprint PSS sits around 25 MB empty and 70 MB with the 100k
+Whole-footprint PSS sits around 16 MB empty and 65 MB with the 100k
 folder open, depending on what else shares Qt's pages. Thunar 4.20 on
 the same machine: first frame about 340 ms, about 400 MB PSS.
 
-The 100k folder costs about 360 bytes per entry today (name, display string,
-collation key, row index, name hash). That is the number to shrink, not the
-gate to loosen. A milestone is not done while it misses a gate.
+The 100k folder costs about 370 bytes per entry today (name, display string,
+collation key, row index, name hash, mode, ids). That is the number to shrink,
+not the gate to loosen. A milestone is not done while it misses a gate.
 
 ## Milestones
 
-All twelve are done and tagged m1 to m12 (2026-10-29 to 2026-10-30);
-the commit on each tag carries the rationale. Since then: issues.
-
-Later: multi-folder create, Opus style (F7 takes one folder per line,
-a/b/c makes the path, cursor on the first); inline folder expanders;
-translations after 1.0.
+All twelve are done (tags m1 to m12 carry the rationale). Since then work is
+GitHub issues, released as 0.x.y. Next: the AUR package. Later: multi-folder
+create, Opus style (F7 takes one folder per line, a/b/c makes the path,
+cursor on the first); inline folder expanders; translations after 1.0.
 
 ## Release
 
@@ -318,29 +318,29 @@ After the tag is pushed, hash GitHub's archive tarball into the
 PKGBUILD's sha256sums (the AUR copy must match) and commit that.
 
 Before a release: ctest in an `-fsanitize=address,undefined` build
-(tests/test_hostile.cpp is the input fuzz), clang-tidy with the
-bugprone, cert, performance and clang-analyzer checks, a render with a
-light theme and one with plain Fusion, and a soak of tabs opening and
-closing while memory is sampled: it must plateau. `unshare -Urm
-tools/screenshots.sh` re-renders the README screenshots.
+(tests/test_hostile.cpp is the input fuzz, tests/test_window.cpp the whole
+window), clang-tidy with the bugprone, cert, performance and clang-analyzer
+checks, a render with a light theme and one with plain Fusion, and a soak of
+tabs opening and closing while memory is sampled: it must plateau. `unshare
+-Urm tools/screenshots.sh` re-renders the README screenshots.
 
 ## Non-goals
 
-Plugins, theming beyond the platform theme, an embedded terminal, a
-search index (the launcher's job), translations before 1.0. Media and
-PDF previews via tumbler or a child (pdftoppm, ffmpeg), never a linked decoder.
+Plugins, theming beyond the platform theme, an embedded terminal, a search
+index (the launcher's job), translations before 1.0, dialogs (rule 10), a
+decoder linked into the process (rule 8), sound or autoplay for video.
 
 ## Conventions
 
 - No global state; pass tab state explicitly through signals and messages
-- Errors are returned (std::expected), not thrown, except on programmer
-  error; GError is converted at the core boundary
+- Errors are returned as a message (empty for success), not thrown,
+  except on programmer error; GError is converted at the core boundary
 - GObject handles live in unique_ptr with an unref deleter; no raw
   new / delete, no manual ref counting outside the wrappers
 - core emits plain QObject signals; app never includes GIO headers; core
   never includes QtGui or QtWidgets
 - Test filesystem ops against a temp dir with QtTest, never mock the
-  filesystem
+  filesystem; what needs the parts wired together goes in test_window
 - A defect found while working on something else, pre-existing or just
   made, gets a GitHub issue first (gh issue create, label bug, the
   style of the open ones: what is wrong, then "Proposed:" bullets) and
