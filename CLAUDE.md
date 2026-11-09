@@ -199,11 +199,11 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   compare.cpp         folder sync engine: name, size, mtime, hash
   child.cpp           a program run for its output, killed on cancel
 src/app/
-  mainwindow.cpp      tree, two panes, preview slot, active pane, keys
+  mainwindow*.cpp     tree, two panes, preview slot, keys; _jobs, _prompts
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
-  pane/tab.cpp        one folder view: location, history, filter, marks
-  pane/listmodel.cpp  QAbstractTableModel over core's vector<Entry>
+  pane/tab*.cpp       one folder view: location, history, filter, marks
+  pane/listmodel*.cpp QAbstractTableModel over core's vector<Entry>
   pane/columns.cpp    the column table: name, label, width, default, sort
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
