@@ -167,20 +167,36 @@ void ListModel::setMarked(int row, bool on)
 
 void ListModel::markAll(bool on)
 {
-    for (quint32 idx : rows_)
-        marked_[idx] = on ? 1 : 0;
-    markedCount_ = on ? static_cast<int>(rows_.size()) : 0;
+    if (!on) {
+        // Clearing is for every mark, the ones a filter hides too.
+        std::fill(marked_.begin(), marked_.end(), quint8(0));
+        markedCount_ = 0;
+    } else {
+        for (quint32 idx : rows_) {
+            markedCount_ += marked_[idx] ? 0 : 1;
+            marked_[idx] = 1;
+        }
+    }
     rowsRepaint();
 }
 
 void ListModel::invertMarks()
 {
-    markedCount_ = 0;
+    // The rows shown; a mark the filter hides stays as it was and stays
+    // counted.
     for (quint32 idx : rows_) {
         marked_[idx] = marked_[idx] ? 0 : 1;
-        markedCount_ += marked_[idx];
+        markedCount_ += marked_[idx] ? 1 : -1;
     }
     rowsRepaint();
+}
+
+int ListModel::markedNotShown() const
+{
+    int shown = 0;
+    for (quint32 idx : rows_)
+        shown += marked_[idx];
+    return static_cast<int>(std::count(marked_.begin(), marked_.end(), quint8(1))) - shown;
 }
 
 QSet<QByteArray> ListModel::markedNames() const

@@ -71,6 +71,7 @@ private Q_SLOTS:
     void vanishedNamesAreNotRestored();
     void finishedJobClearsWhileAway();
     void marksAcrossAnArchive();
+    void marksUnderAFilter();
     void cursorRowSpansTheList();
     void columnsHideAndMove();
     void nameKeepsAFloor();
@@ -172,6 +173,35 @@ void TabTest::finishedJobClearsWhileAway()
     markFirstRows(tab, 1);
     tab.clearMarks(loc(root_));
     QCOMPARE(tab.markedCount(), 0);
+}
+
+void TabTest::marksUnderAFilter()
+{
+    // Invert and mark all act on the rows the filter shows; the marks it
+    // hides stay, stay counted, and the prompt of a job names them (#55).
+    Tab tab(services_);
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    markFirstRows(tab, 2);  // sub, a.txt
+    QTest::keyClick(tab.view(), Qt::Key_B);
+    QCOMPARE(tab.entryNames().size(), 3);
+    QCOMPARE(tab.view()->model()->rowCount(), 2);  // sub, b.txt
+    QCOMPARE(tab.markedCount(), 2);
+    tab.execute(keymap::Command::InvertMarks);  // sub off, b.txt on; a.txt untouched
+    QCOMPARE(tab.markedCount(), 2);
+    QCOMPARE(tab.selectionText(), QStringLiteral("2 items (1 not shown)"));
+    QCOMPARE(tab.selectedLocations().size(), size_t(2));
+    tab.execute(keymap::Command::MarkAll);
+    QCOMPARE(tab.markedCount(), 3);
+    tab.execute(keymap::Command::Cancel);  // the filter goes, the marks stay
+    QCOMPARE(tab.view()->model()->rowCount(), 3);
+    QCOMPARE(markedNames(tab), QStringList({"a.txt", "b.txt", "sub"}));
+    QCOMPARE(tab.selectionText(), QStringLiteral("3 items"));
+    // Clearing takes the hidden ones too: nothing is left to surprise F8.
+    QTest::keyClick(tab.view(), Qt::Key_B);
+    tab.execute(keymap::Command::ClearMarks);
+    tab.execute(keymap::Command::Cancel);
+    QCOMPARE(tab.markedCount(), 0);
+    QVERIFY(tab.selectedLocations().size() <= 1);
 }
 
 void TabTest::marksAcrossAnArchive()

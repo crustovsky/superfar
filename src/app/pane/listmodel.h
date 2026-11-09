@@ -83,9 +83,11 @@ public:
     bool isMarked(int row) const { return marked_[rows_[row]] != 0; }
     void setMarked(int row, bool on);
     void toggleMarked(int row) { setMarked(row, !isMarked(row)); }
+    // On: every row shown. Off: every mark, shown or not.
     void markAll(bool on);
-    void invertMarks();
+    void invertMarks();  // the rows shown
     int markedCount() const { return markedCount_; }
+    int markedNotShown() const;  // marks on entries a filter keeps out of the list
     QSet<QByteArray> markedNames() const;
     std::vector<QByteArray> markedNamesInOrder() const;  // list order, hidden included
     void applyMarks(const QSet<QByteArray>& names);

@@ -111,8 +111,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Alt+F7 find in tree (fuzzy over names, results in a tab)
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
   moves up; Space selects when the filter is empty;
-  Ctrl+= / Ctrl+- select and deselect by glob (keypad + and - too);
-  Ctrl+A all; * invert; Ctrl+Shift+A clears. Selection is marks,
+  Alt+F9 (Ctrl+=) / Alt+F10 (Ctrl+-) select and deselect by glob;
+  Ctrl+A all; Alt+F8 (*) inverts; Ctrl+Shift+A clears. Selection is marks,
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
 - Enter opens a file with its default app; Shift+F3 (Shift+Enter) shows the

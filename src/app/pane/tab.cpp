@@ -158,8 +158,13 @@ std::vector<core::Location> Tab::selectedLocations() const
 QString Tab::selectionText() const
 {
     const int marked = model_->markedCount();
-    if (marked > 0)
-        return tr("%n items", nullptr, marked);
+    if (marked > 0) {
+        // A job takes every mark, so the prompt says when some of them
+        // are not on screen.
+        const int unseen = model_->markedNotShown();
+        const QString items = tr("%n items", nullptr, marked);
+        return unseen > 0 ? tr("%1 (%2 not shown)").arg(items).arg(unseen) : items;
+    }
     const QModelIndex idx = view_->currentIndex();
     return idx.isValid() ? model_->entryAt(idx.row()).display : QString();
 }
