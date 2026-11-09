@@ -3,6 +3,9 @@
 #include "core/gobject.h"
 
 #include <QFile>
+#include <QList>
+
+#include <gio/gdesktopappinfo.h>
 
 namespace core {
 
@@ -56,8 +59,68 @@ void queryContentType(const Location& file,
                             nullptr, &TypeRequest::onInfo, req);
 }
 
+// The terminal's command line up to where the program to run goes;
+// empty when there is none.
+QList<QByteArray> terminalArgv()
+{
+    if (GStr found(g_find_program_in_path("xdg-terminal-exec")); found)
+        return {QByteArray(found.get())};
+    if (const QByteArray term = qgetenv("TERMINAL"); !term.isEmpty())
+        return {term, "-e"};
+    for (const char* t : {"kitty", "foot", "alacritty", "wezterm", "ghostty", "konsole", "xterm"})
+        if (GStr found(g_find_program_in_path(t)); found)
+            return {QByteArray(found.get()), "-e"};
+    return {};
+}
+
+bool shellInTerminal(const QByteArray& cwd, const QByteArray& command, QString* error)
+{
+    QList<QByteArray> argv = terminalArgv();
+    if (argv.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("No terminal found; set $TERMINAL");
+        return false;
+    }
+    argv << "sh" << "-c" << command;
+    std::vector<char*> cargv;
+    for (QByteArray& a : argv)
+        cargv.push_back(a.data());
+    cargv.push_back(nullptr);
+    GError* gerror = nullptr;
+    const bool ok = g_spawn_async(cwd.isEmpty() ? nullptr : cwd.constData(), cargv.data(), nullptr,
+                                  G_SPAWN_SEARCH_PATH, nullptr, nullptr, nullptr, &gerror);
+    GErrorPtr err(gerror);
+    if (!ok && error)
+        *error = errorMessage(err.get());
+    return ok;
+}
+
+bool launchInTerminal(GAppInfo* app, const std::vector<Location>& files, QString* error)
+{
+    const char* line = g_app_info_get_commandline(app);
+    if (!line || !*line) {
+        if (error)
+            *error = QStringLiteral("%1 has no command").arg(QString::fromUtf8(g_app_info_get_name(app)));
+        return false;
+    }
+    const QByteArray exec(line);
+    const QByteArray cwd = files.empty() ? QByteArray() : files.front().parent().path();
+    // An app that takes one file gets a terminal per file, as GLib
+    // starts one instance per file.
+    const bool many = exec.contains("%F") || exec.contains("%U");
+    if (!many && (exec.contains("%f") || exec.contains("%u")) && files.size() > 1) {
+        for (const Location& file : files)
+            if (!shellInTerminal(cwd, expandExec(exec, {file}), error))
+                return false;
+        return true;
+    }
+    return shellInTerminal(cwd, expandExec(exec, files), error);
+}
+
 bool launch(GAppInfo* app, const std::vector<Location>& files, QString* error)
 {
+    if (G_IS_DESKTOP_APP_INFO(app) && g_desktop_app_info_get_boolean(G_DESKTOP_APP_INFO(app), "Terminal"))
+        return launchInTerminal(app, files, error);
     GList* list = fileList(files);
     GError* gerror = nullptr;
     const bool ok = g_app_info_launch(app, list, nullptr, &gerror);
@@ -147,39 +210,48 @@ bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOp
     QString command = shellCommand;
     if (holdOpen)
         command += QStringLiteral("; __s=$?; printf '\\n[exit %s] Enter to close' \"$__s\"; read __r");
+    return shellInTerminal(dir.path(), command.toUtf8(), error);
+}
 
-    QList<QByteArray> argv;
-    if (GStr found(g_find_program_in_path("xdg-terminal-exec")); found) {
-        argv << QByteArray(found.get());
-    } else if (const QByteArray term = qgetenv("TERMINAL"); !term.isEmpty()) {
-        argv << term << "-e";
-    } else {
-        for (const char* t : {"kitty", "foot", "alacritty", "wezterm", "ghostty", "konsole", "xterm"}) {
-            if (GStr found(g_find_program_in_path(t)); found) {
-                argv << QByteArray(found.get()) << "-e";
-                break;
-            }
+QByteArray expandExec(const QByteArray& exec, const std::vector<Location>& files)
+{
+    auto quoted = [](const Location& file, bool uri) {
+        const QByteArray path = file.path();
+        return shellQuote(uri || path.isEmpty() ? file.uri().toUtf8() : path);
+    };
+    auto all = [&](bool uri) {
+        QByteArray out;
+        for (const Location& file : files)
+            out += (out.isEmpty() ? "" : " ") + quoted(file, uri);
+        return out;
+    };
+    QByteArray out;
+    bool placed = false;
+    for (qsizetype i = 0; i < exec.size(); ++i) {
+        if (exec[i] != '%' || i + 1 == exec.size()) {
+            out += exec[i];
+            continue;
+        }
+        const char code = exec[++i];
+        switch (code) {
+        case '%': out += '%'; break;
+        case 'f':
+        case 'u':
+            if (!files.empty())
+                out += quoted(files.front(), code == 'u');
+            placed = true;
+            break;
+        case 'F':
+        case 'U':
+            out += all(code == 'U');
+            placed = true;
+            break;
+        default: break;  // %i, %c, %k and the deprecated ones: nothing a terminal app needs
         }
     }
-    if (argv.isEmpty()) {
-        if (error)
-            *error = QStringLiteral("No terminal found; set $TERMINAL");
-        return false;
-    }
-    argv << "sh" << "-c" << command.toUtf8();
-
-    std::vector<char*> cargv;
-    for (QByteArray& a : argv)
-        cargv.push_back(a.data());
-    cargv.push_back(nullptr);
-    const QByteArray cwd = dir.path();
-    GError* gerror = nullptr;
-    const bool ok = g_spawn_async(cwd.isEmpty() ? nullptr : cwd.constData(), cargv.data(), nullptr,
-                                  G_SPAWN_SEARCH_PATH, nullptr, nullptr, nullptr, &gerror);
-    GErrorPtr err(gerror);
-    if (!ok && error)
-        *error = errorMessage(err.get());
-    return ok;
+    if (!placed && !files.empty())
+        out += ' ' + all(false);
+    return out.trimmed();
 }
 
 QByteArray shellQuote(const QByteArray& arg)
