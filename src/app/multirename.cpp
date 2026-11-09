@@ -1,5 +1,6 @@
 #include "multirename.h"
 
+#include "counted.h"
 #include "config.h"
 #include "core/fileops.h"
 
@@ -199,8 +200,8 @@ void MultiRenamePanel::refresh()
             clashes += clash ? 1 : 0;
         }
     }
-    summary_->setText(clashes > 0 ? tr("%n items, %1 clash", nullptr, checked).arg(clashes)
-                                  : tr("%n items, %1 change", nullptr, checked).arg(plan_.changed));
+    summary_->setText(clashes > 0 ? tr("%1, %2").arg(counted(checked, tr("item"), tr("items")), counted(clashes, tr("clash"), tr("clashes")))
+                                  : tr("%1, %2").arg(counted(checked, tr("item"), tr("items")), counted(plan_.changed, tr("change"), tr("changes"))));
     apply_->setEnabled(clashes == 0 && plan_.changed > 0 && checked > 0);
 }
 
@@ -271,8 +272,8 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
                 }
                 self->adoptLocations(st->undo);
                 Q_EMIT self->message(st->failures > 0
-                                         ? tr("%n renames failed", nullptr, st->failures)
-                                         : tr("%n items renamed", nullptr, static_cast<int>(st->moves.size())));
+                                         ? tr("%1 failed").arg(counted(st->failures, tr("rename"), tr("renames")))
+                                         : tr("%1 renamed").arg(counted(static_cast<qint64>(st->moves.size()), tr("item"), tr("items"))));
                 Q_EMIT self->renamed(st->firstNew.toUtf8());
                 return;
             }

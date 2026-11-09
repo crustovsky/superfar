@@ -9,6 +9,7 @@
 #include "jobs/bars.h"
 #include "mainwindow.h"
 #include "menu.h"
+#include "openwith.h"
 #include "pane/columns.h"
 #include "pane/listview.h"
 #include "pane/pane.h"
@@ -16,11 +17,13 @@
 #include "tree.h"
 #include "uris.h"
 
+#include <QApplication>
 #include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDir>
 #include <QFile>
 #include <QHeaderView>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
@@ -36,6 +39,18 @@
 using keymap::Command;
 
 namespace {
+
+// Apps, defaults and PATH of the test's own (set in main, before GLib
+// reads them): a stand-in viewer registered for text, which writes down
+// its arguments.
+QString g_env;
+
+QStringList viewerCall()
+{
+    QFile f(g_env + "/viewer-call");
+    return f.open(QIODevice::ReadOnly)
+        ? QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts) : QStringList();
+}
 
 void write(const QString& path, const QByteArray& content)
 {
@@ -98,6 +113,7 @@ private Q_SLOTS:
     void propertiesGoDownAFolder();
     void promptOutlivesItsTab();
     void cursorStaysWhereItsItemWas();
+    void openWith();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -517,5 +533,98 @@ void WindowTest::cursorStaysWhereItsItemWas()
     QCOMPARE(tab->currentName(), QByteArray("f2.txt"));
 }
 
-QTEST_MAIN(WindowTest)
+void WindowTest::openWith()
+{
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    view->setCurrentIndex(view->model()->index(1, 0));
+    QCOMPARE(tab->currentName(), QByteArray("one.txt"));
+    auto bar = [&]() -> OpenWithBar* {
+        window_->execute(Command::OpenWith);
+        OpenWithBar* found = nullptr;
+        [&] {
+            QTRY_VERIFY(window_->findChild<OpenWithBar*>());
+            found = window_->findChild<OpenWithBar*>();
+            QTRY_VERIFY(found->findChild<QLineEdit*>()->hasFocus());
+        }();
+        return found;
+    };
+    // Typing narrows the list to the one app, Enter opens with it (#57).
+    OpenWithBar* b = bar();
+    QVERIFY(b);
+    auto* list = b->findChild<QListWidget*>();
+    QVERIFY(list->count() >= 1);
+    QTest::keyClicks(b->findChild<QLineEdit*>(), QStringLiteral("zzq"));
+    QCOMPARE(list->count(), 1);
+    QVERIFY(list->item(0)->text().startsWith(QStringLiteral("Zzq Stub View")));
+    QTest::keyClick(b->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(viewerCall().contains(QStringLiteral("END")));
+    QCOMPARE(viewerCall(), QStringList({a_ + "/one.txt", "END"}));
+    QFile::remove(g_env + "/viewer-call");
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QTRY_VERIFY(!window_->findChild<OpenWithBar*>());
+    QTRY_VERIFY(view->hasFocus());
+
+    // Marked items all open, and text that names no app is a command
+    // run on them.
+    QTest::keyClick(view, Qt::Key_Insert);
+    QTest::keyClick(view, Qt::Key_Insert);
+    QCOMPARE(tab->markedCount(), 2);
+    b = bar();
+    QVERIFY(b);
+    bool titled = false;
+    for (const QLabel* label : b->findChildren<QLabel*>())
+        titled = titled || label->text() == QLatin1String("Open 2 items with");
+    QVERIFY(titled);
+    QTest::keyClicks(b->findChild<QLineEdit*>(), QStringLiteral("zzqview --typed"));
+    QCOMPARE(b->findChild<QListWidget*>()->count(), 0);
+    QTest::keyClick(b->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(viewerCall().contains(QStringLiteral("END")));
+    QCOMPARE(viewerCall(), QStringList({"--typed", a_ + "/one.txt", a_ + "/two.txt", "END"}));
+    QFile::remove(g_env + "/viewer-call");
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QCOMPARE(tab->markedCount(), 2);  // opening spends nothing
+
+    // A folder gets the bar too; Esc closes it.
+    tab->clearMarks();
+    view->setCurrentIndex(view->model()->index(0, 0));
+    QVERIFY(tab->cursorIsDir());
+    b = bar();
+    QVERIFY(b);
+    QTest::keyClick(b->findChild<QLineEdit*>(), Qt::Key_Escape);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QTRY_VERIFY(!window_->findChild<OpenWithBar*>());
+}
+
+int main(int argc, char** argv)
+{
+    QTemporaryDir env;
+    g_env = env.path();
+    QDir().mkpath(g_env + "/bin");
+    QDir().mkpath(g_env + "/data/applications");
+    {
+        QFile script(g_env + "/bin/zzqview");
+        if (!script.open(QIODevice::WriteOnly))
+            return 1;
+        script.write("#!/bin/sh\n{ printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/viewer-call'\n");
+        script.close();
+        script.setPermissions(script.permissions() | QFile::ExeOwner);
+        QFile entry(g_env + "/data/applications/zzqview.desktop");
+        if (!entry.open(QIODevice::WriteOnly))
+            return 1;
+        entry.write("[Desktop Entry]\nType=Application\nName=Zzq Stub View\nExec=zzqview %F\nMimeType=text/plain;\n");
+        QFile cache(g_env + "/data/applications/mimeinfo.cache");
+        if (!cache.open(QIODevice::WriteOnly))
+            return 1;
+        cache.write("[MIME Cache]\ntext/plain=zzqview.desktop;\n");
+    }
+    qputenv("XDG_DATA_HOME", QFile::encodeName(g_env + "/data"));
+    qputenv("XDG_CONFIG_HOME", QFile::encodeName(g_env + "/config"));
+    qputenv("PATH", QFile::encodeName(g_env + "/bin") + ':' + qgetenv("PATH"));
+    QApplication app(argc, argv);
+    QCoreApplication::setAttribute(Qt::AA_Use96Dpi, true);
+    WindowTest test;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&test, argc, argv);
+}
 #include "test_window.moc"

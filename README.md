@@ -129,7 +129,7 @@ what the pane shows, Alt is panels and tools:
 | plain | help | rename | view | edit | copy | move | new folder | trash | menu | quit |
 | Shift | about | multi-rename | open with | new file | sync | | | delete | | |
 | Ctrl | left pane | right pane | sizes | thumbnails | tree | columns | hidden files | preview | | |
-| Alt | go to | properties | | | pack | bookmark | find | | | |
+| Alt | go to | properties | | | pack | bookmark | find | invert marks | mark by pattern | unmark by pattern |
 
 F1 shows the full table inside the window, with whatever you have
 remapped. The defaults by subject, with the keys other file managers
@@ -140,7 +140,7 @@ use kept as second keys:
 | Key | Action |
 |-----|--------|
 | Enter | open with the default app; on a folder or an archive, enter it |
-| Shift+F3, Shift+Enter | choose an app to open with |
+| Shift+F3, Shift+Enter | open the marked items (or the cursor item, a folder too) with another app: type to narrow the list, Enter opens, Ctrl+Enter also makes it the default; text that names no app runs as a command (Ctrl+Enter: in a terminal) |
 | F2 | rename inline; Tab moves on to the row's permissions and owner when those columns are shown |
 | Shift+F2 | multi-rename panel |
 | F3 | view; on a folder, compute its size |
@@ -159,8 +159,10 @@ use kept as second keys:
 |-----|--------|
 | Insert, Shift+Down | mark and move down |
 | Shift+Up | mark and move up |
-| Space, Ctrl+A, * | mark, mark all, invert |
-| Ctrl+=, Ctrl+- | mark and unmark by pattern |
+| Space, Ctrl+A | mark, mark all |
+| Alt+F8, * | invert the marks (mark what stays, invert, F8) |
+| Alt+F9, Ctrl+= | mark by pattern |
+| Alt+F10, Ctrl+- | unmark by pattern |
 | Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
 | any text | filters the current tab; Backspace edits the filter while one is set, Space appends to it |
 | Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |

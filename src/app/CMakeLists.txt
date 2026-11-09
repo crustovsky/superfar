@@ -3,6 +3,8 @@
 qt_add_library(superfar_app STATIC
   bench.cpp
   mainwindow.cpp
+  mainwindow_jobs.cpp
+  mainwindow_prompts.cpp
   tree.cpp
   keymap.cpp
   funcbar.cpp
@@ -34,12 +36,16 @@ qt_add_library(superfar_app STATIC
   pane/tabbar.cpp
   pane/tab.cpp
   pane/tab_archive.cpp
+  pane/tab_marks.cpp
+  pane/tab_commands.cpp
   pane/tab_attributes.cpp
   pane/listview.cpp
   pane/listmodel.cpp
   pane/listmodel_sort.cpp
+  pane/listmodel_marks.cpp
   pane/listmodel_attrs.cpp
   ownercompletion.cpp
+  openwith.cpp
 )
 target_include_directories(superfar_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(superfar_app PUBLIC superfar_core Qt6::Widgets Qt6::DBus)

@@ -1,5 +1,6 @@
 #include "pdfpages.h"
 
+#include "counted.h"
 #include <QWidget>
 #include <algorithm>
 
@@ -82,7 +83,7 @@ void PdfPages::onInfo(quint64 generation, const core::PdfInfo& info)
         Q_EMIT note(info.encrypted ? tr("Encrypted") : tr("No pages"));
         return;
     }
-    Q_EMIT note(tr("%n pages", nullptr, info.pages));
+    Q_EMIT note(counted(info.pages, tr("page"), tr("pages")));
     goToPage(1);
 }
 

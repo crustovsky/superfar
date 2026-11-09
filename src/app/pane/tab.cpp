@@ -1,5 +1,6 @@
 #include "pane/tab.h"
 
+#include "counted.h"
 #include "bench.h"
 #include "core/apps.h"
 #include "core/fileops.h"
@@ -130,8 +131,8 @@ void Tab::onSearchFinished(quint64 generation, quint64 scanned)
     model_->finishLoad();
     restoreMarks();
     placeCursor();
-    Q_EMIT statusChanged(tr("%n matches for %1", nullptr, model_->rowCount()).arg(search_)
-                             + tr(", %n entries scanned", nullptr, static_cast<int>(scanned)),
+    Q_EMIT statusChanged(tr("%1 for %2, %3 scanned").arg(counted(model_->rowCount(), tr("match"), tr("matches")), search_,
+                                                             counted(static_cast<qint64>(scanned), tr("entry"), tr("entries"))),
                          QString());
     Q_EMIT loaded();
 }
@@ -141,76 +142,6 @@ void Tab::reloadWithCursor(const QByteArray& name)
     pendingMarks_ = model_->markedNames();
     cursorName_ = name;
     load(location_);
-}
-
-std::vector<core::Location> Tab::selectedLocations() const
-{
-    std::vector<core::Location> out;
-    if (model_->markedCount() > 0) {
-        for (const QByteArray& name : model_->markedNamesInOrder())
-            out.push_back(location_.child(name));
-    } else if (const QByteArray name = currentName(); !name.isEmpty()) {
-        out.push_back(location_.child(name));
-    }
-    return out;
-}
-
-QString Tab::selectionText() const
-{
-    const int marked = model_->markedCount();
-    if (marked > 0)
-        return tr("%n items", nullptr, marked);
-    const QModelIndex idx = view_->currentIndex();
-    return idx.isValid() ? model_->entryAt(idx.row()).display : QString();
-}
-
-int Tab::markedCount() const
-{
-    return model_->markedCount();
-}
-
-void Tab::clearMarks()
-{
-    model_->markAll(false);
-}
-
-void Tab::clearMarks(const core::Location& dir)
-{
-    if (location_ == dir && !isArchive() && search_.isEmpty())
-        model_->markAll(false);
-    else
-        marks_.forget(dir.uri().toUtf8());
-}
-
-QByteArray Tab::markKey() const
-{
-    // One folder view, one key: an archive folder and a search are not
-    // the folder their location names.
-    QByteArray key = location_.uri().toUtf8();
-    if (isArchive())
-        key += '\0' + archiveDir_;
-    else if (!search_.isEmpty())
-        key += '\0' + search_.toUtf8();
-    return key;
-}
-
-void Tab::stashMarks()
-{
-    if (location_.isValid() && model_->markedCount() > 0)
-        marks_.remember(markKey(), model_->markedNames());
-}
-
-void Tab::restoreMarks()
-{
-    // A reload carries its marks itself; what the store holds for this
-    // folder is spent either way, so a cleared set does not come back.
-    QSet<QByteArray> names = marks_.take(markKey());
-    if (!pendingMarks_.isEmpty()) {
-        names = std::move(pendingMarks_);
-        pendingMarks_.clear();
-    }
-    if (!names.isEmpty())
-        model_->applyMarks(names);
 }
 
 bool Tab::monitoring() const
@@ -236,11 +167,6 @@ bool Tab::cursorIsDir() const
 {
     const QModelIndex idx = view_->currentIndex();
     return idx.isValid() && model_->entryAt(idx.row()).isDir();
-}
-
-void Tab::markGlob(const QString& pattern, bool on)
-{
-    model_->markGlob(pattern, on);
 }
 
 void Tab::typed(const QString& text)
@@ -439,121 +365,6 @@ void Tab::setActive(bool active)
     view_->setActivePane(active);
 }
 
-bool Tab::execute(keymap::Command command)
-{
-    using keymap::Command;
-    const QModelIndex cur = view_->currentIndex();
-    switch (command) {
-    case Command::Mark:
-        if (cur.isValid()) {
-            model_->toggleMarked(cur.row());
-            if (cur.row() + 1 < model_->rowCount())
-                view_->setCurrentIndex(model_->index(cur.row() + 1, 0));
-        }
-        return true;
-    case Command::MarkUp:
-        if (cur.isValid()) {
-            model_->toggleMarked(cur.row());
-            if (cur.row() > 0)
-                view_->setCurrentIndex(model_->index(cur.row() - 1, 0));
-        }
-        return true;
-    case Command::MarkToggle:
-        if (!model_->filter().isEmpty())
-            typed(QStringLiteral(" "));  // Space selects only while no filter is set
-        else if (cur.isValid())
-            model_->toggleMarked(cur.row());
-        return true;
-    case Command::Cancel:
-        if (model_->filter().isEmpty())
-            return false;
-        setFilter(QString());
-        return true;
-    case Command::PreviewFirst:
-    case Command::PreviewPrev:
-    case Command::PreviewNext:
-    case Command::PreviewLast: {
-        // No paged preview took the key: it keeps the list meaning of its
-        // unmodified twin, as Ctrl+Home moved to the first row before.
-        const Qt::Key key = command == Command::PreviewFirst ? Qt::Key_Home
-            : command == Command::PreviewLast                ? Qt::Key_End
-            : command == Command::PreviewPrev                ? Qt::Key_PageUp
-                                                             : Qt::Key_PageDown;
-        QKeyEvent plain(QEvent::KeyPress, key, Qt::NoModifier);
-        QCoreApplication::sendEvent(view_, &plain);
-        return true;
-    }
-    case Command::Rename:
-        if (isArchive()) {
-            Q_EMIT message(tr("Archives are read-only here"));
-            return true;
-        }
-        if (cur.isValid())
-            view_->edit(cur.siblingAtColumn(ListModel::NameColumn));
-        return true;
-    case Command::Edit: {
-        const QByteArray name = currentName();
-        if (name.isEmpty() || cursorIsDir() || isArchive())
-            return true;
-        QString error;
-        const QString editor = core::editorCommand(&error);
-        if (editor.isEmpty()
-            || !core::runInTerminal(location_, editor + QLatin1Char(' ') + QString::fromUtf8(core::shellQuote(name)),
-                                    false, &error))
-            Q_EMIT message(error);
-        return true;
-    }
-    case Command::MarkAll:
-        model_->markAll(true);
-        return true;
-    case Command::InvertMarks:
-        model_->invertMarks();
-        return true;
-    case Command::ClearMarks:
-        model_->markAll(false);
-        return true;
-    case Command::GoUp:
-        if (!model_->filter().isEmpty())
-            setFilter(model_->filter().chopped(1));  // Backspace edits the filter first
-        else
-            goUp();
-        return true;
-    case Command::Activate:
-        activate(cur);
-        return true;
-    case Command::Reload:
-        reload();
-        return true;
-    case Command::ToggleHidden:
-        setShowHidden(!showHidden());
-        return true;
-    case Command::ToggleSizes:
-        model_->setRecursiveSizes(!model_->recursiveSizes());
-        updateStatus();
-        return true;
-    case Command::ToggleThumbnails:
-        setThumbnails(!thumbnails());
-        return true;
-    case Command::View: {
-        // F3 on folders walks them; files get the viewer in milestone 5.
-        bool any = false;
-        if (model_->markedCount() > 0) {
-            for (int row = 0; row < model_->rowCount(); ++row)
-                if (model_->isMarked(row) && model_->entryAt(row).isDir()) {
-                    model_->requestSize(row);
-                    any = true;
-                }
-        } else if (cur.isValid() && model_->entryAt(cur.row()).isDir()) {
-            model_->requestSize(cur.row());
-            any = true;
-        }
-        return any;
-    }
-    default:
-        return false;
-    }
-}
-
 void Tab::onBatch(quint64 generation, std::vector<core::Entry> entries)
 {
     if (generation != generation_)
@@ -740,7 +551,8 @@ void Tab::updateStatus()
     const int hidden = model_->hiddenCount();
     const int marked = model_->markedCount();
     QString text = model_->filter().isEmpty()
-        ? (search_.isEmpty() ? tr("%n items", nullptr, shown) : tr("%n matches for %1", nullptr, shown).arg(search_))
+        ? (search_.isEmpty() ? counted(shown, tr("item"), tr("items"))
+                            : tr("%1 for %2").arg(counted(shown, tr("match"), tr("matches")), search_))
         : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
     if (isArchive())
         text += tr(", in archive");
@@ -748,9 +560,9 @@ void Tab::updateStatus()
     if (const QModelIndex cur = view_->currentIndex(); cur.isValid())
         text += QStringLiteral("  \u00b7  ") + model_->entryAt(cur.row()).display;
     if (marked > 0)
-        text += tr(", %n selected", nullptr, marked);
+        text += tr(", %1 selected").arg(marked);
     if (hidden > 0 && !model_->showHidden())
-        text += tr(", %n hidden", nullptr, hidden);
+        text += tr(", %1 hidden").arg(hidden);
     if (model_->recursiveSizes())
         text += tr(", sizes");
     Q_EMIT statusChanged(text, spaceText_);

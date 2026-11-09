@@ -46,6 +46,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::SHIFT | Qt::Key_Up), Command::MarkUp},
         {QKeySequence(Qt::Key_Space), Command::MarkToggle},
         {QKeySequence(Qt::CTRL | Qt::Key_A), Command::MarkAll},
+        {QKeySequence(Qt::ALT | Qt::Key_F8), Command::InvertMarks},  // beside Trash: mark what stays, invert, F8
         {QKeySequence(Qt::Key_Asterisk), Command::InvertMarks},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_A), Command::ClearMarks},
         {QKeySequence(Qt::Key_Backspace), Command::GoUp},
@@ -56,6 +57,8 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Return), Command::Activate},
         {QKeySequence(Qt::Key_Enter), Command::Activate},
         {QKeySequence(Qt::Key_Escape), Command::Cancel},
+        {QKeySequence(Qt::ALT | Qt::Key_F9), Command::MarkGlob},
+        {QKeySequence(Qt::ALT | Qt::Key_F10), Command::UnmarkGlob},
         {QKeySequence(Qt::CTRL | Qt::Key_Equal), Command::MarkGlob},
         {QKeySequence(Qt::CTRL | Qt::Key_Plus), Command::MarkGlob},
         {QKeySequence(Qt::CTRL | Qt::Key_Minus), Command::UnmarkGlob},
@@ -164,8 +167,8 @@ QString label(Command command)
     case Command::Preview: return QStringLiteral("Preview");
     case Command::ToggleSizes: return QStringLiteral("Sizes");
     case Command::Cancel: return QStringLiteral("Cancel");
-    case Command::MarkGlob: return QStringLiteral("Select by pattern");
-    case Command::UnmarkGlob: return QStringLiteral("Deselect by pattern");
+    case Command::MarkGlob: return QStringLiteral("Select");
+    case Command::UnmarkGlob: return QStringLiteral("Deselect");
     case Command::OpenWith: return QStringLiteral("Open with");
     case Command::FocusCommandLine: return QStringLiteral("Command line");
     case Command::CopyClip: return QStringLiteral("Copy to clipboard");
@@ -263,7 +266,11 @@ QList<QPair<QString, QString>> retiredDefaults()
             {QStringLiteral("Preview"), QStringLiteral("Ctrl+Q")},
             {QStringLiteral("OpenWith"), QStringLiteral("Shift+Return;Shift+Enter")},
             {QStringLiteral("GoTo"), QStringLiteral("Ctrl+G")},
-            {QStringLiteral("Bookmark"), QStringLiteral("Ctrl+D")}};
+            {QStringLiteral("Bookmark"), QStringLiteral("Ctrl+D")},
+            // 0.8.5: the marks got Alt+F8 to Alt+F10
+            {QStringLiteral("InvertMarks"), QStringLiteral("*")},
+            {QStringLiteral("MarkGlob"), QStringLiteral("Ctrl+=;Ctrl++;Num++")},
+            {QStringLiteral("UnmarkGlob"), QStringLiteral("Ctrl+-;Num+-")}};
 }
 
 QList<QKeySequence> keysOf(Command command)

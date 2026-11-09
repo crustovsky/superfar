@@ -1,5 +1,6 @@
 #include "pane/listview.h"
 
+#include "counted.h"
 #include "bench.h"
 #include "menu.h"
 #include "pane/delegate.h"
@@ -321,7 +322,7 @@ void ListView::contextMenuEvent(QContextMenuEvent* event)
         setCurrentIndex(index.siblingAtColumn(ListModel::NameColumn));
         // The commands act on the marks when there are any, whichever
         // row was clicked: the first line says so.
-        title = m->markedCount() > 0 ? tr("%n marked items", nullptr, m->markedCount())
+        title = m->markedCount() > 0 ? counted(m->markedCount(), tr("marked item"), tr("marked items"))
                                      : m->entryAt(index.row()).display;
     }
     const QPoint at = byKey && index.isValid() ? viewport()->mapToGlobal(visualRect(index).center())

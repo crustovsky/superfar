@@ -1,6 +1,7 @@
 // App code with no widget behind it: the key table and the help must
 // agree with each other, and the mark store keeps what a tab leaves in
 // a folder.
+#include "counted.h"
 #include "archivetext.h"
 #include "help.h"
 #include "keymap.h"
@@ -15,6 +16,7 @@ private Q_SLOTS:
     void everyCommandIsComplete();
     void propertiesKeys();
     void functionKeyLayers();
+    void countsOfOne();
     void keyShownInMenus();
     void oneCommandPerKey();
     void markStore();
@@ -61,6 +63,14 @@ void AppTest::propertiesKeys()
             QCOMPARE(keys, QStringList({"Alt+F2", "Alt+Return", "Alt+Enter"}));
 }
 
+void AppTest::countsOfOne()
+{
+    // "1 items" was everywhere (#64).
+    QCOMPARE(counted(0, "item", "items"), QStringLiteral("0 items"));
+    QCOMPARE(counted(1, "item", "items"), QStringLiteral("1 item"));
+    QCOMPARE(counted(2, "entry", "entries"), QStringLiteral("2 entries"));
+}
+
 void AppTest::functionKeyLayers()
 {
     // What the bar shows with a modifier held, row by row. A dash is a
@@ -71,7 +81,7 @@ void AppTest::functionKeyLayers()
         {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "-", "-"}},
         {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleSizes", "ToggleThumbnails", "ToggleTree", "Columns",
                                "ToggleHidden", "Preview", "-", "-"}},
-        {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "-", "-", "-"}},
+        {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
     };
     for (const auto& layer : layers) {
         QStringList row;
@@ -85,7 +95,8 @@ void AppTest::functionKeyLayers()
     // stays, and a config still holding the old line gets both.
     const QList<QPair<Command, QString>> moved = {
         {Command::ToggleHidden, "Ctrl+H"}, {Command::Preview, "Ctrl+Q"}, {Command::OpenWith, "Shift+Return;Shift+Enter"},
-        {Command::GoTo, "Ctrl+G"}, {Command::Bookmark, "Ctrl+D"}};
+        {Command::GoTo, "Ctrl+G"}, {Command::Bookmark, "Ctrl+D"}, {Command::InvertMarks, "*"},
+        {Command::MarkGlob, "Ctrl+=;Ctrl++;Num++"}, {Command::UnmarkGlob, "Ctrl+-;Num+-"}};
     for (const auto& [command, old] : moved) {
         const auto keys = keymap::keysOf(command);
         QVERIFY2(keys.first().toString().contains(QLatin1String("+F")), qPrintable(keymap::name(command)));

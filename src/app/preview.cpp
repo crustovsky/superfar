@@ -1,5 +1,6 @@
 #include "preview.h"
 
+#include "counted.h"
 #include "archivetext.h"
 #include "core/unixattrs.h"
 #include "elidedlabel.h"
@@ -166,7 +167,7 @@ Preview::Preview(const Services& services, QWidget* parent)
             [this](quint64 gen, const QByteArray&, const core::DirSize& s) {
                 if (gen != generation_)
                     return;
-                QString t = tr("%n items directly inside", nullptr, static_cast<int>(s.direct));
+                QString t = tr("%1 directly inside").arg(counted(static_cast<qint64>(s.direct), tr("item"), tr("items")));
                 t += tr("\n%1 in %2 files and %3 folders%4")
                          .arg(jobfmt::bytes(s.bytes))
                          .arg(s.files)

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 
+#include "counted.h"
 #include "bench.h"
 #include "cmdline.h"
 #include "config.h"
@@ -17,6 +18,7 @@
 #include "jobs/bars.h"
 #include "jobs/strip.h"
 #include "menu.h"
+#include "openwith.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
 #include "places.h"
@@ -469,184 +471,6 @@ void MainWindow::execute(keymap::Command command)
         active_->showMessage(tr("Not yet: %1").arg(keymap::label(command)));
 }
 
-void MainWindow::startTransfer(bool move)
-{
-    Tab* tab = active_->activeTab();
-    if (tab->isArchive()) {
-        // Out of an archive: bsdtar extracts the members into the target.
-        const std::vector<QByteArray> members = tab->archiveMembers();
-        if (members.empty())
-            return;
-        const core::Location dest = otherPane()->activeTab()->location();
-        PromptBar* bar = strip_->prompt(tr("Extract %1 to").arg(tab->selectionText()), tr("Extract"), dest.displayPath());
-        const core::Location archive = tab->archiveFile();
-        const int depth = tab->archiveDepth();
-        const core::Location from = tab->location();
-        connect(bar, &PromptBar::accepted, this,
-                [this, tab = QPointer<Tab>(tab), from, archive, members, depth](const QString& text) {
-            const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
-            if (target.isValid())
-                runJob(new core::ExtractJob(archive, members, target, depth), tab, from, target);
-        });
-        return;
-    }
-    const auto sources = tab->selectedLocations();
-    if (sources.empty())
-        return;
-    const core::Location dest = otherPane()->activeTab()->location();
-    const QString verb = move ? tr("Move") : tr("Copy");
-    PromptBar* bar = strip_->prompt(tr("%1 %2 to").arg(verb, tab->selectionText()), verb, dest.displayPath());
-    // The folder the items were taken from, as it was when the prompt
-    // opened: the tab may have moved on, or closed, by the time it is
-    // accepted.
-    const core::Location from = tab->location();
-    connect(bar, &PromptBar::accepted, this, [this, tab = QPointer<Tab>(tab), from, sources, move](const QString& text) {
-        const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
-        if (!target.isValid())
-            return;
-        if (move && tab && tab->location() == from)
-            tab->aboutToRemove(sources);
-        runJob(new core::TransferJob(sources, target, move), tab, from, target);
-    });
-}
-
-void MainWindow::promptMkdir()
-{
-    Tab* tab = active_->activeTab();
-    if (tab->isArchive()) {
-        active_->showMessage(tr("Archives are read-only here"));
-        return;
-    }
-    PromptBar* bar = strip_->prompt(tr("New folder"), tr("Create"), QString());
-    connect(bar, &PromptBar::accepted, this, [this, guard = QPointer<Tab>(tab)](const QString& text) {
-        const QByteArray name = QFile::encodeName(text.trimmed());
-        if (name.isEmpty())
-            return;
-        if (!guard) {
-            active_->showMessage(tr("The tab this was for is closed"));
-            return;
-        }
-        const core::Location dir = guard->location();
-        // The answer may come after the tab, or the window, has gone.
-        core::makeDirectory(dir.child(name), [self = QPointer<MainWindow>(this), guard, dir, name](const QString& error) {
-            if (!self)
-                return;
-            if (!error.isEmpty()) {
-                self->active_->showMessage(error);
-                return;
-            }
-            if (guard && guard->location() == dir)
-                guard->reloadWithCursor(name);
-            self->tree_->refresh(dir);
-        });
-    });
-}
-
-void MainWindow::promptNewFile()
-{
-    Tab* tab = active_->activeTab();
-    if (tab->isArchive()) {
-        active_->showMessage(tr("Archives are read-only here"));
-        return;
-    }
-    PromptBar* bar = strip_->prompt(tr("New file"), tr("Create"), QString());
-    connect(bar, &PromptBar::accepted, this, [this, guard = QPointer<Tab>(tab)](const QString& text) {
-        const QByteArray name = QFile::encodeName(text.trimmed());
-        if (name.isEmpty())
-            return;
-        if (!guard) {
-            active_->showMessage(tr("The tab this was for is closed"));
-            return;
-        }
-        const core::Location dir = guard->location();
-        core::createFile(dir.child(name), [self = QPointer<MainWindow>(this), guard, dir, name](const QString& error) {
-            if (!self)
-                return;
-            if (!error.isEmpty()) {
-                self->active_->showMessage(error);
-                return;
-            }
-            if (guard && guard->location() == dir)
-                guard->reloadWithCursor(name);
-        });
-    });
-}
-
-void MainWindow::promptGlob(bool on)
-{
-    Tab* tab = active_->activeTab();
-    PromptBar* bar = strip_->prompt(on ? tr("Select") : tr("Deselect"), on ? tr("Select") : tr("Deselect"),
-                                    QStringLiteral("*"));
-    QPointer<Tab> guard(tab);
-    connect(bar, &PromptBar::accepted, this, [guard, on](const QString& text) {
-        if (guard && !text.trimmed().isEmpty())
-            guard->markGlob(text.trimmed(), on);
-    });
-}
-
-void MainWindow::chooseColumns()
-{
-    // The header's right-click list and its drag, for the keyboard: the
-    // rows are the columns left to right. Name is not among them: it
-    // stays, and first.
-    Pane* pane = active_;
-    CheckBar* bar = strip_->checks((pane == left_ ? tr("Columns of the left pane") : tr("Columns of the right pane"))
-                                   + tr(": Space shows or hides, Shift+Up and Shift+Down move, Esc closes"));
-    auto fill = [bar, pane] {
-        const columns::Layout layout = pane->columnLayout();
-        QStringList labels;
-        QList<bool> shown;
-        for (int c : layout.order.mid(1)) {
-            labels << columns::label(c);
-            shown << !layout.hidden.value(c);
-        }
-        bar->setItems(labels, shown, tr("Reset columns"));
-    };
-    fill();
-    connect(bar, &CheckBar::toggled, pane, [pane](int index, bool on) {
-        pane->setColumnShown(pane->columnLayout().order.value(index + 1, -1), on);
-    });
-    connect(bar, &CheckBar::moveRequested, pane, [bar, pane, fill](int index, int delta) {
-        const QList<int> before = pane->columnLayout().order;
-        pane->moveColumn(before.value(index + 1, -1), delta);
-        if (pane->columnLayout().order == before)
-            return;  // at an end already
-        fill();
-        bar->setCurrent(index + delta);  // the cursor goes with its column
-    });
-    connect(bar, &CheckBar::actionChosen, pane, [pane, fill] {
-        pane->resetColumns();
-        fill();
-    });
-}
-
-void MainWindow::openWith()
-{
-    Tab* tab = active_->activeTab();
-    const core::Location file = tab->cursorLocation();
-    if (!file.isValid() || tab->cursorIsDir())
-        return;
-    QPointer<MainWindow> guard(this);
-    core::appsFor(file, [guard, file](const std::vector<core::AppChoice>& apps) {
-        if (!guard)
-            return;
-        if (apps.empty()) {
-            guard->active_->showMessage(tr("No application registered for this type"));
-            return;
-        }
-        QStringList names;
-        for (const core::AppChoice& a : apps)
-            names << a.name;
-        ChoiceBar* bar = guard->strip_->choose(tr("Open %1 with").arg(file.displayName()), names);
-        connect(bar, &ChoiceBar::chosen, guard, [guard, apps, file](int index) {
-            QString error;
-            if (index >= 0 && index < static_cast<int>(apps.size())
-                && !core::launchWith(apps[static_cast<size_t>(index)].id, {file}, &error))
-                guard->active_->showMessage(error);
-        });
-    });
-}
-
 void MainWindow::togglePreview()
 {
     if (preview_) {
@@ -681,36 +505,6 @@ void MainWindow::placePreview()
         other->setOverlay(nullptr);
     host->show();
     host->setOverlay(preview_);
-}
-
-void MainWindow::goTo()
-{
-    GoToBar* bar = strip_->goTo();
-    const QList<Config::Visit> history = config_->history();
-    const qint64 now = QDateTime::currentSecsSinceEpoch();
-    // Shown as paths; the uri behind each is kept for the choice.
-    auto shown = std::make_shared<QHash<QString, QString>>();
-    auto refill = [bar, history, now, shown](const QString& text) {
-        QStringList entries;
-        shown->clear();
-        for (const Config::Visit& v : Config::rank(history, text, now)) {
-            const QString path = core::Location::fromUri(v.uri).displayPath();
-            shown->insert(path, v.uri);
-            entries << path;
-            if (entries.size() >= 50)
-                break;
-        }
-        bar->setEntries(entries);
-    };
-    refill(QString());
-    connect(bar, &GoToBar::textChanged, this, refill);
-    connect(bar, &GoToBar::chosen, this, [this, shown](const QString& choice) {
-        const QString uri = shown->value(choice);
-        const core::Location dir = uri.isEmpty() ? core::Location::fromCommandLine(QFile::encodeName(choice))
-                                                 : core::Location::fromUri(uri);
-        if (dir.isValid())
-            active_->activeTab()->navigate(dir);
-    });
 }
 
 void MainWindow::saveSession()
@@ -751,64 +545,6 @@ void MainWindow::runCommand(const QString& command)
         active_->showMessage(error);
 }
 
-void MainWindow::copyToClipboard(bool cut)
-{
-    if (active_->activeTab()->isArchive()) {
-        active_->showMessage(tr("F5 extracts archive members"));
-        return;
-    }
-    const auto files = active_->activeTab()->selectedLocations();
-    if (files.empty())
-        return;
-    QApplication::clipboard()->setMimeData(uris::make(files, cut));
-    active_->showMessage(cut ? tr("%n items cut", nullptr, static_cast<int>(files.size()))
-                             : tr("%n items copied", nullptr, static_cast<int>(files.size())));
-}
-
-void MainWindow::paste()
-{
-    if (active_->activeTab()->isArchive()) {
-        active_->showMessage(tr("Archives are read-only here"));
-        return;
-    }
-    std::vector<core::Location> files;
-    bool cut = false;
-    if (!uris::read(QApplication::clipboard()->mimeData(), &files, &cut))
-        return;
-    transfer(files, active_->activeTab()->location(), cut);
-    if (cut)
-        QApplication::clipboard()->clear();
-}
-
-void MainWindow::transfer(const std::vector<core::Location>& sources, const core::Location& target, bool move)
-{
-    if (sources.empty() || !target.isValid())
-        return;
-    // The job's "source tab" clears its marks when done; the tab showing
-    // the sources' folder is the best guess.
-    Tab* from = active_->activeTab();
-    const core::Location parent = sources.front().parent();
-    for (Pane* pane : {left_, right_})
-        for (Tab* tab : pane->tabs())
-            if (tab->location() == parent)
-                from = tab;
-    if (move && from->location() == parent)
-        from->aboutToRemove(sources);
-    runJob(new core::TransferJob(sources, target, move), from, from->location(), target);
-}
-
-void MainWindow::promptPath()
-{
-    Tab* tab = active_->activeTab();
-    PromptBar* bar = strip_->prompt(tr("Go to"), tr("Go"), tab->location().displayPath());
-    connect(bar, &PromptBar::accepted, this, [tab](const QString& text) {
-        QPointer<Tab> guard(tab);
-        const core::Location dir = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
-        if (guard && dir.isValid())
-            guard->navigate(dir);
-    });
-}
-
 void MainWindow::showFolder(const core::Location& dir)
 {
     if (dir.isValid())
@@ -832,52 +568,6 @@ void MainWindow::raiseWindow()
     show();
     raise();
     activateWindow();
-}
-
-void MainWindow::confirmRemove(bool permanent)
-{
-    Tab* tab = active_->activeTab();
-    if (tab->isArchive()) {
-        active_->showMessage(tr("Archives are read-only here"));
-        return;
-    }
-    const auto sources = tab->selectedLocations();
-    if (sources.empty())
-        return;
-    const QString what = tab->selectionText();
-    PromptBar* bar = strip_->prompt(permanent ? tr("Delete %1 permanently?").arg(what)
-                                              : tr("Move %1 to the trash?").arg(what),
-                                    permanent ? tr("Delete") : tr("Trash"), std::nullopt);
-    const core::Location from = tab->location();
-    connect(bar, &PromptBar::accepted, this, [this, tab = QPointer<Tab>(tab), from, sources, permanent] {
-        if (tab && tab->location() == from)
-            tab->aboutToRemove(sources);
-        runJob(new core::RemoveJob(sources, permanent), tab, from, from);
-    });
-}
-
-void MainWindow::runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
-                        const core::Location& destination)
-{
-    connect(job, &core::Job::finished, this, [this, source, sourceDir, destination] {
-        if (source)
-            source->clearMarks(sourceDir);  // live, or kept for the tab's return
-        refreshAt(sourceDir);
-        refreshAt(destination);
-        tree_->refresh(sourceDir);
-        tree_->refresh(destination);
-    });
-    strip_->addJob(job);
-}
-
-void MainWindow::refreshAt(const core::Location& dir)
-{
-    // Monitored tabs catch up on their own; the rest (remote backends
-    // without monitors) reload explicitly.
-    for (Pane* pane : {left_, right_})
-        for (Tab* tab : pane->tabs())
-            if (tab->location() == dir && !tab->monitoring())
-                tab->reload();
 }
 
 void MainWindow::paintEvent(QPaintEvent* event)

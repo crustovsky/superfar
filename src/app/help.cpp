@@ -49,7 +49,7 @@ QString describe(keymap::Command c)
     case Command::Cancel: return QStringLiteral("clear the filter, close the viewer or panel, close the preview, then clear the marks");
     case Command::MarkGlob: return QStringLiteral("mark by pattern");
     case Command::UnmarkGlob: return QStringLiteral("unmark by pattern");
-    case Command::OpenWith: return QStringLiteral("open the file with a chosen app");
+    case Command::OpenWith: return QStringLiteral("open the marked items with a chosen app, or a typed command");
     case Command::FocusCommandLine: return QStringLiteral("command line: runs in this folder in a terminal; Ctrl+Enter inserts the cursor name");
     case Command::CopyClip: return QStringLiteral("copy to the clipboard (works with other file managers)");
     case Command::CutClip: return QStringLiteral("cut to the clipboard");

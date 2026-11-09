@@ -154,71 +154,6 @@ void ListModel::finishLoad()
     malloc_trim(0);
 }
 
-void ListModel::setMarked(int row, bool on)
-{
-    quint8& m = marked_[rows_[row]];
-    if ((m != 0) == on)
-        return;
-    m = on ? 1 : 0;
-    markedCount_ += on ? 1 : -1;
-    Q_EMIT dataChanged(index(row, 0), index(row, ColumnCount - 1));
-    Q_EMIT marksChanged();
-}
-
-void ListModel::markAll(bool on)
-{
-    for (quint32 idx : rows_)
-        marked_[idx] = on ? 1 : 0;
-    markedCount_ = on ? static_cast<int>(rows_.size()) : 0;
-    rowsRepaint();
-}
-
-void ListModel::invertMarks()
-{
-    markedCount_ = 0;
-    for (quint32 idx : rows_) {
-        marked_[idx] = marked_[idx] ? 0 : 1;
-        markedCount_ += marked_[idx];
-    }
-    rowsRepaint();
-}
-
-QSet<QByteArray> ListModel::markedNames() const
-{
-    QSet<QByteArray> names;
-    for (quint32 i = 0; i < entries_.size(); ++i)
-        if (marked_[i])
-            names.insert(entries_[i].name);
-    return names;
-}
-
-std::vector<QByteArray> ListModel::markedNamesInOrder() const
-{
-    std::vector<QByteArray> names;
-    for (quint32 i = 0; i < entries_.size(); ++i)
-        if (marked_[i])
-            names.push_back(entries_[i].name);
-    return names;
-}
-
-void ListModel::applyMarks(const QSet<QByteArray>& names)
-{
-    markedCount_ = 0;
-    for (quint32 i = 0; i < entries_.size(); ++i) {
-        marked_[i] = names.contains(entries_[i].name) ? 1 : 0;
-        if (marked_[i] && (showHidden_ || !entries_[i].hidden))
-            ++markedCount_;
-    }
-    rowsRepaint();
-}
-
-void ListModel::rowsRepaint()
-{
-    if (!rows_.empty())
-        Q_EMIT dataChanged(index(0, 0), index(rowCount() - 1, ColumnCount - 1));
-    Q_EMIT marksChanged();
-}
-
 void ListModel::setShowHidden(bool on)
 {
     if (on == showHidden_)
@@ -311,23 +246,6 @@ void ListModel::setFilter(const QString& text)
     endResetModel();
     // Marks on rows the filter hides still count; the status says so.
     Q_EMIT marksChanged();
-}
-
-void ListModel::markGlob(const QString& pattern, bool on)
-{
-    const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(pattern),
-                                QRegularExpression::CaseInsensitiveOption);
-    if (!re.isValid())
-        return;
-    for (quint32 idx : rows_) {
-        if (!re.match(entries_[idx].display).hasMatch())
-            continue;
-        if ((marked_[idx] != 0) != on) {
-            marked_[idx] = on ? 1 : 0;
-            markedCount_ += on ? 1 : -1;
-        }
-    }
-    rowsRepaint();
 }
 
 Qt::ItemFlags ListModel::flags(const QModelIndex& index) const
