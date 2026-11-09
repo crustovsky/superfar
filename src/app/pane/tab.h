@@ -44,6 +44,10 @@ public:
     // Where the cursor goes once the running load ends.
     void setCursorOnLoad(const QByteArray& name) { cursorName_ = name; }
     QByteArray currentName() const;  // raw name under the cursor, empty when none
+    // A job is about to take these items away. Should the cursor's be
+    // one of them, the cursor lands on the first entry after it that
+    // stays, else on the last one before it.
+    void aboutToRemove(const std::vector<core::Location>& items);
 
     // The marked entries, or the cursor entry when nothing is marked.
     std::vector<core::Location> selectedLocations() const;
@@ -144,6 +148,8 @@ private:
     MarkStore marks_;                // marks of folders left behind
     QString spaceText_;
     int scrollValue_ = -1;  // restored after a reload
+    int cursorRow_ = -1;    // the cursor's row before a reload, for when its name is gone
+    QByteArray landingName_;  // where the cursor goes when a job removes its item
     bool current_ = true;
     bool dirty_ = false;    // changed while not current or while editing
     bool locked_ = false;

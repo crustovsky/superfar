@@ -15,6 +15,7 @@
 #include <QPointer>
 #include <QScrollBar>
 #include <QVBoxLayout>
+#include <algorithm>
 #include <utility>
 
 Tab::Tab(const Services& services, QWidget* parent)
@@ -95,6 +96,7 @@ void Tab::reload()
 {
     pendingMarks_ = model_->markedNames();
     cursorName_ = currentName();
+    cursorRow_ = view_->currentIndex().row();
     scrollValue_ = view_->verticalScrollBar()->value();
     if (!search_.isEmpty())
         search(location_, search_);
@@ -675,13 +677,47 @@ void Tab::activate(const QModelIndex& index)
     });
 }
 
+void Tab::aboutToRemove(const std::vector<core::Location>& items)
+{
+    landingName_.clear();
+    const int cursor = view_->currentIndex().row();
+    if (cursor < 0)
+        return;
+    QSet<QByteArray> going;
+    for (const core::Location& item : items)
+        if (item.parent() == location_)
+            going.insert(item.basename());
+    if (!going.contains(model_->entryAt(cursor).name))
+        return;
+    const int rows = model_->rowCount();
+    for (int row = cursor + 1; row < rows && landingName_.isEmpty(); ++row)
+        if (!going.contains(model_->entryAt(row).name))
+            landingName_ = model_->entryAt(row).name;
+    for (int row = cursor - 1; row >= 0 && landingName_.isEmpty(); --row)
+        if (!going.contains(model_->entryAt(row).name))
+            landingName_ = model_->entryAt(row).name;
+}
+
 void Tab::placeCursor()
 {
+    // A reload knows the row the cursor was on; anything else is a new
+    // listing, where a landing place left by a job means nothing.
+    const int rowBefore = std::exchange(cursorRow_, -1);
+    if (rowBefore < 0)
+        landingName_.clear();
     if (model_->rowCount() == 0) {
         cursorName_.clear();
         return;
     }
     int row = cursorName_.isEmpty() ? -1 : model_->rowOf(cursorName_);
+    if (row < 0 && rowBefore >= 0) {
+        // The cursor's item went while the folder was shown: the place a
+        // job chose, else the same row, never back to the top (#54).
+        row = landingName_.isEmpty() ? -1 : model_->rowOf(landingName_);
+        if (row < 0)
+            row = std::min(rowBefore, model_->rowCount() - 1);
+        landingName_.clear();
+    }
     const bool restoring = row >= 0;
     if (row < 0)
         row = 0;
