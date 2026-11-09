@@ -97,8 +97,11 @@ private Q_SLOTS:
     void functionBarLayers();
     void propertiesGoDownAFolder();
     void promptOutlivesItsTab();
+    void cursorStaysWhereItsItemWas();
 
 private:
+    // Shift+F8 on the left tab's selection, confirmed.
+    void deleteSelection();
     Pane* left() const { return window_->leftPane(); }
     Pane* right() const
     {
@@ -457,6 +460,61 @@ void WindowTest::promptOutlivesItsTab()
     Q_EMIT bar->accepted(QString());
     QTRY_VERIFY(!QFile::exists(a_ + "/one.txt"));
     QVERIFY(QFile::exists(a_ + "/two.txt"));
+}
+
+void WindowTest::deleteSelection()
+{
+    window_->execute(Command::DeletePermanent);
+    QTRY_VERIFY(window_->findChild<PromptBar*>());
+    Q_EMIT window_->findChild<PromptBar*>()->accepted(QString());
+}
+
+void WindowTest::cursorStaysWhereItsItemWas()
+{
+    // Deleting the item under the cursor leaves the cursor on the next
+    // one, not on the first row (#54).
+    for (int i = 0; i < 8; ++i)
+        write(a_ + QStringLiteral("/f%1.txt").arg(i), "x");
+    Tab* tab = left()->activeTab();
+    QTRY_COMPARE(tab->entryNames().size(), 11);  // sub, f0..f7, one, two
+    ListView* view = tab->view();
+    auto putCursorOn = [&](const QByteArray& name) {
+        for (int row = 0; row < view->model()->rowCount(); ++row) {
+            view->setCurrentIndex(view->model()->index(row, 0));
+            if (tab->currentName() == name)
+                return;
+        }
+        QFAIL("no such row");
+    };
+    putCursorOn("f3.txt");
+    deleteSelection();
+    QTRY_VERIFY(!QFile::exists(a_ + "/f3.txt"));
+    QTRY_COMPARE(tab->entryNames().size(), 10);
+    QCOMPARE(tab->currentName(), QByteArray("f4.txt"));
+
+    // A marked block with the cursor inside it: the first item after
+    // the block.
+    putCursorOn("f4.txt");
+    QTest::keyClick(view, Qt::Key_Insert);
+    QTest::keyClick(view, Qt::Key_Insert);
+    QTest::keyClick(view, Qt::Key_Insert);  // f4, f5, f6 marked, cursor on f7
+    putCursorOn("f5.txt");
+    QCOMPARE(tab->markedCount(), 3);
+    deleteSelection();
+    QTRY_COMPARE(tab->entryNames().size(), 7);
+    QCOMPARE(tab->currentName(), QByteArray("f7.txt"));
+
+    // The last row: the one before it.
+    putCursorOn("two.txt");
+    deleteSelection();
+    QTRY_COMPARE(tab->entryNames().size(), 6);
+    QCOMPARE(tab->currentName(), QByteArray("one.txt"));
+
+    // An item removed by something else: the same row, not the top.
+    putCursorOn("f1.txt");
+    QVERIFY(QFile::remove(a_ + "/f1.txt"));
+    QTRY_COMPARE(tab->entryNames().size(), 5);
+    QCOMPARE(tab->currentName(), QByteArray("f2.txt"));
 }
 
 QTEST_MAIN(WindowTest)

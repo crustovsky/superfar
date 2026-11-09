@@ -504,6 +504,8 @@ void MainWindow::startTransfer(bool move)
         const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
         if (!target.isValid())
             return;
+        if (move && tab && tab->location() == from)
+            tab->aboutToRemove(sources);
         runJob(new core::TransferJob(sources, target, move), tab, from, target);
     });
 }
@@ -790,6 +792,8 @@ void MainWindow::transfer(const std::vector<core::Location>& sources, const core
         for (Tab* tab : pane->tabs())
             if (tab->location() == parent)
                 from = tab;
+    if (move && from->location() == parent)
+        from->aboutToRemove(sources);
     runJob(new core::TransferJob(sources, target, move), from, from->location(), target);
 }
 
@@ -846,6 +850,8 @@ void MainWindow::confirmRemove(bool permanent)
                                     permanent ? tr("Delete") : tr("Trash"), std::nullopt);
     const core::Location from = tab->location();
     connect(bar, &PromptBar::accepted, this, [this, tab = QPointer<Tab>(tab), from, sources, permanent] {
+        if (tab && tab->location() == from)
+            tab->aboutToRemove(sources);
         runJob(new core::RemoveJob(sources, permanent), tab, from, from);
     });
 }
