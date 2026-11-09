@@ -11,7 +11,9 @@ endif()
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets DBus Test)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0>=2.74)
+# gio-unix is GLib's own header set for desktop entries (GDesktopAppInfo),
+# not another library.
+pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0>=2.74 gio-unix-2.0)
 # Sandboxed image decoding for the preview (see CLAUDE.md, Dependencies).
 pkg_check_modules(GLYCIN REQUIRED IMPORTED_TARGET glycin-2)
 

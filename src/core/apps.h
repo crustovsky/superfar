@@ -26,6 +26,10 @@ void openDefault(const Location& file, std::function<void(const QString& error)>
 // nothing is registered for its content type.
 void appsFor(const Location& file, std::function<void(std::vector<AppChoice>)> done);
 
+// An app that runs in a terminal (Terminal=true) is started in the
+// terminal runInTerminal() finds, in the folder of the first file: GLib
+// would pick from a list of its own that knows neither $TERMINAL nor
+// most Wayland terminals.
 bool launchWith(const QString& appId, const std::vector<Location>& files, QString* error);
 
 // Runs the shell command in a terminal, cwd set to dir. The terminal is
@@ -33,6 +37,12 @@ bool launchWith(const QString& appId, const std::vector<Location>& files, QStrin
 // few common ones. With holdOpen the window stays until Enter is
 // pressed, so output can be read.
 bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOpen, QString* error);
+
+// A desktop entry's Exec line as a shell command for these files: %f and
+// %u are the first file, %F and %U all of them (paths, or URIs for what
+// has no path), shell-quoted; %% is a percent sign; the other codes go.
+// Files are appended when the line has no place for them.
+QByteArray expandExec(const QByteArray& exec, const std::vector<Location>& files);
 
 // What F4 edits with: $VISUAL, else $EDITOR, else vi.
 QString editorCommand(QString* error = nullptr);
