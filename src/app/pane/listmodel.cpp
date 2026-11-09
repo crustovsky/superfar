@@ -221,9 +221,9 @@ void ListModel::applyMarks(const QSet<QByteArray>& names)
 {
     markedCount_ = 0;
     for (quint32 i = 0; i < entries_.size(); ++i) {
+        // Every mark counts, shown or not: a job takes them all (#62).
         marked_[i] = names.contains(entries_[i].name) ? 1 : 0;
-        if (marked_[i] && (showHidden_ || !entries_[i].hidden))
-            ++markedCount_;
+        markedCount_ += marked_[i];
     }
     rowsRepaint();
 }
