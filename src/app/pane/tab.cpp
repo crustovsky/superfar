@@ -1,5 +1,6 @@
 #include "pane/tab.h"
 
+#include "counted.h"
 #include "bench.h"
 #include "core/apps.h"
 #include "core/fileops.h"
@@ -130,8 +131,8 @@ void Tab::onSearchFinished(quint64 generation, quint64 scanned)
     model_->finishLoad();
     restoreMarks();
     placeCursor();
-    Q_EMIT statusChanged(tr("%n matches for %1", nullptr, model_->rowCount()).arg(search_)
-                             + tr(", %n entries scanned", nullptr, static_cast<int>(scanned)),
+    Q_EMIT statusChanged(tr("%1 for %2, %3 scanned").arg(counted(model_->rowCount(), tr("match"), tr("matches")), search_,
+                                                             counted(static_cast<qint64>(scanned), tr("entry"), tr("entries"))),
                          QString());
     Q_EMIT loaded();
 }
@@ -162,7 +163,7 @@ QString Tab::selectionText() const
         // A job takes every mark, so the prompt says when some of them
         // are not on screen.
         const int unseen = model_->markedNotShown();
-        const QString items = tr("%n items", nullptr, marked);
+        const QString items = counted(marked, tr("item"), tr("items"));
         return unseen > 0 ? tr("%1 (%2 not shown)").arg(items).arg(unseen) : items;
     }
     const QModelIndex idx = view_->currentIndex();
@@ -745,7 +746,8 @@ void Tab::updateStatus()
     const int hidden = model_->hiddenCount();
     const int marked = model_->markedCount();
     QString text = model_->filter().isEmpty()
-        ? (search_.isEmpty() ? tr("%n items", nullptr, shown) : tr("%n matches for %1", nullptr, shown).arg(search_))
+        ? (search_.isEmpty() ? counted(shown, tr("item"), tr("items"))
+                            : tr("%1 for %2").arg(counted(shown, tr("match"), tr("matches")), search_))
         : tr("filter %1: %2 of %3").arg(model_->filter()).arg(shown).arg(model_->totalCount());
     if (isArchive())
         text += tr(", in archive");
@@ -753,9 +755,9 @@ void Tab::updateStatus()
     if (const QModelIndex cur = view_->currentIndex(); cur.isValid())
         text += QStringLiteral("  \u00b7  ") + model_->entryAt(cur.row()).display;
     if (marked > 0)
-        text += tr(", %n selected", nullptr, marked);
+        text += tr(", %1 selected").arg(marked);
     if (hidden > 0 && !model_->showHidden())
-        text += tr(", %n hidden", nullptr, hidden);
+        text += tr(", %1 hidden").arg(hidden);
     if (model_->recursiveSizes())
         text += tr(", sizes");
     Q_EMIT statusChanged(text, spaceText_);

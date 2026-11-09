@@ -182,7 +182,9 @@ void TabTest::marksUnderAFilter()
     // hides stay, stay counted, and the prompt of a job names them (#55).
     Tab tab(services_);
     load(tab, [&] { tab.navigate(loc(root_)); });
-    markFirstRows(tab, 2);  // sub, a.txt
+    markFirstRows(tab, 1);
+    QCOMPARE(tab.selectionText(), QStringLiteral("1 item"));  // not "1 items" (#64)
+    markFirstRows(tab, 1);  // sub, a.txt
     QTest::keyClick(tab.view(), Qt::Key_B);
     QCOMPARE(tab.entryNames().size(), 3);
     QCOMPARE(tab.view()->model()->rowCount(), 2);  // sub, b.txt

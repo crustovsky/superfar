@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 
+#include "counted.h"
 #include "bench.h"
 #include "cmdline.h"
 #include "config.h"
@@ -770,8 +771,8 @@ void MainWindow::copyToClipboard(bool cut)
     if (files.empty())
         return;
     QApplication::clipboard()->setMimeData(uris::make(files, cut));
-    active_->showMessage(cut ? tr("%n items cut", nullptr, static_cast<int>(files.size()))
-                             : tr("%n items copied", nullptr, static_cast<int>(files.size())));
+    active_->showMessage(cut ? tr("%1 cut").arg(counted(static_cast<qint64>(files.size()), tr("item"), tr("items")))
+                             : tr("%1 copied").arg(counted(static_cast<qint64>(files.size()), tr("item"), tr("items"))));
 }
 
 void MainWindow::paste()

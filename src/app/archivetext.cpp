@@ -1,5 +1,6 @@
 #include "archivetext.h"
 
+#include "counted.h"
 #include "core/entry.h"
 #include "core/sort.h"
 #include "jobs/format.h"
@@ -23,8 +24,8 @@ QString tr(const char* text, int n = -1)
 QString summary(const core::ArchiveSummary& s, const core::ArchiveDropped& dropped, quint64 packedBytes)
 {
     QStringList lines;
-    QString sizes = tr("%n files", static_cast<int>(s.files)) + QStringLiteral(", ")
-        + tr("%n folders", static_cast<int>(s.dirs)) + QStringLiteral(", ")
+    QString sizes = counted(s.files, tr("file"), tr("files")) + QStringLiteral(", ")
+        + counted(s.dirs, tr("folder"), tr("folders")) + QStringLiteral(", ")
         + tr("%1 unpacked").arg(jobfmt::bytes(s.bytes));
     if (packedBytes > 0)
         sizes += tr(" (%1 packed, %2x)").arg(jobfmt::bytes(packedBytes))
@@ -35,7 +36,7 @@ QString summary(const core::ArchiveSummary& s, const core::ArchiveDropped& dropp
     if (!s.topFolder.isEmpty())
         lines << tr("Extracts into one folder: %1/").arg(QString::fromUtf8(s.topFolder));
     else
-        lines << tr("Extracts %n items into the current folder", s.topLevel);
+        lines << tr("Extracts %1 into the current folder").arg(counted(s.topLevel, tr("item"), tr("items")));
     if (s.newest > 0)
         lines << tr("Newest member: %1").arg(QDateTime::fromSecsSinceEpoch(s.newest).toString(QStringLiteral("yyyy-MM-dd HH:mm")));
     if (dropped.absolute > 0)
@@ -96,7 +97,7 @@ QString tree(const std::vector<core::ArchiveEntry>& entries, int maxLines)
     walk(QByteArray(), 0);
     const qsizetype more = seen.size() - lines.size();
     if (more > 0)
-        lines << tr("and %n more", static_cast<int>(more));
+        lines << tr("and %1 more").arg(more);
     return lines.join(QLatin1Char('\n'));
 }
 

@@ -1,6 +1,7 @@
 // App code with no widget behind it: the key table and the help must
 // agree with each other, and the mark store keeps what a tab leaves in
 // a folder.
+#include "counted.h"
 #include "archivetext.h"
 #include "help.h"
 #include "keymap.h"
@@ -15,6 +16,7 @@ private Q_SLOTS:
     void everyCommandIsComplete();
     void propertiesKeys();
     void functionKeyLayers();
+    void countsOfOne();
     void keyShownInMenus();
     void oneCommandPerKey();
     void markStore();
@@ -59,6 +61,14 @@ void AppTest::propertiesKeys()
     for (const auto& [name, keys] : keymap::defaults())
         if (name == QLatin1String("Properties"))
             QCOMPARE(keys, QStringList({"Alt+F2", "Alt+Return", "Alt+Enter"}));
+}
+
+void AppTest::countsOfOne()
+{
+    // "1 items" was everywhere (#64).
+    QCOMPARE(counted(0, "item", "items"), QStringLiteral("0 items"));
+    QCOMPARE(counted(1, "item", "items"), QStringLiteral("1 item"));
+    QCOMPARE(counted(2, "entry", "entries"), QStringLiteral("2 entries"));
 }
 
 void AppTest::functionKeyLayers()

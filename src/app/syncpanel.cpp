@@ -1,5 +1,6 @@
 #include "syncpanel.h"
 
+#include "counted.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "jobs/format.h"
@@ -85,7 +86,7 @@ SyncPanel::SyncPanel(QWidget* parent)
     connect(comparer_, &core::Comparer::finished, this, &SyncPanel::onFinished);
     connect(comparer_, &core::Comparer::progress, this, [this](quint64 gen, quint64 n) {
         if (gen == generation_)
-            summary_->setText(tr("Comparing, %n entries so far", nullptr, static_cast<int>(n)));
+            summary_->setText(tr("Comparing, %1 so far").arg(counted(static_cast<qint64>(n), tr("entry"), tr("entries"))));
     });
     connect(comparer_, &core::Comparer::failed, this, [this](quint64, const QString& m) { summary_->setText(m); });
     setFocusProxy(table_);
@@ -146,7 +147,7 @@ void SyncPanel::onFinished(quint64 generation, std::vector<core::CompareEntry> e
         row->setFlags(row->flags() | Qt::ItemIsUserCheckable);
         row->setCheckState(0, diff ? Qt::Checked : Qt::Unchecked);
     }
-    summary_->setText(tr("%n entries compared, %1 differ", nullptr, static_cast<int>(entries_.size())).arg(different));
+    summary_->setText(tr("%1 compared, %2 differ").arg(counted(static_cast<qint64>(entries_.size()), tr("entry"), tr("entries"))).arg(different));
 }
 
 std::vector<const core::CompareEntry*> SyncPanel::checkedEntries() const

@@ -1,5 +1,6 @@
 #include "properties.h"
 
+#include "counted.h"
 #include "attributesedit.h"
 #include "elidedlabel.h"
 #include "jobs/format.h"
@@ -69,7 +70,7 @@ void PropertiesPanel::show(const std::vector<core::Location>& items)
     firstSeen_ = false;
     editor_->clear();
     title_->setText(items.size() == 1 ? items.front().displayPath()
-                                      : tr("%n items", nullptr, static_cast<int>(items.size())));
+                                      : counted(static_cast<qint64>(items.size()), tr("item"), tr("items")));
     info_->setText(tr("Reading"));
     for (const core::Location& item : items) {
         core::queryDetails(item, [this, gen = generation_](const core::Details& d) {
@@ -121,7 +122,7 @@ void PropertiesPanel::refresh()
         if (!d.owner.isEmpty())
             lines << tr("Owner: %1:%2").arg(d.owner, d.group);
     } else {
-        lines << tr("%n files", nullptr, files_) + tr(", %n folders", nullptr, folders_);
+        lines << counted(files_, tr("file"), tr("files")) + QStringLiteral(", ") + counted(folders_, tr("folder"), tr("folders"));
         if (files_ > 0)
             lines << tr("Files: %1").arg(jobfmt::bytes(fileBytes_));
     }
