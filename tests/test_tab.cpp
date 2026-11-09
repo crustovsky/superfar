@@ -72,6 +72,7 @@ private Q_SLOTS:
     void finishedJobClearsWhileAway();
     void marksAcrossAnArchive();
     void marksUnderAFilter();
+    void marksOnHiddenFilesStayCounted();
     void cursorRowSpansTheList();
     void columnsHideAndMove();
     void nameKeepsAFloor();
@@ -202,6 +203,25 @@ void TabTest::marksUnderAFilter()
     tab.execute(keymap::Command::Cancel);
     QCOMPARE(tab.markedCount(), 0);
     QVERIFY(tab.selectedLocations().size() <= 1);
+}
+
+void TabTest::marksOnHiddenFilesStayCounted()
+{
+    // A marked dotfile, hidden afterwards: the count, the prompt and
+    // what a job would take agree, before and after a reload (#62).
+    write(root_ + "/.dot", "d");
+    Tab tab(services_);
+    tab.setShowHidden(true);
+    load(tab, [&] { tab.navigate(loc(root_)); });
+    QCOMPARE(tab.entryNames(), QStringList({"sub", ".dot", "a.txt", "b.txt"}));
+    tab.view()->setCurrentIndex(tab.view()->model()->index(1, 0));
+    markFirstRows(tab, 2);  // .dot, a.txt
+    tab.setShowHidden(false);
+    QCOMPARE(tab.markedCount(), 2);
+    load(tab, [&] { tab.reload(); });
+    QCOMPARE(tab.markedCount(), 2);
+    QCOMPARE(tab.selectionText(), QStringLiteral("2 items (1 not shown)"));
+    QCOMPARE(tab.selectedLocations().size(), size_t(2));
 }
 
 void TabTest::marksAcrossAnArchive()
