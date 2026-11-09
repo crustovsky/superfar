@@ -155,36 +155,40 @@ void openDefault(const Location& file, std::function<void(const QString& error)>
     });
 }
 
-void appsFor(const Location& file, std::function<void(std::vector<AppChoice>)> done)
+void appsFor(const Location& file,
+             std::function<void(const QString& contentType, std::vector<AppChoice> apps)> done)
 {
     queryContentType(file, [done = std::move(done)](const QString& type, const QString&) {
         std::vector<AppChoice> out;
         if (type.isEmpty()) {
-            done(out);
+            done(type, out);
             return;
         }
-        auto add = [&](GList* list) {
-            for (GList* l = list; l; l = l->next) {
-                auto* app = G_APP_INFO(l->data);
-                const char* id = g_app_info_get_id(app);
-                if (!id)
-                    continue;
-                const QString qid = QString::fromUtf8(id);
-                bool seen = false;
-                for (const AppChoice& c : out)
-                    seen = seen || c.id == qid;
-                if (!seen)
-                    out.push_back({qid, QString::fromUtf8(g_app_info_get_display_name(app)), iconNamesOf(app)});
-            }
+        auto add = [&](GAppInfo* app, bool isDefault) {
+            const char* id = g_app_info_get_id(app);
+            if (!id)
+                return;
+            const QString qid = QString::fromUtf8(id);
+            for (const AppChoice& c : out)
+                if (c.id == qid)
+                    return;
+            out.push_back({qid, QString::fromUtf8(g_app_info_get_display_name(app)), iconNamesOf(app), isDefault});
+        };
+        auto addAll = [&](GList* list) {
+            for (GList* l = list; l; l = l->next)
+                add(G_APP_INFO(l->data), false);
             g_list_free_full(list, g_object_unref);
         };
-        add(g_app_info_get_recommended_for_type(type.toUtf8().constData()));
-        add(g_app_info_get_all_for_type(type.toUtf8().constData()));
-        done(out);
+        const QByteArray utf8 = type.toUtf8();
+        if (GPtr<GAppInfo> app(g_app_info_get_default_for_type(utf8.constData(), FALSE)); app)
+            add(app.get(), true);
+        addAll(g_app_info_get_recommended_for_type(utf8.constData()));
+        addAll(g_app_info_get_all_for_type(utf8.constData()));
+        done(type, out);
     });
 }
 
-bool launchWith(const QString& appId, const std::vector<Location>& files, QString* error)
+bool launchWith(const QString& appId, const std::vector<Location>& files, QString* error, const LaunchNote& note)
 {
     GList* all = g_app_info_get_all();
     GAppInfo* found = nullptr;
@@ -202,7 +206,53 @@ bool launchWith(const QString& appId, const std::vector<Location>& files, QStrin
             *error = QStringLiteral("Application %1 not found").arg(appId);
         return false;
     }
-    return launch(app.get(), files, error);
+    if (!launch(app.get(), files, error))
+        return false;
+    if (!note.contentType.isEmpty()) {
+        // The app is running; a mimeapps.list that cannot be written is
+        // worth a word, not a failure.
+        const QByteArray type = note.contentType.toUtf8();
+        GError* gerror = nullptr;
+        const bool noted = note.makeDefault ? g_app_info_set_as_default_for_type(app.get(), type.constData(), &gerror)
+                                            : g_app_info_set_as_last_used_for_type(app.get(), type.constData(), &gerror);
+        GErrorPtr err(gerror);
+        if (!noted && note.makeDefault && error)
+            *error = QStringLiteral("Opened, but the default was not changed: %1").arg(errorMessage(err.get()));
+    }
+    return true;
+}
+
+bool launchCommand(const QString& command, const std::vector<Location>& files, bool inTerminal, QString* error)
+{
+    const QByteArray typed = command.trimmed().toLocal8Bit();
+    // sh would start and fail unseen; say it here. A leading VAR=value
+    // is the shell's business.
+    const QByteArray program = typed.split(' ').first();
+    if (!program.contains('=')) {
+        if (GStr found(g_find_program_in_path(program.constData())); !found) {
+            if (error)
+                *error = QStringLiteral("%1 is not on PATH").arg(QString::fromLocal8Bit(program));
+            return false;
+        }
+    }
+    QByteArray line = typed;
+    for (const Location& file : files) {
+        const QByteArray path = file.path();
+        line += ' ' + shellQuote(path.isEmpty() ? file.uri().toUtf8() : path);
+    }
+    const QByteArray cwd = files.empty() ? QByteArray() : files.front().parent().path();
+    if (inTerminal)
+        return shellInTerminal(cwd, line, error);
+    QByteArray sh("sh"), dashC("-c");
+    char* argv[] = {sh.data(), dashC.data(), line.data(), nullptr};
+    GError* gerror = nullptr;
+    const bool ok = g_spawn_async(cwd.isEmpty() ? nullptr : cwd.constData(), argv, nullptr,
+                                  GSpawnFlags(G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL),
+                                  nullptr, nullptr, nullptr, &gerror);
+    GErrorPtr err(gerror);
+    if (!ok && error)
+        *error = errorMessage(err.get());
+    return ok;
 }
 
 bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOpen, QString* error)

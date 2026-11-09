@@ -17,6 +17,7 @@
 #include "jobs/bars.h"
 #include "jobs/strip.h"
 #include "menu.h"
+#include "openwith.h"
 #include "pane/pane.h"
 #include "pane/tab.h"
 #include "places.h"
@@ -623,25 +624,33 @@ void MainWindow::chooseColumns()
 void MainWindow::openWith()
 {
     Tab* tab = active_->activeTab();
-    const core::Location file = tab->cursorLocation();
-    if (!file.isValid() || tab->cursorIsDir())
+    if (tab->isArchive()) {
+        active_->showMessage(tr("F5 extracts; open it from the extracted copy"));
         return;
+    }
+    // The marked items, else the cursor's; folders too. The list is for
+    // the type of the first one: with marks the cursor is usually on
+    // something else by now.
+    const std::vector<core::Location> items = tab->selectedLocations();
+    if (items.empty())
+        return;
+    const QString title = tr("Open %1 with").arg(tab->selectionText());
     QPointer<MainWindow> guard(this);
-    core::appsFor(file, [guard, file](const std::vector<core::AppChoice>& apps) {
+    core::appsFor(items.front(), [guard, items, title](const QString& type, std::vector<core::AppChoice> apps) {
         if (!guard)
             return;
-        if (apps.empty()) {
-            guard->active_->showMessage(tr("No application registered for this type"));
-            return;
-        }
-        QStringList names;
-        for (const core::AppChoice& a : apps)
-            names << a.name;
-        ChoiceBar* bar = guard->strip_->choose(tr("Open %1 with").arg(file.displayName()), names);
-        connect(bar, &ChoiceBar::chosen, guard, [guard, apps, file](int index) {
+        OpenWithBar* bar = guard->strip_->openWith(title, std::move(apps));
+        connect(bar, &OpenWithBar::appChosen, guard, [guard, items, type](const core::AppChoice& app, bool makeDefault) {
             QString error;
-            if (index >= 0 && index < static_cast<int>(apps.size())
-                && !core::launchWith(apps[static_cast<size_t>(index)].id, {file}, &error))
+            const bool ok = core::launchWith(app.id, items, &error, {type, makeDefault});
+            if (!error.isEmpty())
+                guard->active_->showMessage(error);
+            else if (ok && makeDefault)
+                guard->active_->showMessage(tr("%1 is the default for %2 now").arg(app.name, type));
+        });
+        connect(bar, &OpenWithBar::commandTyped, guard, [guard, items](const QString& command, bool inTerminal) {
+            QString error;
+            if (!core::launchCommand(command, items, inTerminal, &error))
                 guard->active_->showMessage(error);
         });
     });

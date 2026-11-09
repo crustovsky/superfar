@@ -2,6 +2,7 @@
 
 #include "jobs/bars.h"
 #include "jobs/format.h"
+#include "openwith.h"
 
 #include <QApplication>
 #include <QHBoxLayout>
@@ -266,6 +267,16 @@ GoToBar* JobStrip::goTo()
     auto* bar = new GoToBar(this);
     connect(bar, &GoToBar::chosen, this, [this, bar] { removeBar(bar); });
     connect(bar, &GoToBar::rejected, this, [this, bar] { removeBar(bar); });
+    showBar(bar);
+    return bar;
+}
+
+OpenWithBar* JobStrip::openWith(const QString& title, std::vector<core::AppChoice> apps)
+{
+    auto* bar = new OpenWithBar(title, std::move(apps), this);
+    connect(bar, &OpenWithBar::appChosen, this, [this, bar] { removeBar(bar); });
+    connect(bar, &OpenWithBar::commandTyped, this, [this, bar] { removeBar(bar); });
+    connect(bar, &OpenWithBar::rejected, this, [this, bar] { removeBar(bar); });
     showBar(bar);
     return bar;
 }

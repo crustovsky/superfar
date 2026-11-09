@@ -115,10 +115,10 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Ctrl+A all; Alt+F8 (*) inverts; Ctrl+Shift+A clears. Selection is marks,
   separate from the cursor; a folder's marks come back when the tab
   returns to it after a trip into a subfolder or an archive
-- Enter opens a file with its default app; Shift+F3 (Shift+Enter) shows the
-  in-window open-with list; Alt+F2 (Alt+Enter) the properties panel (mode
-  and owner of the marked items, down their folders if asked); Esc clears
-  the filter, closes the viewer or panel, then the preview, then the marks
+- Enter opens with the default app; Shift+F3 (Shift+Enter) the open-with
+  bar (filter, Ctrl+Enter sets the default, no match runs as a command);
+  Alt+F2 (Alt+Enter) properties (mode and owner, down folders if asked); Esc
+  clears the filter, closes the viewer or panel, then the preview, then marks
 - Alt+F6 (Ctrl+D) bookmarks the current folder (or removes the bookmark)
 - Type to quick-filter the current tab (fuzzy, prefix-biased). Backspace
   edits the filter while one is set and goes up otherwise; Esc clears it
@@ -194,7 +194,7 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       attributes is chmod and chown down a tree with chmod's
                       X
   monitor.cpp         directory change events, coalesced by timer
-  apps.cpp            GAppInfo: default app, open-with list, terminal launch
+  apps.cpp            GAppInfo: default app, open-with list, terminal apps
   mounts.cpp          volumes, mount, unmount; prompts go to the window
   compare.cpp         folder sync engine: name, size, mtime, hash
   child.cpp           a program run for its output, killed on cancel

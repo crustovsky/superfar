@@ -140,7 +140,7 @@ use kept as second keys:
 | Key | Action |
 |-----|--------|
 | Enter | open with the default app; on a folder or an archive, enter it |
-| Shift+F3, Shift+Enter | choose an app to open with |
+| Shift+F3, Shift+Enter | open the marked items (or the cursor item, a folder too) with another app: type to narrow the list, Enter opens, Ctrl+Enter also makes it the default; text that names no app runs as a command (Ctrl+Enter: in a terminal) |
 | F2 | rename inline; Tab moves on to the row's permissions and owner when those columns are shown |
 | Shift+F2 | multi-rename panel |
 | F3 | view; on a folder, compute its size |

@@ -4,6 +4,7 @@
 // a job that ended with skips or failures. Hidden when empty.
 #pragma once
 
+#include "core/apps.h"
 #include "core/jobs/job.h"
 #include "jobs/panel.h"
 
@@ -17,6 +18,7 @@ class JobPanel;
 class AuthBar;
 class CheckBar;
 class ChoiceBar;
+class OpenWithBar;
 class GoToBar;
 class PromptBar;
 class QLabel;
@@ -76,6 +78,7 @@ public:
     AuthBar* auth(const QString& message, const QString& user, const QString& domain, bool needUser,
                   bool needDomain, bool needPassword, bool anonymousOk);
     GoToBar* goTo();
+    OpenWithBar* openWith(const QString& title, std::vector<core::AppChoice> apps);
 
 Q_SIGNALS:
     void jobFinished(core::Job* job);

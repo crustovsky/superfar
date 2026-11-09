@@ -40,6 +40,7 @@ qt_add_library(superfar_app STATIC
   pane/listmodel_sort.cpp
   pane/listmodel_attrs.cpp
   ownercompletion.cpp
+  openwith.cpp
 )
 target_include_directories(superfar_app PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(superfar_app PUBLIC superfar_core Qt6::Widgets Qt6::DBus)

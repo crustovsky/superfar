@@ -52,7 +52,7 @@ enum class Command {
     Cancel,       // Esc: clear the filter, close what is open
     MarkGlob,     // select by pattern
     UnmarkGlob,
-    OpenWith,     // choose an app for the cursor file
+    OpenWith,     // choose an app for the marked items
     FocusCommandLine,
     CopyClip,     // clipboard, interoperable with other file managers
     CutClip,
