@@ -8,7 +8,7 @@ url="https://github.com/crustovsky/superfar"
 license=('MIT')
 depends=('qt6-base' 'glib2' 'glycin' 'hicolor-icon-theme')
 makedepends=('cmake' 'ninja' 'pkgconf')
-optdepends=('gvfs: trash, mounts, network shares'
+optdepends=('gvfs: trash, mounts, network shares, administrator access'
             'libarchive: open archives as folders, pack into them'
             'tumbler: thumbnails and media previews'
             'poppler: PDF pages in the preview'

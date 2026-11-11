@@ -127,9 +127,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Enter on an archive (zip, tar.*, 7z, rar, iso, ...) opens it as a
   read-only folder listed by bsdtar in a child process, F5 extracts the
   marked members to the other pane
-- Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
-  with credentials asked in the window); Alt+F1 (Ctrl+G) go to folder, fuzzy
-  over history by frecency; Ctrl+R reloads
+- Ctrl+L edits the path (accepts remote URIs and admin:///path, root by
+  polkit; an unmounted one is mounted, credentials asked in the window);
+  Alt+F1 (Ctrl+G) go to folder, fuzzy over history by frecency; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
@@ -195,7 +195,7 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       records its own inverse (redo), trashes, never deletes
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal apps
-  mounts.cpp          volumes, mount, unmount; prompts go to the window
+  mounts.cpp          volumes, mount, unmount; admin.cpp: admin:// past denials
   compare.cpp         folder sync engine: name, size, mtime, hash
   child.cpp           a program run for its output, killed on cancel
 src/app/

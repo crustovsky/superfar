@@ -3,6 +3,7 @@
 // and the path. See mainwindow.cpp for the rest of the class.
 #include "mainwindow.h"
 
+#include "core/admin.h"
 #include "core/fileops.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
@@ -29,22 +30,7 @@ void MainWindow::promptMkdir()
             active_->showMessage(tr("The tab this was for is closed"));
             return;
         }
-        const core::Location dir = guard->location();
-        // The answer may come after the tab, or the window, has gone.
-        core::makeDirectory(dir.child(name), [self = QPointer<MainWindow>(this), guard, dir, name](const QString& error) {
-            if (!self)
-                return;
-            if (!error.isEmpty()) {
-                self->active_->showMessage(error);
-                return;
-            }
-            const core::Location made = dir.child(name);
-            self->undo_.record({tr("new folder %1").arg(made.displayName()),
-                                {core::UndoItem::created(made, made.isNative())}});
-            if (guard && guard->location() == dir)
-                guard->reloadWithCursor(name);
-            self->tree_->refresh(dir);
-        });
+        createEntry(guard->location(), name, true, guard);
     });
 }
 
@@ -64,19 +50,70 @@ void MainWindow::promptNewFile()
             active_->showMessage(tr("The tab this was for is closed"));
             return;
         }
-        const core::Location dir = guard->location();
-        core::createFile(dir.child(name), [self = QPointer<MainWindow>(this), guard, dir, name](const QString& error) {
+        createEntry(guard->location(), name, false, guard);
+    });
+}
+
+void MainWindow::createEntry(const core::Location& dir, const QByteArray& name, bool folder, const QPointer<Tab>& tab)
+{
+    // The answer may come after the tab, or the window, has gone.
+    auto done = [self = QPointer<MainWindow>(this), tab, dir, name, folder](const QString& error) {
+        if (!self)
+            return;
+        if (!error.isEmpty()) {
+            if (!core::admin::offerFor(dir)) {
+                self->active_->showMessage(core::admin::isAdmin(dir) ? core::admin::refusal(error) : error);
+                return;
+            }
+            PromptBar* bar = self->strip_->prompt(tr("%1. Create it as administrator? It will belong to root.").arg(error),
+                                                  tr("As &administrator"), std::nullopt);
+            connect(bar, &PromptBar::accepted, self, [self, tab, dir, name, folder] {
+                self->createEntry(core::admin::of(dir), name, folder, tab);
+            });
+            return;
+        }
+        const core::Location made = dir.child(name);
+        self->undo_.record({(folder ? tr("new folder %1") : tr("new file %1")).arg(made.displayName()),
+                            {core::UndoItem::created(made, made.isNative())}});
+        // The tab shows the folder by its own location, as administrator or not.
+        const core::Location shown = core::admin::plain(dir);
+        if (tab && (tab->location() == dir || tab->location() == shown))
+            tab->reloadWithCursor(name);
+        if (folder)
+            self->tree_->refresh(shown);
+    };
+    if (folder)
+        core::makeDirectory(dir.child(name), done);
+    else
+        core::createFile(dir.child(name), done);
+}
+
+void MainWindow::offerAdmin(Tab* tab, const core::Location& dir)
+{
+    PromptBar* bar = strip_->prompt(tr("Permission denied: %1. Open as administrator?").arg(dir.displayPath()),
+                                    tr("As &administrator"), std::nullopt);
+    connect(bar, &PromptBar::accepted, this, [guard = QPointer<Tab>(tab), dir] {
+        if (guard && guard->location() == dir)
+            guard->navigate(core::admin::of(dir));  // polkit asks; the tab then stays there
+    });
+}
+
+void MainWindow::offerAdminRename(const core::Location& file, const QString& newName, const QString& error)
+{
+    PromptBar* bar = strip_->prompt(tr("%1. Rename %2 as administrator?").arg(error, file.displayName()),
+                                    tr("As &administrator"), std::nullopt);
+    connect(bar, &PromptBar::accepted, this, [this, file, newName] {
+        const core::Location from = core::admin::of(file);
+        core::renameEntry(from, newName, [self = QPointer<MainWindow>(this), from](const QString& error, const QByteArray& actual, const QString&) {
             if (!self)
                 return;
             if (!error.isEmpty()) {
-                self->active_->showMessage(error);
+                self->active_->showMessage(core::admin::refusal(error));
                 return;
             }
-            const core::Location made = dir.child(name);
-            self->undo_.record({tr("new file %1").arg(made.displayName()),
-                                {core::UndoItem::created(made, made.isNative())}});
-            if (guard && guard->location() == dir)
-                guard->reloadWithCursor(name);
+            self->undo_.record({tr("rename of %1").arg(from.displayName()),
+                                {core::UndoItem::moved(from, from.parent().child(actual), false)}});
+            self->refreshAt(core::admin::plain(from.parent()));  // a monitored tab has seen it already
         });
     });
 }

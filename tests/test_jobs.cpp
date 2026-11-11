@@ -1,4 +1,5 @@
 // Jobs and the monitor against a real temp directory.
+#include "core/admin.h"
 #include "core/archive.h"
 #include "core/fileops.h"
 #include "core/jobs/attributes.h"
@@ -111,6 +112,7 @@ private Q_SLOTS:
     void undoOfAnAbortedJob();
     void permanentDeleteRecordsNothing();
     void queuedJobsWaitTheirTurn();
+    void deniedItemsOfferAdministrator();
 };
 
 void JobsTest::copyIntoItself()
@@ -1089,6 +1091,91 @@ void JobsTest::queuedJobsWaitTheirTurn()
     QTRY_COMPARE(queue.count(), 0);
 }
 
+void JobsTest::deniedItemsOfferAdministrator()
+{
+    if (::geteuid() == 0)
+        QSKIP("root is never denied");
+    QVERIFY(core::admin::available());  // the stand-in backend file, see main()
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/ro"));
+    write(tmp.path() + "/f.txt", "f");
+    write(tmp.path() + "/ro/kept.txt", "kept");
+    QCOMPARE(::chmod(QFile::encodeName(tmp.path() + "/ro").constData(), 0555), 0);
+    struct Unlock {
+        QByteArray path;
+        ~Unlock() { ::chmod(path.constData(), 0755); }
+    } unlock{QFile::encodeName(tmp.path() + "/ro")};
+
+    // The answers given here are never "as administrator": that would
+    // ask the developer's own polkit agent. What is checked is the offer.
+    auto offered = [&](core::Job& job, core::ErrorAction answer = core::ErrorAction::Skip) {
+        QList<bool> offers;
+        connect(&job, &core::Job::failure, [&](const core::Failure& f) {
+            offers << f.offerAdmin;
+            job.answerError(answer, false);
+        });
+        runJob(job);
+        return offers;
+    };
+    // A copy into a folder that is not ours to write to, a move out of
+    // it, a delete in it, a chmod of what is not ours: denied, local.
+    {
+        core::TransferJob job({loc(tmp.path() + "/f.txt")}, loc(tmp.path() + "/ro"), false);
+        QCOMPARE(offered(job), QList<bool>({true}));
+        QCOMPARE(job.log().size(), 1u);
+    }
+    {
+        core::TransferJob job({loc(tmp.path() + "/ro/kept.txt")}, loc(tmp.path()), true);
+        QCOMPARE(offered(job), QList<bool>({true}));
+        QVERIFY(QFile::exists(tmp.path() + "/ro/kept.txt"));
+    }
+    {
+        core::RemoveJob job({loc(tmp.path() + "/ro/kept.txt")}, true);
+        QCOMPARE(offered(job), QList<bool>({true}));
+    }
+    {
+        // A folder: it cannot be made there, and is asked about once.
+        makeTree(tmp.path() + "/tree");
+        core::TransferJob job({loc(tmp.path() + "/tree")}, loc(tmp.path() + "/ro"), false);
+        QCOMPARE(offered(job), QList<bool>({true}));
+        QVERIFY(!QFile::exists(tmp.path() + "/ro/tree"));
+    }
+    {
+        core::AttributeChange change;
+        change.mode = 0700;
+        core::AttributesJob job({loc(QStringLiteral("/etc/hostname"))}, change);
+        if (QFile::exists(QStringLiteral("/etc/hostname")))
+            QCOMPARE(offered(job), QList<bool>({true}));
+    }
+    // A failure that is not about permission carries no offer.
+    {
+        core::TransferJob job({loc(tmp.path() + "/gone.txt")}, loc(tmp.path()), false);
+        QCOMPARE(offered(job), QList<bool>({false}));
+    }
+    // Unattended never asks, so never escalates: the item is a failure
+    // in the log, as before.
+    {
+        core::TransferJob job({loc(tmp.path() + "/f.txt")}, loc(tmp.path() + "/ro"), false);
+        job.setUnattended(true);
+        QCOMPARE(offered(job), QList<bool>());
+        QCOMPARE(job.log().size(), 1u);
+        QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Failed);
+    }
+    // "Skip, for all" is a policy like any other.
+    {
+        write(tmp.path() + "/g.txt", "g");
+        core::TransferJob job({loc(tmp.path() + "/f.txt"), loc(tmp.path() + "/g.txt")}, loc(tmp.path() + "/ro"), false);
+        int asked = 0;
+        connect(&job, &core::Job::failure, [&](const core::Failure&) {
+            ++asked;
+            job.answerError(core::ErrorAction::Skip, true);
+        });
+        runJob(job);
+        QCOMPARE(asked, 1);
+        QCOMPARE(job.log().size(), 2u);
+    }
+}
+
 int main(int argc, char** argv)
 {
     // A home and a trash of the test's own, set before GLib reads them.
@@ -1097,6 +1184,13 @@ int main(int argc, char** argv)
     QTemporaryDir home;
     qputenv("HOME", QFile::encodeName(home.path()));
     qputenv("XDG_DATA_HOME", QFile::encodeName(home.path() + "/data"));
+    // GVfs's admin backend counts as installed (its file is there):
+    // the offer to go on as administrator does not depend on the
+    // machine the tests run on.
+    QDir().mkpath(home.path() + "/sys/gvfs/mounts");
+    if (QFile backend(home.path() + "/sys/gvfs/mounts/admin.mount"); !backend.open(QIODevice::WriteOnly))
+        return 1;
+    qputenv("XDG_DATA_DIRS", QFile::encodeName(home.path() + "/sys") + ":/usr/local/share:/usr/share");
     QCoreApplication app(argc, argv);
     JobsTest test;
     QTEST_SET_MAIN_SOURCE_PATH

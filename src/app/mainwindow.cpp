@@ -243,6 +243,8 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
         connect(tab, &Tab::undoable, this, [this](const QString& what, const core::UndoItem& item) {
             undo_.record({what, {item}});
         });
+        connect(tab, &Tab::adminNeeded, this, [this, tab](const core::Location& dir) { offerAdmin(tab, dir); });
+        connect(tab, &Tab::adminRenameNeeded, this, &MainWindow::offerAdminRename);
         connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) {
             QPointer<Tab> guard(tab);
             places_->mountFor(dir, [guard, dir] {

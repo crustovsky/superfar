@@ -83,6 +83,8 @@ struct Listing::Job {
                 why = ListFailure::NotDirectory;
             else if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
                 why = ListFailure::NotSupported;
+            else if (isDenied(error.get()))
+                why = ListFailure::Denied;
             Q_EMIT owner->failed(generation, errorMessage(error.get()), why);
         }
         detach();

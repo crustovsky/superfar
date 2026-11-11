@@ -42,6 +42,7 @@
 #include <memory>
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 using keymap::Command;
 
@@ -125,6 +126,7 @@ private Q_SLOTS:
     void warningsSayWhatCannotBeUndone();
     void queueBehindARunningJob();
     void syntaxColoursFromBat();
+    void permissionDeniedOffersAdministrator();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -912,6 +914,72 @@ void WindowTest::syntaxColoursFromBat()
     qputenv("PATH", path);
 }
 
+void WindowTest::permissionDeniedOffersAdministrator()
+{
+    if (::geteuid() == 0)
+        QSKIP("root is never denied");
+    // The offers are looked at and turned down, never taken: taking
+    // one would ask the polkit agent of whoever runs the tests.
+    QVERIFY(QDir().mkpath(a_ + "/locked"));
+    QVERIFY(QDir().mkpath(b_ + "/ro"));
+    QCOMPARE(::chmod(QFile::encodeName(a_ + "/locked").constData(), 0), 0);
+    QCOMPARE(::chmod(QFile::encodeName(b_ + "/ro").constData(), 0555), 0);
+    struct Unlock {
+        QString a, b;
+        ~Unlock()
+        {
+            ::chmod(QFile::encodeName(a).constData(), 0755);
+            ::chmod(QFile::encodeName(b).constData(), 0755);
+        }
+    } unlock{a_ + "/locked", b_ + "/ro"};
+
+    // A folder that cannot be read: a bar in the window, and the tab
+    // stays where it is when the offer is turned down.
+    Tab* tab = left()->activeTab();
+    tab->navigate(loc(a_ + "/locked"));
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(shows(openPrompt(), QStringLiteral("Permission denied: %1. Open as administrator?").arg(a_ + "/locked")));
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("As &administrator")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_VERIFY(!openPrompt());
+    QCOMPARE(tab->location(), loc(a_ + "/locked"));
+    QVERIFY(shows(left(), QStringLiteral("denied")) || shows(left(), QStringLiteral("Permission")));
+    tab->navigate(loc(a_));
+    QTRY_COMPARE(tab->entryNames().size(), 4);
+
+    // A job item that is denied has one more choice on its error bar.
+    right()->activeTab()->navigate(loc(b_ + "/ro"));
+    QTRY_COMPARE(right()->activeTab()->location(), loc(b_ + "/ro"));
+    ListView* view = tab->view();
+    view->setFocus();
+    view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(QStringLiteral("one.txt")), 0));
+    QCOMPARE(tab->currentName(), QByteArray("one.txt"));
+    window_->execute(Command::Copy);
+    QTRY_VERIFY(openPrompt());
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ErrorBar*>());
+    auto* error = window_->findChild<ErrorBar*>();
+    QVERIFY(buttonOf<QPushButton>(error, QStringLiteral("As a&dministrator")));
+    buttonOf<QPushButton>(error, QStringLiteral("&Skip"))->click();
+    QTRY_VERIFY(window_->findChild<LogBar*>());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    settle();
+    QVERIFY(!QFile::exists(b_ + "/ro/one.txt"));
+
+    // A new folder where it may not be made: the same question, and
+    // nothing made when it is turned down.
+    right()->activeTab()->view()->setFocus();
+    QTRY_VERIFY(right()->isActive());
+    window_->execute(Command::Mkdir);
+    QTRY_VERIFY(promptEdit() && openPrompt());
+    openPrompt()->findChild<QLineEdit*>()->setText(QStringLiteral("made"));
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(openPrompt() && shows(openPrompt(), QStringLiteral("Create it as administrator? It will belong to root.")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_VERIFY(!openPrompt());
+    QVERIFY(!QDir(b_ + "/ro/made").exists());
+}
+
 int main(int argc, char** argv)
 {
     QTemporaryDir env;
@@ -948,6 +1016,11 @@ int main(int argc, char** argv)
     // beside the test folders, F8 has a trash wherever the temp dir is.
     qputenv("HOME", QFile::encodeName(g_env));
     qputenv("XDG_DATA_HOME", QFile::encodeName(g_env + "/data"));
+    // GVfs's admin backend counts as installed wherever the tests run.
+    QDir().mkpath(g_env + "/sys/gvfs/mounts");
+    if (QFile backend(g_env + "/sys/gvfs/mounts/admin.mount"); !backend.open(QIODevice::WriteOnly))
+        return 1;
+    qputenv("XDG_DATA_DIRS", QFile::encodeName(g_env + "/sys") + ":/usr/local/share:/usr/share");
     qputenv("XDG_CONFIG_HOME", QFile::encodeName(g_env + "/config"));
     qputenv("PATH", QFile::encodeName(g_env + "/bin") + ':' + qgetenv("PATH"));
     QApplication app(argc, argv);

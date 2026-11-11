@@ -1,4 +1,5 @@
 // Headless tests for core against a real temp directory (never a mock).
+#include "core/admin.h"
 #include "core/apps.h"
 #include "core/archive.h"
 #include "core/bookmarks.h"
@@ -66,6 +67,8 @@ class CoreTest : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void location();
+    void adminLocations();
+    void deniedListingIsToldApart();
     void listingEntries();
     void listingCancel();
     void naturalSort();
@@ -1886,6 +1889,74 @@ void CoreTest::ownerChanges()
     QCOMPARE(quint32(statOf().st_mode & 07777), 0644u);
     QVERIFY(wait([&](auto done) { core::setMode(dir.child("link"), 0600, 07777, done, true); }).isEmpty());
     QCOMPARE(quint32(statOf().st_mode & 07777), 0600u);
+}
+
+void CoreTest::adminLocations()
+{
+    using core::Location;
+    namespace admin = core::admin;
+    // The admin:// form of a path and back, names that need escaping
+    // and names that are not UTF-8 included.
+    for (const QByteArray& path : {QByteArray("/etc/fstab"), QByteArray("/"), QByteArray("/srv/a b/c#d%20e?f"),
+                                   QByteArray("/srv/caf\xe9/\xc5\xbc\xc3\xb3\xc5\x82w")}) {
+        const Location local = Location::fromPath(path);
+        const Location elevated = admin::of(local);
+        QVERIFY(admin::isAdmin(elevated));
+        QVERIFY(!admin::isAdmin(local));
+        QVERIFY(!elevated.isNative());
+        QVERIFY(elevated.uri().startsWith(QStringLiteral("admin:///")));
+        QCOMPARE(admin::plain(elevated).path(), path);
+        QCOMPARE(elevated.basename(), local.basename());
+        // A child of an administrator folder is one too.
+        QVERIFY(admin::isAdmin(elevated.child("x")));
+        QCOMPARE(admin::plain(elevated.child("x")).path(), local.child("x").path());
+    }
+    QCOMPARE(admin::of(Location::fromPath("/etc")).uri(), QStringLiteral("admin:///etc"));
+    // Only a local location has one: a remote one, and one that is
+    // admin:// already, come back as they are, and plain() leaves
+    // anything else alone.
+    const Location remote = Location::fromUri(QStringLiteral("sftp://host/etc"));
+    QCOMPARE(admin::of(remote), remote);
+    QCOMPARE(admin::plain(remote), remote);
+    const Location elevated = admin::of(Location::fromPath("/etc"));
+    QCOMPARE(admin::of(elevated), elevated);
+    QCOMPARE(admin::plain(Location::fromPath("/etc")), Location::fromPath("/etc"));
+    QVERIFY(!admin::of(Location()).isValid());
+
+    // No offer without the backend: GVfs installs a file for it.
+    QTemporaryDir data;
+    QVERIFY(!admin::availableIn({data.path()}));
+    QVERIFY(!admin::availableIn({}));
+    QVERIFY(QDir().mkpath(data.path() + "/gvfs/mounts"));
+    QVERIFY(!admin::availableIn({data.path()}));
+    QFile mount(data.path() + "/gvfs/mounts/admin.mount");
+    QVERIFY(mount.open(QIODevice::WriteOnly));
+    mount.close();
+    QVERIFY(admin::availableIn({QStringLiteral("/nowhere"), data.path()}));
+    // And none for a folder that is not local, or that is ours to write to.
+    QVERIFY(!admin::offerFor(remote));
+    QVERIFY(!admin::offerFor(Location::fromPath(QFile::encodeName(data.path()))));
+    QVERIFY(admin::refusal(QStringLiteral("Permission denied")).contains(QStringLiteral("polkit")));
+}
+
+void CoreTest::deniedListingIsToldApart()
+{
+    if (::geteuid() == 0)
+        QSKIP("root is never denied");
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/locked"));
+    QVERIFY(QFile::setPermissions(tmp.path() + "/locked", QFile::Permissions()));
+    core::Listing listing;
+    QSignalSpy failed(&listing, &core::Listing::failed);
+    listing.start(core::Location::fromPath(QFile::encodeName(tmp.path() + "/locked")), 1);
+    QTRY_COMPARE(failed.size(), 1);
+    QCOMPARE(failed.first().at(2).value<core::ListFailure>(), core::ListFailure::Denied);
+    QFile::setPermissions(tmp.path() + "/locked", QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    // A folder that is not there is another matter.
+    QSignalSpy missing(&listing, &core::Listing::failed);
+    listing.start(core::Location::fromPath(QFile::encodeName(tmp.path() + "/nowhere")), 2);
+    QTRY_COMPARE(missing.size(), 1);
+    QVERIFY(missing.first().at(2).value<core::ListFailure>() != core::ListFailure::Denied);
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

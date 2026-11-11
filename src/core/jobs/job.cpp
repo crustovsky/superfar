@@ -1,5 +1,6 @@
 #include "core/jobs/job.h"
 
+#include "core/admin.h"
 #include "core/gobject.h"
 
 #include <QElapsedTimer>
@@ -175,7 +176,13 @@ ErrorAction Job::askError(const Failure& f)
 {
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (errorPolicy_ != ErrorAction::Ask)
+        // Unattended never escalates: a denied item is a failure in the
+        // log. "As administrator, for all" speaks for denied items
+        // only; any other failure is still asked about.
+        const bool admin = errorPolicy_ == ErrorAction::AsAdmin;
+        if (admin && f.offerAdmin && !unattended_)
+            return ErrorAction::AsAdmin;
+        if (errorPolicy_ != ErrorAction::Ask && !admin)
             return errorPolicy_;
         if (unattended_)
             return ErrorAction::Skip;  // the caller logs the failure
@@ -200,6 +207,17 @@ void Job::logSkip(const QString& path, const QString& message)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     log_.push_back({LogEntry::Kind::Skipped, path, message});
+}
+
+void Job::describe(Failure& f, const GError* error, const Location& a, const Location& b)
+{
+    f.message = errorMessage(error);
+    if (!isDenied(error))
+        return;
+    if (admin::isAdmin(a) || admin::isAdmin(b))
+        f.message = admin::refusal(f.message);
+    else
+        f.offerAdmin = (a.isNative() || b.isNative()) && admin::available();
 }
 
 void Job::record(UndoItem item)

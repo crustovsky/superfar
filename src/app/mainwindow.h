@@ -64,6 +64,14 @@ private:
     void undo(bool redo);
     void onJobFinished(core::Job* job);
     void promptNewFile();
+    // F7 and Shift+F4 once the name is known. Denied in a local folder,
+    // it asks whether to go on as administrator and comes back here
+    // with the folder's admin:// form.
+    void createEntry(const core::Location& dir, const QByteArray& name, bool folder, const QPointer<Tab>& tab);
+    // A tab met "Permission denied": offer to open the folder, or to
+    // rename the item, as administrator.
+    void offerAdmin(Tab* tab, const core::Location& dir);
+    void offerAdminRename(const core::Location& file, const QString& newName, const QString& error);
     void promptGlob(bool on);
     void chooseColumns();
     void openWith();

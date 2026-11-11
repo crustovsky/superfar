@@ -101,6 +101,10 @@ Q_SIGNALS:
     void openInNewTab(const core::Location& dir);    // navigation while locked
     void sortChanged();                              // for the session
     void mountNeeded(const core::Location& dir);     // the load failed for want of a mount
+    // Permission was denied where going on as administrator can help:
+    // reading this local folder, or renaming an item in it.
+    void adminNeeded(const core::Location& dir);
+    void adminRenameNeeded(const core::Location& file, const QString& newName, const QString& error);
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
     void message(const QString& text);  // an error worth a moment in the status line
     // A rename or a cell edit happened: one item for the undo stack.

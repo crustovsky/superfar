@@ -1,3 +1,4 @@
+#include "core/admin.h"
 #include "core/jobs/queue.h"
 #include "counted.h"
 #include "pane/pane.h"
@@ -109,8 +110,9 @@ bool Pane::eventFilter(QObject* watched, QEvent* event)
 
 QString Pane::title(const core::Location& dir)
 {
-    const QString name = dir.displayName();
-    return name.isEmpty() ? dir.displayPath() : name;
+    const QString name = dir.displayName().isEmpty() ? dir.displayPath() : dir.displayName();
+    // An administrator tab says so: what is done in it is done as root.
+    return core::admin::isAdmin(dir) ? tr("%1 (admin)").arg(name) : name;
 }
 
 Tab* Pane::activeTab() const
@@ -128,7 +130,9 @@ QList<Config::TabState> Pane::tabStates() const
     QList<Config::TabState> out;
     for (Tab* tab : tabs()) {
         Config::TabState t;
-        t.uri = tab->location().uri();
+        // An administrator tab comes back as the plain folder: a start
+        // that asks for a password nobody asked it to ask for is no start.
+        t.uri = core::admin::plain(tab->location()).uri();
         t.hidden = tab->showHidden();
         t.locked = tab->isLocked();
         t.sizes = tab->recursiveSizes();

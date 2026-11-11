@@ -2,6 +2,7 @@
 # GIO header can leak into app through this target.
 qt_add_library(superfar_core STATIC
   location.cpp
+  admin.cpp
   sort.cpp
   match.cpp
   listing.cpp

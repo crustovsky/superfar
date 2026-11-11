@@ -4,6 +4,7 @@
 #include "mainwindow.h"
 
 #include "counted.h"
+#include "core/admin.h"
 #include "core/jobs/extract.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -50,7 +51,10 @@ void MainWindow::startTransfer(bool move)
     const core::Location dest = otherPane()->activeTab()->location();
     const QString verb = move ? tr("Move") : tr("Copy");
     const QString what = tab->selectionText();
-    PromptBar* bar = strip_->prompt(tr("%1 %2 to").arg(verb, what), verb, dest.displayPath(), true);
+    // Into an administrator tab: say whose the new files will be.
+    PromptBar* bar = strip_->prompt(core::admin::isAdmin(dest) ? tr("%1 %2, to belong to root, to").arg(verb, what)
+                                                               : tr("%1 %2 to").arg(verb, what),
+                                    verb, dest.displayPath(), true);
     // The folder the items were taken from, as it was when the prompt
     // opened: the tab may have moved on, or closed, by the time it is
     // accepted.

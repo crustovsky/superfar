@@ -18,6 +18,7 @@
 #include <vector>
 
 typedef struct _GCancellable GCancellable;
+typedef struct _GError GError;
 
 namespace core {
 
@@ -38,7 +39,9 @@ struct JobProgress {
 };
 
 enum class ConflictAction { Ask, Skip, Overwrite, OverwriteIfNewer, Rename };
-enum class ErrorAction { Ask, Skip, Retry, Abort, DeletePermanently };
+// AsAdmin: try the item again through admin:// (core/admin.h). As a
+// policy it covers every later item that is denied, and only those.
+enum class ErrorAction { Ask, Skip, Retry, Abort, DeletePermanently, AsAdmin };
 
 struct Conflict {
     QString name;
@@ -60,6 +63,7 @@ struct Failure {
     QString path;
     QString message;
     bool offerDelete = false;  // trash refused; permanent delete is an option
+    bool offerAdmin = false;   // permission denied on a local path, and admin:// is there
 };
 
 struct LogEntry {
@@ -134,6 +138,11 @@ protected:
     void report(const JobProgress& p, bool force = false);
     void logSkip(const QString& path, const QString& message = QString());
     void record(UndoItem item);
+    // Fills in a failure from the error on an operation between a and
+    // b (b may be invalid): the system's words and, when permission was
+    // denied on a local path, the offer to go on as administrator. A
+    // denial that came back through admin:// is worded as polkit's.
+    void describe(Failure& f, const GError* error, const Location& a, const Location& b = Location());
     // An overwrite is about to replace target: it goes to the trash
     // first, which is what makes the overwrite undoable. False when
     // there is no trash for it; the caller then overwrites for good,

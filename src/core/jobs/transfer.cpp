@@ -1,5 +1,6 @@
 #include "core/jobs/transfer.h"
 
+#include "core/admin.h"
 #include "core/fileops.h"
 #include "core/gobject.h"
 
@@ -123,7 +124,7 @@ struct TransferJob::Impl {
         return false;
     }
 
-    bool transferFile(const Location& src, Location dst, quint64 size)
+    bool transferFile(Location src, Location dst, quint64 size)
     {
         bool forGood = false;
         for (;;) {
@@ -173,9 +174,13 @@ struct TransferJob::Impl {
             Failure f;
             f.name = src.displayName();
             f.path = src.displayPath();
-            f.message = errorMessage(err.get());
+            job.describe(f, err.get(), src, dst);
             switch (job.askError(f)) {
             case ErrorAction::Retry:
+                continue;
+            case ErrorAction::AsAdmin:
+                src = admin::of(src);  // whichever side is local
+                dst = admin::of(dst);
                 continue;
             case ErrorAction::Abort:
                 job.abort();
@@ -231,9 +236,11 @@ struct TransferJob::Impl {
                     return !job.isAborted();
                 if (!g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_WOULD_RECURSE)
                     && !g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_WOULD_MERGE)) {
-                    if (!handleError(src, errorMessage(err.get())))
-                        return false;
-                    return finishItem(0, true);
+                    switch (folderError(src, dst, err.get())) {
+                    case Went::Abort: return false;
+                    case Went::Admin: return transferDir(admin::of(src), admin::of(dst));
+                    case Went::On: return finishItem(0, true);
+                    }
                 }
             }
             if (!g_file_make_directory(dst.gfile(), c, &error)) {
@@ -241,9 +248,11 @@ struct TransferJob::Impl {
                 if (!g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_EXISTS)) {
                     if (isCancelled(err.get()))
                         return !job.isAborted();
-                    if (!handleError(src, errorMessage(err.get())))
-                        return false;
-                    return finishItem(0, true);
+                    switch (folderError(src, dst, err.get())) {
+                    case Went::Abort: return false;
+                    case Went::Admin: return transferDir(admin::of(src), admin::of(dst));
+                    case Went::On: return finishItem(0, true);
+                    }
                 }
             } else {
                 made = true;
@@ -282,7 +291,13 @@ struct TransferJob::Impl {
             GErrorPtr err(error);
             if (isCancelled(err.get()))
                 return !job.isAborted();
-            return handleError(src, errorMessage(err.get()));
+            switch (folderError(src, dst, err.get())) {
+            case Went::Abort: return false;
+            case Went::On: return true;
+            case Went::Admin:
+                --p.itemsDone;  // the folder is done over, and counted then
+                return transferDir(admin::of(src), admin::of(dst));
+            }
         }
         for (;;) {
             if (!job.waitIfPaused())
@@ -310,7 +325,28 @@ struct TransferJob::Impl {
         return true;
     }
 
-    // Asks about a non-file error; false means abort.
+    // A folder could not be moved, made or read. Asks; the answer is
+    // to abort, to go on without it, or to do it over as administrator.
+    enum class Went { Abort, On, Admin };
+    Went folderError(const Location& src, const Location& dst, const GError* error)
+    {
+        Failure f;
+        f.name = src.displayName();
+        f.path = src.displayPath();
+        job.describe(f, error, src, dst);
+        switch (job.askError(f)) {
+        case ErrorAction::Abort:
+            job.abort();
+            return Went::Abort;
+        case ErrorAction::AsAdmin:
+            return Went::Admin;
+        default:
+            job.logFail(f.path, f.message);
+            return Went::On;
+        }
+    }
+
+    // Asks about an error that is not the filesystem's; false means abort.
     bool handleError(const Location& where, const QString& message)
     {
         Failure f;

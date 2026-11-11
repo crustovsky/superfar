@@ -1,5 +1,6 @@
 #include "core/jobs/attributes.h"
 
+#include "core/admin.h"
 #include "core/fileops.h"
 #include "core/gobject.h"
 
@@ -21,18 +22,20 @@ quint32 deviceOf(GFileInfo* info)
     return g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_DEVICE);
 }
 
-QString takeMessage(GError* error)
-{
-    GErrorPtr err(error);
-    return err ? errorMessage(err.get()) : QStringLiteral("failed");
-}
-
 } // namespace
 
 struct AttributesJob::Impl {
     AttributesJob& job;
     JobProgress p;
     Location top;  // the item named by the user that the walk is under
+    bool denied = false;  // the last refusal was for want of permission
+
+    QString takeMessage(GError* error)
+    {
+        GErrorPtr err(error);
+        denied = isDenied(err.get());
+        return err ? errorMessage(err.get()) : QStringLiteral("failed");
+    }
 
     // The items a run will touch, for the bar.
     void count(const Location& loc, GFileInfo* info)
@@ -59,6 +62,8 @@ struct AttributesJob::Impl {
         was.kind = UndoItem::Kind::Attributes;
         was.at = top;
         was.below = loc.relativePathFrom(top);
+        if (was.below.isNull())
+            was.at = loc;  // reached as administrator: not under top's own location
         was.mode[0] = was.mode[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_MODE) & 07777;
         was.uid[0] = was.uid[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_UID);
         was.gid[0] = was.gid[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_GID);
@@ -113,18 +118,27 @@ struct AttributesJob::Impl {
     }
 
     // Asks what to do about a refusal. False means abort; retry says
-    // whether to try the same thing again.
-    bool refused(const Location& loc, const QString& message, bool* retry)
+    // whether to try the same thing again, on loc or, when the answer
+    // was to go on as administrator, on its admin:// form.
+    bool refused(Location& loc, const QString& message, bool* retry)
     {
         Failure f;
         f.name = loc.displayName();
         f.path = loc.displayPath();
         f.message = message;
+        if (denied && admin::isAdmin(loc))
+            f.message = admin::refusal(message);
+        else
+            f.offerAdmin = denied && loc.isNative() && admin::available();
         *retry = false;
         switch (job.askError(f)) {
         case ErrorAction::Abort:
             job.abort();
             return false;
+        case ErrorAction::AsAdmin:
+            loc = admin::of(loc);
+            *retry = true;
+            return true;
         case ErrorAction::Retry:
             *retry = true;
             return true;
@@ -135,7 +149,7 @@ struct AttributesJob::Impl {
     }
 
     // loc, then what is below it. False means abort.
-    bool apply(const Location& loc, GFileInfo* info, bool below)
+    bool apply(Location loc, GFileInfo* info, bool below)
     {
         if (!job.waitIfPaused())
             return false;
@@ -196,7 +210,7 @@ AttributesJob::AttributesJob(std::vector<Location> items, AttributeChange change
 
 void AttributesJob::run()
 {
-    Impl impl{*this, {}, {}};
+    Impl impl{*this, {}, {}, false};
     JobProgress& p = impl.p;
 
     std::vector<GPtr<GFileInfo>> infos;
@@ -207,7 +221,7 @@ void AttributesJob::run()
             impl.count(item, infos.back().get());
         } else {
             ++p.itemsTotal;
-            logFail(item.displayPath(), takeMessage(error));
+            logFail(item.displayPath(), impl.takeMessage(error));
         }
     }
     p.phase = JobProgress::Phase::Running;

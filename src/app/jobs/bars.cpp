@@ -401,6 +401,8 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     add(tr("&Skip"), core::ErrorAction::Skip);
     if (f.offerDelete)
         first = add(tr("Delete &permanently (cannot be undone)"), core::ErrorAction::DeletePermanently);
+    if (f.offerAdmin)
+        add(tr("As a&dministrator"), core::ErrorAction::AsAdmin);
     add(tr("A&bort"), core::ErrorAction::Abort);
     row->addStretch(1);
     row->addWidget(all);
