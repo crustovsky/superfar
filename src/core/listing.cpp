@@ -41,8 +41,8 @@ Entry toEntry(GFileInfo* info)
     const char* display = g_file_info_get_display_name(info);
     e.display = display ? QString::fromUtf8(display) : QString::fromUtf8(e.name);
     e.type = typeOf(g_file_info_get_file_type(info));
-    e.hidden = g_file_info_get_is_hidden(info);
-    e.symlink = g_file_info_get_is_symlink(info);
+    e.hidden = infoIsHidden(info);
+    e.symlink = infoIsSymlink(info);
     e.size = static_cast<quint64>(g_file_info_get_size(info));
     e.modified = static_cast<qint64>(g_file_info_get_attribute_uint64(info, G_FILE_ATTRIBUTE_TIME_MODIFIED));
     if (g_file_info_has_attribute(info, G_FILE_ATTRIBUTE_UNIX_MODE)) {
