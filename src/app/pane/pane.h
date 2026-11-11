@@ -79,6 +79,8 @@ Q_SIGNALS:
                        const core::Location& archive, const QByteArray& options);
     // From the properties panel: permissions and owner for the items.
     void attributesRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
+    // From the multi-rename panel: a batch, for the undo stack.
+    void undoable(const QString& what, const std::vector<core::UndoItem>& items);
     void sessionChanged();  // tabs opened, closed, moved to, or locked
     void columnResized(const QString& column, int width);
     void columnsChanged(const QStringList& order, const QStringList& hidden);

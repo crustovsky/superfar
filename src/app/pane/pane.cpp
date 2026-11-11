@@ -1,3 +1,4 @@
+#include "counted.h"
 #include "pane/pane.h"
 
 #include "core/sort.h"
@@ -471,6 +472,17 @@ bool Pane::execute(keymap::Command command)
             rename_ = new MultiRenamePanel(services_.config, this);
             connect(rename_, &MultiRenamePanel::closed, this, &Pane::closeOwnOverlay);
             connect(rename_, &MultiRenamePanel::message, this, &Pane::showMessage);
+            connect(rename_, &MultiRenamePanel::batchDone, this,
+                    [this](const std::vector<std::pair<core::Location, core::Location>>& steps) {
+                        std::vector<core::UndoItem> items;
+                        int temporary = 0;
+                        for (const auto& [from, to] : steps) {
+                            items.push_back(core::UndoItem::moved(from, to, to.isNative()));
+                            temporary += to.basename().startsWith(".superfar-rename-") ? 1 : 0;
+                        }
+                        const auto renamed = static_cast<qint64>(steps.size()) - temporary;
+                        Q_EMIT undoable(tr("rename of %1").arg(counted(renamed, tr("item"), tr("items"))), items);
+                    });
             connect(rename_, &MultiRenamePanel::renamed, this, [this](const QByteArray& first) {
                 if (Tab* t = activeTab())
                     t->reloadWithCursor(first);

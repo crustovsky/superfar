@@ -30,6 +30,8 @@ qt_add_library(superfar_core STATIC
   jobs/job.cpp
   jobs/transfer.cpp
   jobs/remove.cpp
+  jobs/undo.cpp
+  undo.cpp
 )
 target_include_directories(superfar_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(superfar_core

@@ -324,6 +324,8 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
                                this);
     details->setEnabled(false);
     layout->addWidget(details);
+    if (c.cannotUndo)
+        layout->addWidget(new QLabel(tr("There is no trash here to keep what is replaced: overwriting cannot be undone."), this));
 
     auto* row = new QHBoxLayout;
     auto* all = new QCheckBox(tr("Apply to &all"), this);
@@ -374,7 +376,7 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     auto* first = add(tr("&Retry"), core::ErrorAction::Retry);
     add(tr("&Skip"), core::ErrorAction::Skip);
     if (f.offerDelete)
-        first = add(tr("Delete &permanently"), core::ErrorAction::DeletePermanently);
+        first = add(tr("Delete &permanently (cannot be undone)"), core::ErrorAction::DeletePermanently);
     add(tr("A&bort"), core::ErrorAction::Abort);
     row->addStretch(1);
     row->addWidget(all);
@@ -409,7 +411,8 @@ LogBar::LogBar(const QString& title, const std::vector<core::LogEntry>& log, QWi
     list->setFocusPolicy(Qt::NoFocus);
     list->setSelectionMode(QAbstractItemView::NoSelection);
     for (const core::LogEntry& e : log) {
-        const QString kind = e.kind == core::LogEntry::Kind::Skipped ? tr("skipped") : tr("failed");
+        const QString kind = e.kind == core::LogEntry::Kind::Skipped ? tr("skipped")
+                             : e.kind == core::LogEntry::Kind::Failed ? tr("failed") : tr("overwritten");
         list->addItem(e.message.isEmpty() ? QStringLiteral("%1: %2").arg(kind, e.path)
                                           : QStringLiteral("%1: %2 (%3)").arg(kind, e.path, e.message));
     }

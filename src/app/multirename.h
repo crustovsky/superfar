@@ -1,7 +1,8 @@
 // Shift+F2: the multi-rename panel, shown in place of the list (rule 10).
 // A rule from core::rename is applied to the marked items with a live
 // old / new table, a checkbox per row, clash marking, presets kept in
-// the config, a cycle-safe apply and an undo of the last batch.
+// the config and a cycle-safe apply. A batch is undone like any other
+// operation, from the window's undo stack.
 #pragma once
 
 #include "core/location.h"
@@ -30,7 +31,10 @@ public:
 Q_SIGNALS:
     void closed();
     void message(const QString& text);
-    void renamed(const QByteArray& firstNewName);  // a batch was applied or undone
+    void renamed(const QByteArray& firstNewName);  // a batch was applied
+    // Every rename a batch made, in order, temporary names included:
+    // what undo walks back.
+    void batchDone(const std::vector<std::pair<core::Location, core::Location>>& steps);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
@@ -40,8 +44,7 @@ private:
     void controlsFromRule(const core::RenameRule& rule);
     void refresh();
     void apply();
-    void undo();
-    void runBatch(std::vector<std::pair<core::Location, QString>> moves, bool recordUndo);
+    void runBatch(std::vector<std::pair<core::Location, QString>> moves);
     // After a batch: the items are where the batch left them.
     void adoptLocations(const std::vector<std::pair<core::Location, QString>>& finals);
     void loadPresets();
@@ -52,7 +55,6 @@ private:
     std::vector<core::Location> items_;
     QStringList existing_;
     core::RenamePlan plan_;
-    std::vector<std::pair<core::Location, QString>> undo_;  // new location -> old name
 
     QComboBox* mode_;
     QLineEdit* pattern_;
@@ -68,5 +70,4 @@ private:
     QTreeWidget* table_;
     QLabel* summary_;
     QPushButton* apply_;
-    QPushButton* undoBtn_;
 };

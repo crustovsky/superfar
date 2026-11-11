@@ -52,6 +52,8 @@ QString Job::title() const
     case JobKind::Extract: return tr("Extract");
     case JobKind::Pack: return tr("Pack");
     case JobKind::Attributes: return tr("Set attributes");
+    case JobKind::Undo: return tr("Undo");
+    case JobKind::Redo: return tr("Redo");
     }
     return {};
 }
@@ -141,8 +143,10 @@ GCancellable* Job::beginItem()
     return current_;
 }
 
-ConflictAction Job::askConflict(const Conflict& c)
+ConflictAction Job::askConflict(const Conflict& c, bool* asked)
 {
+    if (asked)
+        *asked = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (conflictPolicy_ != ConflictAction::Ask)
@@ -151,6 +155,8 @@ ConflictAction Job::askConflict(const Conflict& c)
             return ConflictAction::Skip;  // the caller logs the skip
         answered_ = false;
     }
+    if (asked)
+        *asked = true;
     Q_EMIT conflict(c);
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] { return answered_ || aborted_; });
@@ -182,10 +188,36 @@ void Job::report(const JobProgress& p, bool force)
     Q_EMIT progress(p);
 }
 
-void Job::logSkip(const QString& path)
+void Job::logSkip(const QString& path, const QString& message)
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    log_.push_back({LogEntry::Kind::Skipped, path, QString()});
+    log_.push_back({LogEntry::Kind::Skipped, path, message});
+}
+
+void Job::record(UndoItem item)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    undo_.push_back(std::move(item));
+}
+
+bool Job::canTrash(const Location& target)
+{
+    GPtr<GFileInfo> info(g_file_query_info(target.gfile(), G_FILE_ATTRIBUTE_ACCESS_CAN_TRASH,
+                                           G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nullptr, nullptr));
+    return info && g_file_info_get_attribute_boolean(info.get(), G_FILE_ATTRIBUTE_ACCESS_CAN_TRASH);
+}
+
+bool Job::keepReplaced(const Location& target, GCancellable* cancellable, bool warned)
+{
+    if (g_file_trash(target.gfile(), cancellable, nullptr)) {
+        record(UndoItem::trashed(target));
+        return true;
+    }
+    if (!warned) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        log_.push_back({LogEntry::Kind::Overwritten, target.displayPath(), tr("no trash there: this cannot be undone")});
+    }
+    return false;
 }
 
 void Job::logFail(const QString& path, const QString& message)

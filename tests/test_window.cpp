@@ -114,6 +114,8 @@ private Q_SLOTS:
     void promptOutlivesItsTab();
     void cursorStaysWhereItsItemWas();
     void openWith();
+    void undoAndRedo();
+    void warningsSayWhatCannotBeUndone();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -133,6 +135,21 @@ private:
     {
         const auto* bar = window_->findChild<PromptBar*>();
         return bar ? bar->findChild<QLineEdit*>() : nullptr;
+    }
+
+    // Every job has ended and been taken note of, and the keys are the list's again.
+    void settle()
+    {
+        QTRY_VERIFY(window_->findChildren<core::Job*>().isEmpty());
+        QTRY_VERIFY(left()->activeTab()->view()->hasFocus());
+    }
+    // Whether some label under w reads text (the status line, a bar).
+    static bool shows(const QWidget* w, const QString& text)
+    {
+        for (const QLabel* label : w->findChildren<QLabel*>())
+            if (label->isVisible() && label->text().contains(text))
+                return true;
+        return false;
     }
 
     QTemporaryDir tmp_;
@@ -596,6 +613,93 @@ void WindowTest::openWith()
     QTRY_VERIFY(!window_->findChild<OpenWithBar*>());
 }
 
+void WindowTest::undoAndRedo()
+{
+    ListView* view = left()->activeTab()->view();
+    view->setCurrentIndex(view->model()->index(1, 0));
+    QCOMPARE(left()->activeTab()->currentName(), QByteArray("one.txt"));
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(shows(left(), QStringLiteral("Nothing to undo")));
+
+    // F5 and Enter copy it across; Ctrl+Z takes the copy back (to the
+    // trash), Ctrl+Shift+Z puts it there again.
+    QTest::keyClick(view, Qt::Key_F5);
+    QTRY_VERIFY(promptEdit());
+    QTest::keyClick(promptEdit(), Qt::Key_Return);
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(!QFile::exists(b_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: copy of one.txt")));
+    QVERIFY(QFile::exists(a_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Redid: copy of one.txt")));
+
+    // F8 and Enter trash it; Ctrl+Z brings it back from the trash.
+    settle();
+    QTRY_COMPARE(left()->activeTab()->currentName(), QByteArray("one.txt"));
+    QTest::keyClick(view, Qt::Key_F8);
+    QTRY_VERIFY(window_->findChild<PromptBar*>());
+    QVERIFY(shows(window_.get(), QStringLiteral("Move one.txt to the trash?")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTRY_VERIFY(!QFile::exists(a_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(QFile::exists(a_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: trash of one.txt")));
+    QTRY_VERIFY(left()->activeTab()->entryNames().contains(QStringLiteral("one.txt")));
+
+    // F7 makes a folder, F2 would rename: both are on the stack too.
+    // The last operation goes first.
+    window_->execute(Command::Mkdir);
+    QTRY_VERIFY(promptEdit());
+    promptEdit()->setText(QStringLiteral("made"));
+    QTest::keyClick(promptEdit(), Qt::Key_Return);
+    QTRY_VERIFY(left()->activeTab()->entryNames().contains(QStringLiteral("made")));  // made, and noted
+    window_->execute(Command::Undo);
+    QTRY_VERIFY(!QDir(a_ + "/made").exists());
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: new folder made")));
+    // The menu has both, with their keys.
+    bool undo = false, redo = false;
+    for (const QAction* a : window_->findChildren<QAction*>()) {
+        undo = undo || a->text().startsWith(QStringLiteral("&Undo"));
+        redo = redo || a->text().startsWith(QStringLiteral("Redo"));
+    }
+    QVERIFY(undo && redo);
+}
+
+void WindowTest::warningsSayWhatCannotBeUndone()
+{
+    // Shift+F8 says so before it deletes.
+    ListView* view = left()->activeTab()->view();
+    view->setCurrentIndex(view->model()->index(1, 0));
+    window_->execute(Command::DeletePermanent);
+    QTRY_VERIFY(window_->findChild<PromptBar*>());
+    QVERIFY(shows(window_.get(), QStringLiteral("Delete one.txt permanently? This cannot be undone.")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QVERIFY(QFile::exists(a_ + "/one.txt"));
+
+    // So does the choice offered when the trash refuses an item, and
+    // the conflict question where what is replaced cannot be kept.
+    core::Failure failure;
+    failure.offerDelete = true;
+    ErrorBar error(QStringLiteral("trash"), failure);
+    bool said = false;
+    for (const QPushButton* b : error.findChildren<QPushButton*>())
+        said = said || b->text() == QLatin1String("Delete &permanently (cannot be undone)");
+    QVERIFY(said);
+    core::Conflict conflict;
+    ConflictBar plain(conflict);
+    conflict.cannotUndo = true;
+    ConflictBar warned(conflict);
+    plain.show();
+    warned.show();
+    QVERIFY(!shows(&plain, QStringLiteral("cannot be undone")));
+    QVERIFY(shows(&warned, QStringLiteral("overwriting cannot be undone")));
+}
+
 int main(int argc, char** argv)
 {
     QTemporaryDir env;
@@ -618,6 +722,9 @@ int main(int argc, char** argv)
             return 1;
         cache.write("[MIME Cache]\ntext/plain=zzqview.desktop;\n");
     }
+    // The home trash serves the home's filesystem: with the home here,
+    // beside the test folders, F8 has a trash wherever the temp dir is.
+    qputenv("HOME", QFile::encodeName(g_env));
     qputenv("XDG_DATA_HOME", QFile::encodeName(g_env + "/data"));
     qputenv("XDG_CONFIG_HOME", QFile::encodeName(g_env + "/config"));
     qputenv("PATH", QFile::encodeName(g_env + "/bin") + ':' + qgetenv("PATH"));

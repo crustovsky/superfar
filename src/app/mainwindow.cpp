@@ -144,6 +144,8 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                 [this, pane](const core::Location& parent, const std::vector<QByteArray>& names,
                              const core::Location& archive, const QByteArray& options) {
                     auto* job = new core::PackJob(parent, names, archive, options);
+                    job->setSubject(names.size() == 1 ? parent.child(names.front()).displayName()
+                                                      : counted(static_cast<qint64>(names.size()), tr("item"), tr("items")));
                     const core::Location dest = archive.parent();
                     const QByteArray name = archive.basename();
                     connect(job, &core::Job::finished, this, [this, dest, name] {
@@ -160,6 +162,8 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                     // what was refused. The marks stay: the owner may
                     // follow the mode.
                     auto* job = new core::AttributesJob(items, change);
+                    job->setSubject(items.size() == 1 ? items.front().displayName()
+                                                      : counted(static_cast<qint64>(items.size()), tr("item"), tr("items")));
                     const core::Location dir = pane->activeTab()->location();
                     connect(job, &core::Job::finished, this, [this, pane, dir] {
                         refreshAt(dir);
@@ -178,8 +182,11 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                 preview_->show(item);
         });
         connect(pane, &Pane::commandRequested, this, &MainWindow::execute);
+        connect(pane, &Pane::undoable, this, [this](const QString& what, const std::vector<core::UndoItem>& items) {
+            undo_.record({what, items});
+        });
     }
-    connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
+    connect(strip_, &JobStrip::jobFinished, this, &MainWindow::onJobFinished);
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
     // The tree's keys are the window's commands (Tab back to the pane,
@@ -229,6 +236,9 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
             config_->recordVisit(dir.uri(), QDateTime::currentSecsSinceEpoch());
         });
         connect(tab, &Tab::dropRequested, this, &MainWindow::transfer);
+        connect(tab, &Tab::undoable, this, [this](const QString& what, const core::UndoItem& item) {
+            undo_.record({what, {item}});
+        });
         connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) {
             QPointer<Tab> guard(tab);
             places_->mountFor(dir, [guard, dir] {
@@ -377,6 +387,12 @@ void MainWindow::execute(keymap::Command command)
         return;
     case Command::NewFile:
         promptNewFile();
+        return;
+    case Command::Undo:
+        undo(false);
+        return;
+    case Command::Redo:
+        undo(true);
         return;
     case Command::MarkGlob:
         promptGlob(true);

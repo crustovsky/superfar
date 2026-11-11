@@ -8,12 +8,14 @@
 #include "core/location.h"
 #include "core/monitor.h"
 #include "core/sort.h"
+#include "core/undo.h"
 #include "core/space.h"
 #include "core/unixattrs.h"
 #include "keymap.h"
 #include "pane/markstore.h"
 
 #include <QSet>
+#include <optional>
 #include <QWidget>
 
 class ListModel;
@@ -101,6 +103,8 @@ Q_SIGNALS:
     void mountNeeded(const core::Location& dir);     // the load failed for want of a mount
     void dropRequested(const std::vector<core::Location>& sources, const core::Location& target, bool move);
     void message(const QString& text);  // an error worth a moment in the status line
+    // A rename or a cell edit happened: one item for the undo stack.
+    void undoable(const QString& what, const core::UndoItem& item);
 
 private:
     void load(const core::Location& dir);
@@ -119,6 +123,7 @@ private:
     void rename(const QByteArray& name, const QString& newName);
     void changeMode(const QByteArray& name, quint32 permissions);
     void changeOwner(const QByteArray& name, const core::OwnerChange& owner);
+    std::optional<core::UndoItem> attributesBefore(const QByteArray& name) const;
     void applySort(int column, bool ascending);
     void resort();
     void placeCursor();

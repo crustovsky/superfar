@@ -130,6 +130,7 @@ struct RemoveJob::Impl {
             GCancellable* c = job.beginItem();
             GError* error = nullptr;
             if (g_file_trash(loc.gfile(), c, &error)) {
+                job.record(UndoItem::trashed(loc));
                 itemDone();
                 return true;
             }

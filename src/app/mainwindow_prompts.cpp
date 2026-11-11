@@ -38,6 +38,9 @@ void MainWindow::promptMkdir()
                 self->active_->showMessage(error);
                 return;
             }
+            const core::Location made = dir.child(name);
+            self->undo_.record({tr("new folder %1").arg(made.displayName()),
+                                {core::UndoItem::created(made, made.isNative())}});
             if (guard && guard->location() == dir)
                 guard->reloadWithCursor(name);
             self->tree_->refresh(dir);
@@ -69,6 +72,9 @@ void MainWindow::promptNewFile()
                 self->active_->showMessage(error);
                 return;
             }
+            const core::Location made = dir.child(name);
+            self->undo_.record({tr("new file %1").arg(made.displayName()),
+                                {core::UndoItem::created(made, made.isNative())}});
             if (guard && guard->location() == dir)
                 guard->reloadWithCursor(name);
         });

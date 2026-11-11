@@ -103,9 +103,12 @@ void PackJob::run()
         c.targetSize = static_cast<quint64>(g_file_info_get_size(existing.get()));
         c.targetModified = static_cast<qint64>(g_file_info_get_attribute_uint64(existing.get(), G_FILE_ATTRIBUTE_TIME_MODIFIED));
         c.targetIsDir = g_file_info_get_file_type(existing.get()) == G_FILE_TYPE_DIRECTORY;
-        switch (askConflict(c)) {
+        c.cannotUndo = !canTrash(target);
+        bool asked = false;
+        switch (askConflict(c, &asked)) {
         case ConflictAction::Overwrite:
         case ConflictAction::OverwriteIfNewer:  // the archive is being made now
+            keepReplaced(target, nullptr, asked && c.cannotUndo);  // else bsdtar replaces it for good
             break;
         case ConflictAction::Rename:
             target = uniqueSibling(target);
@@ -193,6 +196,7 @@ void PackJob::run()
         } else {
             p.itemsDone = p.itemsTotal;
             p.bytesDone = p.bytesTotal;
+            record(UndoItem::created(target));
         }
     }
     finish();

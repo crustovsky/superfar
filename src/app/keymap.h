@@ -74,6 +74,8 @@ enum class Command {
     PreviewLast,
     PreviewPlay,       // a previewed video: play or pause
     Columns,           // Ctrl+F6: the pane's column list
+    Undo,              // Ctrl+Z: take the last file operation back
+    Redo,              // Ctrl+Shift+Z: do it again
 };
 
 Command lookup(const QKeySequence& key);

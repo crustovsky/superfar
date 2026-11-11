@@ -60,7 +60,7 @@ QString describe(keymap::Command c)
     case Command::Properties: return QStringLiteral("properties of the marked items or the cursor item; change their permissions and owner, down the folders if asked");
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
-    case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
+    case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview and presets");
     case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
     case Command::About: return QStringLiteral("name, version and build date");
     case Command::ToggleTree: return QStringLiteral("hide or show the folder tree; hidden, it does no work");
@@ -71,6 +71,8 @@ QString describe(keymap::Command c)
     case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
     case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
     case Command::Columns: return QStringLiteral("the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it");
+    case Command::Undo: return QStringLiteral("undo the last copy, move, trash, rename, new folder or file, extract, pack or attribute change; what it created goes to the trash, never deleted");
+    case Command::Redo: return QStringLiteral("redo what was undone");
     case Command::None: return {};
     }
     return {};

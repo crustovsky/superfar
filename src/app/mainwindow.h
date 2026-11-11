@@ -2,6 +2,7 @@
 
 #include "core/jobs/job.h"
 #include "core/location.h"
+#include "core/undo.h"
 #include "keymap.h"
 #include "services.h"
 
@@ -57,6 +58,10 @@ private:
     void runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
                 const core::Location& destination);
     void refreshAt(const core::Location& dir);
+    // Ctrl+Z and Ctrl+Shift+Z: the last entry of that side, taken back
+    // by a job like any other.
+    void undo(bool redo);
+    void onJobFinished(core::Job* job);
     void promptNewFile();
     void promptGlob(bool on);
     void chooseColumns();
@@ -90,6 +95,7 @@ private:
     CommandLine* cmdline_;
     Places* places_;
     Preview* preview_ = nullptr;  // exists while Ctrl+Q is on
+    core::UndoStack undo_;        // this window's operations, until it closes
     QTimer* sessionTimer_;
     QList<int> treeSizes_;  // tree | panes while the tree is shown
     bool painted_ = false;

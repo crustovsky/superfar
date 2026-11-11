@@ -3,6 +3,9 @@
 
 #include "core/gobject.h"
 
+#include <QList>
+#include <algorithm>
+
 namespace core {
 
 ExtractJob::ExtractJob(Location archive, std::vector<QByteArray> members, Location destination, int stripComponents,
@@ -32,6 +35,16 @@ void ExtractJob::run()
         p.phase = JobProgress::Phase::Done;
         report(p, true);
         return;
+    }
+    // What the extraction will put directly in the destination, less
+    // what is there already: those are new, and undo can take them back.
+    std::vector<Location> fresh;
+    for (const QByteArray& m : members_) {
+        const QList<QByteArray> parts = m.split('/');
+        const Location top = dest_.child(parts.value(strip_));
+        if (top.isValid() && std::find(fresh.begin(), fresh.end(), top) == fresh.end()
+            && !g_file_query_exists(top.gfile(), nullptr))
+            fresh.push_back(top);
     }
     std::vector<QByteArray> args = {"bsdtar", "-xf", archivePath, "-C", destPath};
     if (strip_ > 0)
@@ -70,6 +83,9 @@ void ExtractJob::run()
         if (errOut)
             g_bytes_unref(errOut);
     }
+    for (const Location& top : fresh)
+        if (g_file_query_exists(top.gfile(), nullptr))
+            record(UndoItem::created(top));  // whole or, after an abort, in part
     p.phase = JobProgress::Phase::Done;
     report(p, true);
 }

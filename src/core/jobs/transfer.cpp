@@ -34,6 +34,9 @@ struct TransferJob::Impl {
     TransferJob& job;
     JobProgress p;
     quint64 currentBase = 0;
+    // Inside a folder this copy made nothing is recorded: taking the
+    // folder back takes its contents with it.
+    int insideCreated = 0;
 
     void scanEntry(const Location& loc, bool isDir, quint64 size)
     {
@@ -76,7 +79,7 @@ struct TransferJob::Impl {
 
     // Decides what to do about an existing target. Returns false to skip.
     bool resolveConflict(const Location& src, bool srcIsDir, Location& dst, GFileInfo* dstInfo,
-                         bool& overwrite)
+                         bool& overwrite, bool& warned)
     {
         Conflict c;
         c.name = dst.displayName();
@@ -94,7 +97,11 @@ struct TransferJob::Impl {
             c.sourceModified = static_cast<qint64>(
                 g_file_info_get_attribute_uint64(si.get(), G_FILE_ATTRIBUTE_TIME_MODIFIED));
         }
-        switch (job.askConflict(c)) {
+        c.cannotUndo = !canTrash(dst);
+        bool asked = false;
+        const ConflictAction action = job.askConflict(c, &asked);
+        warned = asked && c.cannotUndo;
+        switch (action) {
         case ConflictAction::Overwrite:
             overwrite = true;
             return true;
@@ -118,17 +125,22 @@ struct TransferJob::Impl {
 
     bool transferFile(const Location& src, Location dst, quint64 size)
     {
+        bool forGood = false;
         for (;;) {
             GCancellable* c = job.beginItem();
             auto flags = static_cast<GFileCopyFlags>(G_FILE_COPY_NOFOLLOW_SYMLINKS);
             GPtr<GFileInfo> existing(g_file_query_info(dst.gfile(), kConflictAttrs,
                                                        G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, c, nullptr));
             if (existing) {
-                bool overwrite = false;
-                if (!resolveConflict(src, false, dst, existing.get(), overwrite))
+                bool overwrite = false, warned = false;
+                if (!resolveConflict(src, false, dst, existing.get(), overwrite, warned))
                     return finishItem(size, true);
-                if (overwrite)
+                // What is replaced goes to the trash, so undo can bring
+                // it back; without a trash it is overwritten in place.
+                if (overwrite && !job.keepReplaced(dst, c, warned)) {
                     flags = static_cast<GFileCopyFlags>(flags | G_FILE_COPY_OVERWRITE);
+                    forGood = true;  // nothing undo could give back
+                }
             }
             p.currentName = dst.displayName();
             p.from = src.displayPath();
@@ -143,8 +155,15 @@ struct TransferJob::Impl {
                 ? g_file_move(src.gfile(), dst.gfile(), flags, c, &onProgress, this, &error)
                 : g_file_copy(src.gfile(), dst.gfile(), flags, c, &onProgress, this, &error);
             GErrorPtr err(error);
-            if (ok)
+            if (ok) {
+                if (forGood)
+                    ;
+                else if (job.move_)
+                    job.record(UndoItem::moved(src, dst));
+                else if (insideCreated == 0)
+                    job.record(UndoItem::created(dst));
                 return finishItem(size, true);
+            }
             if (isCancelled(err.get())) {
                 if (job.isAborted())
                     return false;
@@ -184,28 +203,28 @@ struct TransferJob::Impl {
         GPtr<GFileInfo> existing(g_file_query_info(dst.gfile(), kConflictAttrs,
                                                    G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, c, nullptr));
         if (existing && !isDirInfo(existing.get())) {
-            bool overwrite = false;
-            if (!resolveConflict(src, true, dst, existing.get(), overwrite))
+            bool overwrite = false, warned = false;
+            if (!resolveConflict(src, true, dst, existing.get(), overwrite, warned))
                 return finishItem(0, true);
-            if (overwrite) {
+            if (overwrite && !job.keepReplaced(dst, c, warned))
                 g_file_delete(dst.gfile(), c, nullptr);
-                existing.reset();
-            } else {
-                existing.reset();  // renamed: the new name does not exist
-            }
+            existing.reset();  // out of the way, or renamed: the new name does not exist
         }
         p.currentName = dst.displayName();
         p.from = src.displayPath();
         p.to = dst.displayPath();
         job.report(p, true);
 
+        bool made = false;
         if (!existing) {
             GError* error = nullptr;
             if (job.move_) {
                 // A rename moves the whole tree at once when GIO can do it.
                 if (g_file_move(src.gfile(), dst.gfile(), G_FILE_COPY_NOFOLLOW_SYMLINKS, c,
-                                nullptr, nullptr, &error))
+                                nullptr, nullptr, &error)) {
+                    job.record(UndoItem::moved(src, dst));
                     return finishItem(0, true);
+                }
                 GErrorPtr err(error);
                 error = nullptr;
                 if (isCancelled(err.get()))
@@ -226,9 +245,35 @@ struct TransferJob::Impl {
                         return false;
                     return finishItem(0, true);
                 }
+            } else {
+                made = true;
             }
         }
         finishItem(0, true);
+
+        // What this folder's part comes to, on every way out, an abort
+        // included. A copy that made the folder records the folder and
+        // nothing inside it. A move records each file where it went,
+        // and here the folder it made and the one it emptied and
+        // removed, so undo can put the tree back as it was.
+        struct Note {
+            Impl& self;
+            const Location& src;
+            const Location& dst;
+            bool made;
+            bool removed = false;
+            ~Note()
+            {
+                if (self.job.move_) {
+                    if (made || removed)
+                        self.job.record(UndoItem::folder(made ? dst : Location(), removed ? src : Location()));
+                } else if (made && --self.insideCreated == 0) {
+                    self.job.record(UndoItem::created(dst));
+                }
+            }
+        } note{*this, src, dst, made};
+        if (made && !job.move_)
+            ++insideCreated;
 
         GError* error = nullptr;
         GPtr<GFileEnumerator> en(g_file_enumerate_children(src.gfile(), kScanAttrs,
@@ -261,7 +306,7 @@ struct TransferJob::Impl {
         en.reset();
         g_file_copy_attributes(src.gfile(), dst.gfile(), G_FILE_COPY_NOFOLLOW_SYMLINKS, nullptr, nullptr);
         if (job.move_)
-            g_file_delete(src.gfile(), nullptr, nullptr);  // fails when something was skipped
+            note.removed = g_file_delete(src.gfile(), nullptr, nullptr);  // fails when something was skipped
         return true;
     }
 
@@ -293,7 +338,7 @@ TransferJob::TransferJob(std::vector<Location> sources, Location destination, bo
 
 void TransferJob::run()
 {
-    Impl impl{*this, {}, 0};
+    Impl impl{*this, {}, 0, 0};
     JobProgress& p = impl.p;
 
     // Scan for totals, unless this is a move within one filesystem, where

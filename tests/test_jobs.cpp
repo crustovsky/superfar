@@ -2,9 +2,11 @@
 #include "core/archive.h"
 #include "core/fileops.h"
 #include "core/jobs/attributes.h"
+#include "core/jobs/extract.h"
 #include "core/jobs/pack.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
+#include "core/jobs/undo.h"
 #include "core/location.h"
 #include "core/monitor.h"
 
@@ -59,6 +61,21 @@ void makeTree(const QString& root)
     QVERIFY(QFile::link("a.txt", root + "/link"));
 }
 
+// Takes an entry back and returns the entry for the other direction.
+core::UndoEntry takeBack(core::UndoEntry entry, size_t expectLog = 0, bool redo = false)
+{
+    core::UndoJob job(std::move(entry), redo);
+    job.setUnattended(true);
+    runJob(job);
+    [&] { QCOMPARE(job.log().size(), expectLog); }();
+    return {job.what(), std::move(job.undoItems())};
+}
+
+core::UndoEntry entryOf(core::Job& job)
+{
+    return {QStringLiteral("test"), std::move(job.undoItems())};
+}
+
 } // namespace
 
 class JobsTest : public QObject {
@@ -78,6 +95,20 @@ private Q_SLOTS:
     void trashOrDelete();
     void monitor();
     void mkdir();
+    void undoStack();
+    void undoCopy();
+    void undoCopyIntoExistingFolder();
+    void undoMove();
+    void undoMoveAcrossFilesystems();
+    void undoTrash();
+    void undoOverwrite();
+    void overwriteWithoutTrash();
+    void undoLeavesChangedItems();
+    void undoAttributes();
+    void undoSingleOperations();
+    void undoPackAndExtract();
+    void undoOfAnAbortedJob();
+    void permanentDeleteRecordsNothing();
 };
 
 void JobsTest::copyIntoItself()
@@ -585,5 +616,411 @@ void JobsTest::attributesRefusedAndLogged()
     }
 }
 
-QTEST_GUILESS_MAIN(JobsTest)
+void JobsTest::undoStack()
+{
+    core::UndoStack stack;
+    using Side = core::UndoStack::Side;
+    auto entry = [](const QString& what) {
+        return core::UndoEntry{what, {core::UndoItem::trashed(core::Location::fromPath("/nowhere"))}};
+    };
+    QVERIFY(!stack.take(Side::Undo));
+    stack.record(entry("a"));
+    stack.record(entry("b"));
+    QCOMPARE(stack.take(Side::Undo)->what, QStringLiteral("b"));
+    stack.put(Side::Redo, entry("b"));
+    // The outcome of a redo goes back without touching what else can be redone.
+    stack.put(Side::Redo, entry("c"));
+    stack.put(Side::Undo, entry("c"));
+    QCOMPARE(stack.count(Side::Redo), 2u);
+    // A new operation: nothing to redo any more.
+    stack.record(entry("d"));
+    QCOMPARE(stack.count(Side::Redo), 0u);
+    QCOMPARE(stack.take(Side::Undo)->what, QStringLiteral("d"));
+    // An entry without items is not one, and the stack is bounded.
+    stack.record({QStringLiteral("empty"), {}});
+    QCOMPARE(stack.take(Side::Undo)->what, QStringLiteral("c"));
+    for (int i = 0; i < 60; ++i)
+        stack.record(entry(QString::number(i)));
+    QCOMPARE(stack.count(Side::Undo), core::UndoStack::kLimit);
+    QCOMPARE(stack.take(Side::Undo)->what, QStringLiteral("59"));
+}
+
+void JobsTest::undoCopy()
+{
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    core::TransferJob job({loc(tmp.path() + "/src"), loc(tmp.path() + "/src/a.txt")}, loc(tmp.path() + "/dst"), false);
+    runJob(job);
+    QVERIFY(job.log().empty());
+    // The folder the copy made is one item, whatever is inside it.
+    QCOMPARE(job.undoItems().size(), 2u);
+    QCOMPARE(read(tmp.path() + "/dst/src/sub/deep/c.txt"), QByteArray("c"));
+
+    core::UndoEntry redo = takeBack(entryOf(job));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/src"));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/a.txt"));
+    QCOMPARE(read(tmp.path() + "/src/sub/deep/c.txt"), QByteArray("c"));  // the sources are not the undo's business
+
+    core::UndoEntry undo = takeBack(std::move(redo), 0, true);
+    QCOMPARE(read(tmp.path() + "/dst/src/sub/deep/c.txt"), QByteArray("c"));
+    QCOMPARE(read(tmp.path() + "/dst/a.txt"), QByteArray("aaa"));
+    QVERIFY(QFileInfo(tmp.path() + "/dst/src/link").isSymLink());
+
+    takeBack(std::move(undo));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/src"));
+}
+
+void JobsTest::undoCopyIntoExistingFolder()
+{
+    // A merge: only what the copy added goes, what was there stays.
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst/src/sub"));
+    write(tmp.path() + "/dst/src/mine.txt", "mine");
+    write(tmp.path() + "/dst/src/sub/kept.txt", "kept");
+    core::TransferJob job({loc(tmp.path() + "/src")}, loc(tmp.path() + "/dst"), false);
+    runJob(job);
+    QCOMPARE(read(tmp.path() + "/dst/src/sub/deep/c.txt"), QByteArray("c"));
+    takeBack(entryOf(job));
+    QCOMPARE(QDir(tmp.path() + "/dst/src").entryList(QDir::AllEntries | QDir::NoDotAndDotDot),
+             QStringList({"mine.txt", "sub"}));
+    QCOMPARE(QDir(tmp.path() + "/dst/src/sub").entryList(QDir::AllEntries | QDir::NoDotAndDotDot),
+             QStringList({"kept.txt"}));
+}
+
+void JobsTest::undoMove()
+{
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    core::TransferJob job({loc(tmp.path() + "/src")}, loc(tmp.path() + "/dst"), true);
+    runJob(job);
+    QVERIFY(!QFile::exists(tmp.path() + "/src"));
+    core::UndoEntry redo = takeBack(entryOf(job));
+    QCOMPARE(read(tmp.path() + "/src/sub/b.txt"), QByteArray("bbbb"));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/src"));
+    // Something took the old place meanwhile: unattended, the undo
+    // leaves both alone and says so.
+    core::UndoEntry undo = takeBack(std::move(redo), 0, true);
+    write(tmp.path() + "/src", "in the way");
+    takeBack(std::move(undo), 1);
+    QCOMPARE(read(tmp.path() + "/src"), QByteArray("in the way"));
+    QCOMPARE(read(tmp.path() + "/dst/src/a.txt"), QByteArray("aaa"));
+}
+
+void JobsTest::undoMoveAcrossFilesystems()
+{
+    // Across filesystems a folder is moved file by file and removed at
+    // the end; undo has to make it again, empty folders included.
+    QTemporaryDir tmp;
+    QTemporaryDir other(QStringLiteral("/dev/shm/superfar-test-XXXXXX"));
+    struct stat a {}, b {};
+    if (!other.isValid() || ::stat(QFile::encodeName(tmp.path()).constData(), &a) != 0
+        || ::stat(QFile::encodeName(other.path()).constData(), &b) != 0 || a.st_dev == b.st_dev)
+        QSKIP("needs a second filesystem at /dev/shm");
+    makeTree(tmp.path() + "/src");
+    QVERIFY(QDir().mkpath(tmp.path() + "/src/empty"));
+    core::TransferJob job({loc(tmp.path() + "/src")}, loc(other.path()), true);
+    runJob(job);
+    QVERIFY(job.log().empty());
+    QVERIFY(!QFile::exists(tmp.path() + "/src"));
+    QCOMPARE(read(other.path() + "/src/sub/deep/c.txt"), QByteArray("c"));
+
+    core::UndoEntry redo = takeBack(entryOf(job));
+    QCOMPARE(read(tmp.path() + "/src/sub/deep/c.txt"), QByteArray("c"));
+    QCOMPARE(read(tmp.path() + "/src/a.txt"), QByteArray("aaa"));
+    QVERIFY(QDir(tmp.path() + "/src/empty").exists());
+    QVERIFY(QFileInfo(tmp.path() + "/src/link").isSymLink());
+    QVERIFY(!QFile::exists(other.path() + "/src"));
+
+    takeBack(std::move(redo), 0, true);
+    QVERIFY(!QFile::exists(tmp.path() + "/src"));
+    QCOMPARE(read(other.path() + "/src/sub/deep/c.txt"), QByteArray("c"));
+    QVERIFY(QDir(other.path() + "/src/empty").exists());
+}
+
+void JobsTest::undoTrash()
+{
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    write(tmp.path() + "/single", "x");
+    core::RemoveJob job({loc(tmp.path() + "/src"), loc(tmp.path() + "/single")}, false);
+    runJob(job);
+    QVERIFY(job.log().empty());
+    QVERIFY(!QFile::exists(tmp.path() + "/src"));
+    // The same name trashed again later: each undo brings its own back.
+    write(tmp.path() + "/single", "second");  // within the same second
+    core::RemoveJob again({loc(tmp.path() + "/single")}, false);
+    runJob(again);
+
+    core::UndoEntry redo = takeBack(entryOf(again));
+    QCOMPARE(read(tmp.path() + "/single"), QByteArray("second"));
+    takeBack(std::move(redo), 0, true);
+    QVERIFY(!QFile::exists(tmp.path() + "/single"));
+
+    takeBack(entryOf(job));
+    QCOMPARE(read(tmp.path() + "/single"), QByteArray("x"));
+    QCOMPARE(read(tmp.path() + "/src/sub/deep/c.txt"), QByteArray("c"));
+}
+
+void JobsTest::undoOverwrite()
+{
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    write(tmp.path() + "/f.txt", "new");
+    write(tmp.path() + "/dst/f.txt", "old");
+    core::Conflict seen;
+    core::TransferJob job({loc(tmp.path() + "/f.txt")}, loc(tmp.path() + "/dst"), false);
+    connect(&job, &core::Job::conflict, [&](const core::Conflict& c) {
+        seen = c;
+        job.answerConflict(core::ConflictAction::Overwrite, false);
+    });
+    runJob(job);
+    QVERIFY(job.log().empty());
+    QVERIFY(!seen.cannotUndo);
+    QCOMPARE(read(tmp.path() + "/dst/f.txt"), QByteArray("new"));
+
+    core::UndoEntry redo = takeBack(entryOf(job));
+    QCOMPARE(read(tmp.path() + "/dst/f.txt"), QByteArray("old"));
+    takeBack(std::move(redo), 0, true);
+    QCOMPARE(read(tmp.path() + "/dst/f.txt"), QByteArray("new"));
+
+    // A move over a file likewise: the source goes back, the old target returns.
+    write(tmp.path() + "/g.txt", "moved");
+    write(tmp.path() + "/dst/g.txt", "was here");
+    core::TransferJob mv({loc(tmp.path() + "/g.txt")}, loc(tmp.path() + "/dst"), true);
+    mv.setConflictPolicy(core::ConflictAction::Overwrite);
+    runJob(mv);
+    QCOMPARE(read(tmp.path() + "/dst/g.txt"), QByteArray("moved"));
+    takeBack(entryOf(mv));
+    QCOMPARE(read(tmp.path() + "/g.txt"), QByteArray("moved"));
+    QCOMPARE(read(tmp.path() + "/dst/g.txt"), QByteArray("was here"));
+}
+
+void JobsTest::overwriteWithoutTrash()
+{
+    if (::geteuid() == 0)
+        QSKIP("root can always write to the trash");
+    // The trash refuses: as a policy the overwrite still happens, is
+    // logged, and is not something undo will pretend to take back.
+    const QString trash = QString::fromLocal8Bit(qgetenv("XDG_DATA_HOME")) + "/Trash";
+    QVERIFY(QDir().mkpath(trash + "/files"));
+    QVERIFY(QDir().mkpath(trash + "/info"));
+    QCOMPARE(::chmod(QFile::encodeName(trash + "/files").constData(), 0500), 0);
+    QCOMPARE(::chmod(QFile::encodeName(trash + "/info").constData(), 0500), 0);
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    write(tmp.path() + "/f.txt", "new");
+    write(tmp.path() + "/dst/f.txt", "old");
+    write(tmp.path() + "/fresh.txt", "fresh");
+    core::TransferJob job({loc(tmp.path() + "/f.txt"), loc(tmp.path() + "/fresh.txt")}, loc(tmp.path() + "/dst"), false);
+    job.setConflictPolicy(core::ConflictAction::Overwrite);
+    runJob(job);
+    ::chmod(QFile::encodeName(trash + "/files").constData(), 0700);
+    ::chmod(QFile::encodeName(trash + "/info").constData(), 0700);
+    QCOMPARE(read(tmp.path() + "/dst/f.txt"), QByteArray("new"));
+    QCOMPARE(job.log().size(), 1u);
+    QCOMPARE(job.log().front().kind, core::LogEntry::Kind::Overwritten);
+    QCOMPARE(job.undoItems().size(), 1u);  // the file that replaced nothing
+    takeBack(entryOf(job));
+    QCOMPARE(read(tmp.path() + "/dst/f.txt"), QByteArray("new"));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/fresh.txt"));
+}
+
+void JobsTest::undoLeavesChangedItems()
+{
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    write(tmp.path() + "/a.txt", "a");
+    write(tmp.path() + "/b.txt", "b");
+    core::TransferJob job({loc(tmp.path() + "/a.txt"), loc(tmp.path() + "/b.txt")}, loc(tmp.path() + "/dst"), false);
+    runJob(job);
+    write(tmp.path() + "/dst/a.txt", "worked on since");
+    core::UndoJob undo(entryOf(job), false);
+    runJob(undo);
+    QCOMPARE(undo.log().size(), 1u);
+    QCOMPARE(undo.log().front().kind, core::LogEntry::Kind::Skipped);
+    QCOMPARE(read(tmp.path() + "/dst/a.txt"), QByteArray("worked on since"));
+    QVERIFY(!QFile::exists(tmp.path() + "/dst/b.txt"));
+    QCOMPARE(undo.undoItems().size(), 1u);  // redo knows of b alone
+}
+
+void JobsTest::undoAttributes()
+{
+    QTemporaryDir tmp;
+    const QString root = tmp.path() + "/tree";
+    makeTree(root);
+    auto mode = [&](const QString& rel) {
+        struct stat st {};
+        return ::lstat(QFile::encodeName(root + rel).constData(), &st) == 0 ? quint32(st.st_mode & 07777) : ~0u;
+    };
+    QCOMPARE(::chmod(QFile::encodeName(root + "/a.txt").constData(), 0600), 0);
+    QCOMPARE(::chmod(QFile::encodeName(root + "/sub").constData(), 0700), 0);
+    QCOMPARE(::chmod(QFile::encodeName(root + "/sub/b.txt").constData(), 0640), 0);
+    const quint32 deep = mode("/sub/deep");
+
+    core::AttributeChange change;
+    change.mode = 0755;
+    change.recursive = true;
+    core::AttributesJob job({loc(root)}, change);
+    runJob(job);
+    QCOMPARE(mode("/sub"), 0755u);
+    QCOMPARE(mode("/a.txt"), 0644u);
+
+    // One item changed again by hand: it is left as it is now.
+    QCOMPARE(::chmod(QFile::encodeName(root + "/sub/b.txt").constData(), 0444), 0);
+    core::UndoEntry redo = takeBack(entryOf(job), 1);
+    QCOMPARE(mode("/a.txt"), 0600u);
+    QCOMPARE(mode("/sub"), 0700u);
+    QCOMPARE(mode("/sub/deep"), deep);
+    QCOMPARE(mode("/sub/b.txt"), 0444u);
+
+    takeBack(std::move(redo), 0, true);
+    QCOMPARE(mode("/a.txt"), 0644u);
+    QCOMPARE(mode("/sub"), 0755u);
+    QCOMPARE(mode("/sub/b.txt"), 0444u);
+}
+
+void JobsTest::undoSingleOperations()
+{
+    // Rename, new folder and new file are not jobs; the window records
+    // them with the same items.
+    QTemporaryDir tmp;
+    write(tmp.path() + "/old.txt", "content");
+    QVERIFY(QFile::rename(tmp.path() + "/old.txt", tmp.path() + "/new.txt"));
+    QVERIFY(QDir().mkpath(tmp.path() + "/made"));
+    core::UndoEntry entry{QStringLiteral("test"),
+                          {core::UndoItem::moved(loc(tmp.path() + "/old.txt"), loc(tmp.path() + "/new.txt")),
+                           core::UndoItem::created(loc(tmp.path() + "/made"))}};
+    core::UndoEntry redo = takeBack(std::move(entry));
+    QCOMPARE(read(tmp.path() + "/old.txt"), QByteArray("content"));
+    QVERIFY(!QFile::exists(tmp.path() + "/new.txt"));
+    QVERIFY(!QFile::exists(tmp.path() + "/made"));
+    takeBack(std::move(redo), 0, true);
+    QCOMPARE(read(tmp.path() + "/new.txt"), QByteArray("content"));
+    QVERIFY(QDir(tmp.path() + "/made").exists());
+
+    // A swap through temporary names, as the multi-rename panel does
+    // it, goes back step by step.
+    write(tmp.path() + "/x", "x");
+    write(tmp.path() + "/y", "y");
+    std::vector<core::UndoItem> steps;
+    auto step = [&](const QString& from, const QString& to) {
+        QVERIFY(QFile::rename(tmp.path() + from, tmp.path() + to));
+        steps.push_back(core::UndoItem::moved(loc(tmp.path() + from), loc(tmp.path() + to)));
+    };
+    step("/x", "/t1");
+    step("/y", "/t2");
+    step("/t1", "/y");
+    step("/t2", "/x");
+    QCOMPARE(read(tmp.path() + "/x"), QByteArray("y"));
+    takeBack({QStringLiteral("swap"), std::move(steps)});
+    QCOMPARE(read(tmp.path() + "/x"), QByteArray("x"));
+    QCOMPARE(read(tmp.path() + "/y"), QByteArray("y"));
+}
+
+void JobsTest::undoPackAndExtract()
+{
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    QVERIFY(QDir().mkpath(tmp.path() + "/out/src"));
+    write(tmp.path() + "/out/src/there.txt", "there");
+    const core::Location archive = loc(tmp.path() + "/made.tar.gz");
+    core::PackJob pack(loc(tmp.path()), {QByteArray("src")}, archive, {});
+    runJob(pack);
+    if (!pack.log().empty())
+        QSKIP("needs bsdtar");
+    QVERIFY(QFile::exists(tmp.path() + "/made.tar.gz"));
+
+    // Into a folder that has src/ already: what the extraction merged
+    // into it is not undo's to sort out, the new top-level folder is.
+    core::ExtractJob merged(archive, {QByteArray("src/a.txt")}, loc(tmp.path() + "/out"), 0);
+    runJob(merged);
+    QVERIFY(merged.undoItems().empty());
+    QVERIFY(QDir().mkpath(tmp.path() + "/fresh"));
+    core::ExtractJob extract(archive, {QByteArray("src/sub/b.txt"), QByteArray("src/a.txt")}, loc(tmp.path() + "/fresh"), 0);
+    runJob(extract);
+    QCOMPARE(read(tmp.path() + "/fresh/src/sub/b.txt"), QByteArray("bbbb"));
+    QCOMPARE(extract.undoItems().size(), 1u);
+    takeBack(entryOf(extract));
+    QVERIFY(!QFile::exists(tmp.path() + "/fresh/src"));
+
+    core::UndoEntry redo = takeBack(entryOf(pack));
+    QVERIFY(!QFile::exists(tmp.path() + "/made.tar.gz"));
+    takeBack(std::move(redo), 0, true);
+    QVERIFY(QFile::exists(tmp.path() + "/made.tar.gz"));
+}
+
+void JobsTest::undoOfAnAbortedJob()
+{
+    // A job aborted halfway records the part it did; an undo aborted
+    // halfway leaves the rest to be undone later.
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    std::vector<core::Location> sources;
+    for (int i = 0; i < 300; ++i) {
+        write(tmp.path() + QString("/f%1").arg(i), QByteArray(64, 'x'));
+        sources.push_back(loc(tmp.path() + QString("/f%1").arg(i)));
+    }
+    core::TransferJob job(sources, loc(tmp.path() + "/dst"), false);
+    connect(&job, &core::Job::progress, [&](const core::JobProgress& p) {
+        if (p.phase == core::JobProgress::Phase::Running && p.itemsDone >= 20)
+            job.abort();
+    });
+    runJob(job);
+    QVERIFY(job.aborted());
+    const size_t copied = static_cast<size_t>(QDir(tmp.path() + "/dst").entryList(QDir::Files).size());
+    QCOMPARE(job.undoItems().size(), copied);
+
+    takeBack(entryOf(job));
+    QCOMPARE(QDir(tmp.path() + "/dst").entryList(QDir::Files).size(), 0);
+
+    // Thirty files moved; something sits where f10 was. The undo goes
+    // backwards, asks about it, and is aborted there: f11 and up are
+    // back, the ten before it wait for the next undo.
+    sources.resize(30);
+    core::TransferJob mv(sources, loc(tmp.path() + "/dst"), true);
+    runJob(mv);
+    QCOMPARE(mv.undoItems().size(), 30u);
+    write(tmp.path() + "/f10", "in the way");
+    core::UndoJob undo(entryOf(mv), false);
+    connect(&undo, &core::Job::conflict, [&](const core::Conflict& c) {
+        QCOMPARE(c.name, QStringLiteral("f10"));
+        undo.abort();
+    });
+    runJob(undo);
+    QVERIFY(undo.aborted());
+    QVERIFY(QFile::exists(tmp.path() + "/f29"));
+    QVERIFY(!QFile::exists(tmp.path() + "/f9"));
+    QCOMPARE(undo.remaining().items.size(), 10u);
+    QCOMPARE(undo.undoItems().size(), 19u);
+    takeBack(undo.remaining());
+    QVERIFY(QFile::exists(tmp.path() + "/f0"));
+    QCOMPARE(QDir(tmp.path() + "/dst").entryList(QDir::Files), QStringList({"f10"}));
+}
+
+void JobsTest::permanentDeleteRecordsNothing()
+{
+    QTemporaryDir tmp;
+    makeTree(tmp.path() + "/src");
+    core::RemoveJob job({loc(tmp.path() + "/src")}, true);
+    runJob(job);
+    QVERIFY(!QFile::exists(tmp.path() + "/src"));
+    QVERIFY(job.undoItems().empty());
+}
+
+int main(int argc, char** argv)
+{
+    // A home and a trash of the test's own, set before GLib reads them.
+    // The home trash serves files on the home's filesystem, so with the
+    // home beside the temp folders the trash works wherever those are.
+    QTemporaryDir home;
+    qputenv("HOME", QFile::encodeName(home.path()));
+    qputenv("XDG_DATA_HOME", QFile::encodeName(home.path() + "/data"));
+    QCoreApplication app(argc, argv);
+    JobsTest test;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&test, argc, argv);
+}
 #include "test_jobs.moc"

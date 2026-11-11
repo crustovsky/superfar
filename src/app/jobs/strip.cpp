@@ -34,7 +34,9 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     auto* row = new QHBoxLayout(line);
     row->setContentsMargins(6, 2, 6, 2);
     row->setSpacing(6);
-    auto* title = new QLabel(job->title(), this);
+    // An undo says what it takes back.
+    const bool back = job->kind() == core::JobKind::Undo || job->kind() == core::JobKind::Redo;
+    auto* title = new QLabel(back ? tr("%1: %2").arg(job->title(), job->subject()) : job->title(), this);
     title->setMinimumWidth(title->fontMetrics().horizontalAdvance(QStringLiteral("Delete")) + 4);
     row->addWidget(title);
     name_->setTextFormat(Qt::PlainText);
@@ -209,12 +211,15 @@ void JobStrip::addJob(core::Job* job)
         row->deleteLater();
         --rows_;
         if (!job->log().empty()) {
-            int skipped = 0, failed = 0;
+            int skipped = 0, failed = 0, overwritten = 0;
             for (const auto& e : job->log())
-                (e.kind == core::LogEntry::Kind::Skipped ? skipped : failed)++;
-            const QString title = tr("%1 %2: %3 skipped, %4 failed")
-                                      .arg(job->title(), job->aborted() ? tr("aborted") : tr("finished"))
-                                      .arg(skipped).arg(failed);
+                (e.kind == core::LogEntry::Kind::Skipped ? skipped
+                 : e.kind == core::LogEntry::Kind::Failed ? failed : overwritten)++;
+            QString title = tr("%1 %2: %3 skipped, %4 failed")
+                                .arg(job->title(), job->aborted() ? tr("aborted") : tr("finished"))
+                                .arg(skipped).arg(failed);
+            if (overwritten > 0)
+                title += tr(", %1 overwritten for good").arg(overwritten);
             auto* bar = new LogBar(title, job->log(), this);
             connect(bar, &LogBar::closed, this, [this, bar] { removeBar(bar); });
             showBar(bar);

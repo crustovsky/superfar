@@ -194,6 +194,8 @@ void Tab::rename(const QByteArray& name, const QString& newName)
             Q_EMIT guard->message(error);
             return;
         }
+        Q_EMIT guard->undoable(tr("rename of %1").arg(dir.child(name).displayName()),
+                               core::UndoItem::moved(dir.child(name), dir.child(actual), dir.isNative()));
         if (guard->location_ != dir)
             return;
         // While a neighbouring row is being edited a reload would close

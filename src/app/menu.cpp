@@ -33,6 +33,8 @@ const std::vector<Group>& groups()
             {Command::MultiRename, "Multi-rename"}, {Command::Mkdir, "New &folder"}, {Command::NewFile, "New f&ile"},
             {Command::Trash, "&Trash"}, {Command::DeletePermanent, "&Delete permanently"},
             {Command::None, ""},
+            {Command::Undo, "&Undo the last operation"}, {Command::Redo, "Redo wh&at was undone"},
+            {Command::None, ""},
             {Command::Quit, "&Quit"},
         }},
         {"&Select", {

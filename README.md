@@ -75,7 +75,8 @@ thumbnail; nothing else changes.
 | **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
-| **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
+| **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |
+| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it; nothing is deleted, and an item changed since is left alone. | Ctrl+Z, Ctrl+Shift+Z |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
 
 ### Looking and finding
@@ -149,7 +150,9 @@ use kept as second keys:
 | Shift+F5 | folder sync panel |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
 | F7, Shift+F4 | new folder, new file |
-| F8, Shift+F8 | trash, delete permanently |
+| F8, Shift+F8 | trash, delete permanently (which cannot be undone, and says so) |
+| Ctrl+Z, Shift+F9 | undo the last file operation of this window |
+| Ctrl+Shift+Z, Shift+F10 | redo it |
 | Alt+F2, Alt+Enter | properties, with permissions and owner for every marked item |
 | Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
 

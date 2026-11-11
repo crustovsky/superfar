@@ -96,7 +96,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
   copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
-  find and replace, {n} numbering, case, presets, undo)
+  find and replace, {n} numbering, case, presets)
 - Shift+F5 folder sync panel: compares the active tab with the other
   pane's by size, time and optional SHA-256; copies or trashes the
   checked differences through the job engine
@@ -108,7 +108,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   rows); Ctrl+F5 the tree; Ctrl+F6 the column list (show, hide, move);
   Ctrl+F7 (Ctrl+H) hidden files; a header click sorts, a drag moves it
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
-  Alt+F7 find in tree (fuzzy over names, results in a tab)
+  Alt+F7 find in tree (fuzzy over names, results in a tab); Ctrl+Z
+  (Shift+F9) undoes the window's last file operation, Ctrl+Shift+Z redoes
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
   moves up; Space selects when the filter is empty;
   Alt+F9 (Ctrl+=) / Alt+F10 (Ctrl+-) select and deselect by glob;
@@ -183,16 +184,15 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   sort.cpp            natural sort by GLib collation key, dirs first
   unixattrs.cpp       mode and owner as text and back, id names cached
   dirsize.cpp         recursive size and count walker (see rule 9)
-  jobs/               copy, move, trash, delete, extract, pack, attributes:
-                      one worker thread each, progress, pause, skip, cancel,
-                      conflict policy, error log. Copy is g_file_copy with a
-                      progress callback (reflinks, splice, metadata and
-                      server-side copy for free): Pause blocks in the
-                      callback, Skip cancels the per-file cancellable. Move
-                      is g_file_move. A trash failure on another volume
-                      offers permanent delete. Extract and pack run bsdtar;
-                      attributes is chmod and chown down a tree with chmod's
-                      X
+  jobs/               copy, move, trash, delete, extract, pack, attributes,
+                      undo: one worker thread each, progress, pause, skip,
+                      cancel, conflict policy, error log. Copy and move are
+                      g_file_copy and g_file_move with a progress callback:
+                      Pause blocks in it, Skip cancels the per-file
+                      cancellable. A failed trash offers permanent delete.
+                      Extract and pack run bsdtar; attributes is chmod -R with
+                      X. Each records what it did (undo.h); undo inverts it,
+                      records its own inverse (redo), trashes, never deletes
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal apps
   mounts.cpp          volumes, mount, unmount; prompts go to the window
