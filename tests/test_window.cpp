@@ -869,6 +869,20 @@ void WindowTest::syntaxColoursFromBat()
     QTest::keyClick(text, Qt::Key_F9, Qt::ControlModifier);
     QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
     QVERIFY(Highlight::enabled(config_.get()));
+    // The theme changes while the file is open: bat is asked again,
+    // for the other kind of theme.
+    const QPalette before = QApplication::palette();
+    const bool wasDark = before.color(QPalette::Base).lightness() < 128;
+    QPalette other = before;
+    other.setColor(QPalette::Base, wasDark ? Qt::white : Qt::black);
+    other.setColor(QPalette::Text, wasDark ? Qt::black : Qt::white);
+    QFile::remove(g_env + "/bat-call");
+    QApplication::setPalette(other);
+    QTRY_VERIFY(batCall().contains(wasDark ? QStringLiteral("--theme=light") : QStringLiteral("--theme=dark")));
+    QFile::remove(g_env + "/bat-call");
+    QApplication::setPalette(before);
+    QTRY_VERIFY(batCall().contains(wasDark ? QStringLiteral("--theme=dark") : QStringLiteral("--theme=light")));
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
     QTest::keyClick(text, Qt::Key_Escape);
     QTRY_VERIFY(view->hasFocus());
 

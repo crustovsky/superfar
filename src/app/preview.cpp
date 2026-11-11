@@ -253,8 +253,9 @@ void Preview::rehighlight()
 void Preview::changeEvent(QEvent* event)
 {
     QWidget::changeEvent(event);
+    // Once the event has gone round: the text view gets its palette after us.
     if (event->type() == QEvent::PaletteChange && !textBytes_.isEmpty())
-        rehighlight();
+        QMetaObject::invokeMethod(this, &Preview::rehighlight, Qt::QueuedConnection);
 }
 
 void Preview::showPicture(const QImage& image)

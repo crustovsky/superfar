@@ -115,8 +115,10 @@ void Viewer::rehighlight()
 void Viewer::changeEvent(QEvent* event)
 {
     QWidget::changeEvent(event);
+    // A dark theme's colours do not read on a light one. Once the
+    // event has gone round: the text view gets its palette after us.
     if (event->type() == QEvent::PaletteChange && !whole_.isEmpty())
-        rehighlight();  // a dark theme's colours do not read on a light one
+        QMetaObject::invokeMethod(this, &Viewer::rehighlight, Qt::QueuedConnection);
 }
 
 void Viewer::updateStatus()
