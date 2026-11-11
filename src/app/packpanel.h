@@ -22,7 +22,8 @@ public:
     // what: the selection text; stem: the suggested name without an
     // extension; here and other: the two folders to choose between.
     void show(const QString& what, const QByteArray& stem, const core::Location& here, const core::Location& other);
-    // While other jobs are there: a Queue button, and Shift+Enter.
+    // While other jobs are there the panel asks which it is to be:
+    // Queue (Enter) or Run now (Shift+Enter), as the job prompts do.
     void offerQueue(bool on);
 
 Q_SIGNALS:
@@ -50,4 +51,5 @@ private:
     QComboBox* level_;
     QComboBox* destination_;
     QPushButton* queue_;
+    QPushButton* packBtn_;
 };

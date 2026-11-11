@@ -72,12 +72,12 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
 
     auto* actions = new QHBoxLayout;
     actions->addStretch(1);
-    auto* packBtn = new QPushButton(tr("&Pack"), this);
+    auto* packBtn = packBtn_ = new QPushButton(tr("&Pack"), this);
     auto* closeBtn = new QPushButton(tr("Clos&e"), this);
-    actions->addWidget(packBtn);
     actions->addWidget(queue_);
+    actions->addWidget(packBtn);
     actions->addWidget(closeBtn);
-    queue_->setToolTip(tr("Start when the jobs before it have ended (Shift+Enter)"));
+    queue_->setToolTip(tr("Start when the jobs before it have ended (Enter)"));
     queue_->hide();
     layout->addLayout(actions);
     layout->addStretch(1);
@@ -98,7 +98,7 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
 
     connect(format_, &QComboBox::currentIndexChanged, this, [this] { ext_->setText(QString::fromLatin1(extension())); });
     connect(name_, &QLineEdit::returnPressed, this, [this] {
-        pack(queue_->isVisibleTo(this) && (QGuiApplication::keyboardModifiers() & Qt::ShiftModifier));
+        pack(queue_->isVisibleTo(this) && !(QGuiApplication::keyboardModifiers() & Qt::ShiftModifier));
     });
     connect(packBtn, &QPushButton::clicked, this, [this] { pack(false); });
     connect(queue_, &QPushButton::clicked, this, [this] { pack(true); });
@@ -135,6 +135,7 @@ QByteArray PackPanel::options() const
 void PackPanel::offerQueue(bool on)
 {
     queue_->setVisible(on);
+    packBtn_->setText(on ? tr("Run &now") : tr("&Pack"));
 }
 
 void PackPanel::pack(bool queued)
@@ -158,7 +159,7 @@ void PackPanel::keyPressEvent(QKeyEvent* event)
         return;
     }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        pack(queue_->isVisibleTo(this) && (event->modifiers() & Qt::ShiftModifier));  // from a combo box too
+        pack(queue_->isVisibleTo(this) && !(event->modifiers() & Qt::ShiftModifier));  // from a combo box too
         return;
     }
     QWidget::keyPressEvent(event);

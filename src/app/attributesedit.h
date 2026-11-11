@@ -42,6 +42,7 @@ private:
     QCheckBox* recursive_;
     QLabel* recursiveNote_;
     QPushButton* queue_;
+    QPushButton* applyBtn_;
     quint32 allSet_ = 0777;  // bits every item has
     quint32 anySet_ = 0;     // bits some item has
     QString user_;           // what the items share; empty when they differ

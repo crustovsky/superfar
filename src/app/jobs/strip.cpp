@@ -60,7 +60,7 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     unattended_->setCheckable(true);
     pause_ = add(tr("Pause"));
     pause_->setCheckable(true);
-    auto* abort = add(tr("Abort"));
+    auto* abort = abort_ = add(tr("Abort"));
     details_ = add(tr("Details"));
     details_->setCheckable(true);
 
@@ -96,6 +96,8 @@ void JobRow::setQueued(bool queued)
                        static_cast<QWidget*>(details_)})
         w->setVisible(!queued);
     name_->setText(queued ? tr("Queued: %1").arg(job_->plan()) : tr("Scanning"));
+    abort_->setText(queued ? tr("Remove") : tr("Abort"));  // out of the queue: it never ran
+    queued_ = queued;
 }
 
 void JobRow::addBar(QWidget* bar)
@@ -198,7 +200,17 @@ void JobStrip::addJob(core::Job* job, bool queued)
 {
     job->setParent(this);
     auto* row = new JobRow(job, this);
-    layout_->addWidget(row);
+    // The list reads top down: what runs, then what waits, in the order
+    // it will start. A job started beside the others goes above the
+    // queue, not under it.
+    int at = layout_->count();
+    if (!queued)
+        for (int i = 0; i < layout_->count(); ++i)
+            if (auto* other = qobject_cast<JobRow*>(layout_->itemAt(i)->widget()); other && other->queued()) {
+                at = i;
+                break;
+            }
+    layout_->insertWidget(at, row);
     ++rows_;
     updateVisibility();
     connect(row, &JobRow::startNowRequested, this, [this, job] { queue_->startNow(job); });

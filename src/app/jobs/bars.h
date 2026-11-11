@@ -19,8 +19,9 @@ public:
     PromptBar(const QString& message, const QString& okLabel, std::optional<QString> input,
               QWidget* parent = nullptr);
 
-    // Adds Queue (Shift+Enter) beside the button: the job this prompt
-    // is for can wait behind the ones already there.
+    // Another job is there already, so this prompt asks which it is to
+    // be: Queue (Enter), behind the others, or Run now (Shift+Enter),
+    // beside them. Its own button becomes "Run now".
     void offerQueue();
     // Whether accepted() came by Queue; for the slot it is emitted to.
     bool queued() const { return queued_; }

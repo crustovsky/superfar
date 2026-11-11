@@ -34,6 +34,7 @@ public:
 
     core::Job* job() const { return job_; }
     void addBar(QWidget* bar);
+    bool queued() const { return queued_; }
     // A conflict or error question is open under the row: the job is
     // blocked, so the clock stops and the panel does not open on its own.
     void setWaiting(bool on) { waiting_ = on; }
@@ -54,6 +55,7 @@ private:
     QElapsedTimer runClock_;
     bool running_ = false;
     bool waiting_ = false;
+    bool queued_ = false;
     bool autoOpened_ = false;
     qint64 activeMs_ = 0;  // running time less pauses and questions
     quint64 sampleBytes_ = 0;
@@ -68,6 +70,7 @@ private:
     QToolButton* start_ = nullptr;
     QToolButton* unattended_ = nullptr;
     QToolButton* pause_ = nullptr;
+    QToolButton* abort_ = nullptr;
     QToolButton* details_ = nullptr;
     JobPanel* panel_;
 };
@@ -83,8 +86,8 @@ public:
     const core::JobQueue* queue() const { return queue_; }
     // A prompt; the caller connects accepted() / rejected(), the strip
     // removes the bar afterwards and gives focus back. A prompt for a
-    // job offers Queue beside its button while other jobs are there;
-    // the bar's queued() then says which one was chosen.
+    // job, while other jobs are there, asks whether to queue it or run
+    // it now; the bar's queued() then says which was chosen.
     PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input,
                       bool forJob = false);
     ChoiceBar* choose(const QString& message, const QStringList& items);

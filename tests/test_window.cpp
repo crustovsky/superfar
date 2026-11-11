@@ -767,29 +767,32 @@ void WindowTest::queueBehindARunningJob()
     QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
     QTRY_VERIFY(window_->findChild<ConflictBar*>());
 
-    // Now the prompt offers Queue. The job gets a row that says what
-    // it will do, with Start now, Unattended and Abort, and waits.
+    // Now the prompt asks which it is to be: Queue or Run now. Queued,
+    // the job gets a row below the running one that says what it will
+    // do, with Start now, Unattended and Remove, and waits.
     startCopy(1);
     QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("Run &now")));
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("Copy")));
     buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
     QTRY_VERIFY(queuedRow());
     JobRow* row = queuedRow();
     QVERIFY(shows(row, QStringLiteral("Queued: one.txt from %1 to %2").arg(a_, b_)));
-    for (const char* text : {"Start now", "Unattended", "Abort"})
+    for (const char* text : {"Start now", "Unattended", "Remove"})
         QVERIFY2(buttonOf<QToolButton>(row, QString::fromLatin1(text))->isVisible(), text);
     QVERIFY(!buttonOf<QToolButton>(row, QStringLiteral("Pause"))->isVisible());
     QTest::qWait(100);
     QVERIFY(!QFile::exists(b_ + "/one.txt"));
 
-    // Abort takes it out of the queue: it never runs.
-    buttonOf<QToolButton>(row, QStringLiteral("Abort"))->click();
+    // Remove takes it out of the queue: it never runs.
+    buttonOf<QToolButton>(row, QStringLiteral("Remove"))->click();
     QTRY_VERIFY(!queuedRow());
     QVERIFY(!QFile::exists(b_ + "/one.txt"));
 
-    // Shift+Enter queues from the keyboard; Unattended can be set
-    // ahead. When the job before it ends, it runs.
+    // Enter queues from the keyboard; Unattended can be set ahead.
+    // When the job before it ends, it runs.
     startCopy(1);
-    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return, Qt::ShiftModifier);
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
     QTRY_VERIFY(queuedRow());
     row = queuedRow();
     buttonOf<QToolButton>(row, QStringLiteral("Unattended"))->click();
@@ -818,6 +821,22 @@ void WindowTest::queueBehindARunningJob()
     startCopy(1);
     buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
     QTRY_VERIFY(queuedRow());
+    // Shift+Enter is Run now: that job starts beside the first, and
+    // its row goes above the one that waits, not under it.
+    startCopy(0);
+    QCOMPARE(tab->currentName(), QByteArray("sub"));
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return, Qt::ShiftModifier);
+    QTRY_VERIFY(QDir(b_ + "/sub").exists());
+    QVERIFY(queuedRow());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+    {
+        const QList<JobRow*> rows = window_->findChildren<JobRow*>();
+        int lowest = 0;
+        for (const JobRow* r : rows)
+            if (r->isVisible())
+                lowest = std::max(lowest, r->mapTo(window_.get(), QPoint(0, 0)).y());
+        QCOMPARE(queuedRow()->mapTo(window_.get(), QPoint(0, 0)).y(), lowest);
+    }
     buttonOf<QToolButton>(queuedRow(), QStringLiteral("Start now"))->click();
     QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
     QVERIFY(window_->findChild<ConflictBar*>()->isVisible());  // the first still waits

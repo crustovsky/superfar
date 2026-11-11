@@ -55,7 +55,10 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     auto* cancel = button(tr("&Cancel"), this);
     layout->addWidget(ok);
     layout->addWidget(cancel);
-    connect(ok, &QPushButton::clicked, this, [this] { Q_EMIT accepted(edit_ ? edit_->text() : QString()); });
+    connect(ok, &QPushButton::clicked, this, [this] {
+        queued_ = false;
+        Q_EMIT accepted(edit_ ? edit_->text() : QString());
+    });
     connect(cancel, &QPushButton::clicked, this, &PromptBar::rejected);
     if (edit_) {
         setFocusProxy(edit_);
@@ -68,23 +71,40 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
 void PromptBar::offerQueue()
 {
     auto* queue = button(tr("&Queue"), this);
-    queue->setToolTip(tr("Start when the jobs before it have ended (Shift+Enter)"));
+    queue->setToolTip(tr("Start when the jobs before it have ended (Enter)"));
+    ok_->setText(tr("Run &now"));
+    ok_->setToolTip(tr("Start at once, beside the others (Shift+Enter)"));
     auto* row = static_cast<QHBoxLayout*>(layout());
-    row->insertWidget(row->indexOf(ok_) + 1, queue);
+    row->insertWidget(row->indexOf(ok_), queue);
     connect(queue, &QPushButton::clicked, this, [this] {
         queued_ = true;
         Q_EMIT accepted(edit_ ? edit_->text() : QString());
     });
-    // Shift+Enter where Enter accepts: the field, or the button.
-    (edit_ ? static_cast<QWidget*>(edit_) : static_cast<QWidget*>(ok_))->installEventFilter(this);
+    // Enter queues, the choice that can still be changed afterwards
+    // (a queued job has Start now; a running one cannot be made to
+    // wait). In the field Enter accepts; without one it is the button
+    // with the focus, which is Queue.
+    if (edit_) {
+        edit_->installEventFilter(this);
+    } else {
+        setFocusProxy(queue);
+        queue->installEventFilter(this);
+    }
 }
 
 bool PromptBar::eventFilter(QObject* watched, QEvent* event)
 {
     if (event->type() == QEvent::KeyPress) {
         const auto* key = static_cast<QKeyEvent*>(event);
-        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && (key->modifiers() & Qt::ShiftModifier))
-            queued_ = true;  // the Enter then accepts as it always does
+        if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) {
+            const bool now = key->modifiers() & Qt::ShiftModifier;
+            if (watched == edit_) {
+                queued_ = !now;  // the field's Enter then accepts as it always does
+            } else if (now) {
+                ok_->click();    // on the Queue button: Shift+Enter is the other one
+                return true;
+            }
+        }
     }
     return QFrame::eventFilter(watched, event);
 }
