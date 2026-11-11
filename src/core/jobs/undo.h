@@ -1,7 +1,9 @@
 // Takes an undo entry back: its items in reverse, each by its inverse.
 // What was created goes to the trash, what was trashed or replaced
 // comes back from it, what was moved or renamed goes back, mode and
-// owner are set to what they were. Nothing is deleted. An item that
+// owner are set to what they were. Nothing is deleted on its own:
+// where there is no trash (a network share), taking a created item
+// back means deleting it, and the job asks first. An item that
 // changed since the operation (size or time, or mode and owner) is
 // left alone and listed.
 //

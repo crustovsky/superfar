@@ -210,11 +210,59 @@ struct UndoJob::Impl {
     {
         if (!intact(item, item.at))
             return;
+        for (;;) {
+            GError* error = nullptr;
+            if (g_file_trash(item.at.gfile(), c, &error)) {
+                job.record(UndoItem::trashed(item.at));
+                return;
+            }
+            GErrorPtr err(error);
+            // No trash there (a network share, another volume): the
+            // only way to take the item back is to delete it, which
+            // undo does not do on its own. It asks, as F8 does when
+            // the trash refuses; unattended, the item stays.
+            Failure f;
+            f.name = item.at.displayName();
+            f.path = item.at.displayPath();
+            f.message = errorMessage(err.get());
+            f.offerDelete = g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED);
+            const ErrorAction answer = isCancelled(err.get()) ? ErrorAction::Skip : job.askError(f);
+            if (answer == ErrorAction::Retry) {
+                c = job.beginItem();
+                continue;
+            }
+            if (answer == ErrorAction::Abort)
+                job.abort();
+            else if (answer == ErrorAction::DeletePermanently && f.offerDelete && deleteTree(item.at))
+                return;  // gone for good: nothing a redo could bring back
+            else
+                job.logFail(f.path, f.message);
+            return;
+        }
+    }
+
+    // loc and everything under it, children first. False when something
+    // could not be deleted; that is logged.
+    bool deleteTree(const Location& loc)
+    {
+        GPtr<GFileInfo> info(g_file_query_info(loc.gfile(), "standard::type", kNoFollow, nullptr, nullptr));
+        bool whole = true;
+        if (info && g_file_info_get_file_type(info.get()) == G_FILE_TYPE_DIRECTORY) {
+            GPtr<GFileEnumerator> en(g_file_enumerate_children(loc.gfile(), "standard::name", kNoFollow, nullptr, nullptr));
+            while (en && !job.isAborted()) {
+                GPtr<GFileInfo> child(g_file_enumerator_next_file(en.get(), nullptr, nullptr));
+                if (!child)
+                    break;
+                whole = deleteTree(loc.child(g_file_info_get_name(child.get()))) && whole;
+            }
+        }
+        if (!whole || job.isAborted())
+            return false;
         GError* error = nullptr;
-        if (g_file_trash(item.at.gfile(), c, &error))
-            job.record(UndoItem::trashed(item.at));
-        else
-            job.logFail(item.at.displayPath(), takeMessage(error));
+        if (g_file_delete(loc.gfile(), nullptr, &error))
+            return true;
+        job.logFail(loc.displayPath(), takeMessage(error));
+        return false;
     }
 
     void trashed(const UndoItem& item, GCancellable* c)

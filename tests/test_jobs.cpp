@@ -106,6 +106,7 @@ private Q_SLOTS:
     void undoOverwrite();
     void overwriteWithoutTrash();
     void undoLeavesChangedItems();
+    void undoWhereThereIsNoTrash();
     void undoAttributes();
     void undoSingleOperations();
     void undoPackAndExtract();
@@ -848,6 +849,82 @@ void JobsTest::undoLeavesChangedItems()
     QCOMPARE(read(tmp.path() + "/dst/a.txt"), QByteArray("worked on since"));
     QVERIFY(!QFile::exists(tmp.path() + "/dst/b.txt"));
     QCOMPARE(undo.undoItems().size(), 1u);  // redo knows of b alone
+}
+
+void JobsTest::undoWhereThereIsNoTrash()
+{
+    // A copy to a place without a trash (a network share; here another
+    // tmpfs, which GLib will not trash on): the copy can only be taken
+    // back by deleting it. Undo asks first, as F8 does when the trash
+    // refuses, and unattended it leaves the item where it is.
+    QTemporaryDir tmp;
+    QTemporaryDir other(QStringLiteral("/dev/shm/superfar-test-XXXXXX"));
+    if (!other.isValid())
+        QSKIP("needs /dev/shm");
+    write(other.path() + "/probe", "p");
+    {
+        core::RemoveJob probe({loc(other.path() + "/probe")}, false);
+        bool offered = false;
+        connect(&probe, &core::Job::failure, [&](const core::Failure& f) {
+            offered = f.offerDelete;
+            probe.answerError(core::ErrorAction::Skip, false);
+        });
+        runJob(probe);
+        if (!offered)
+            QSKIP("/dev/shm has a trash here");
+    }
+    makeTree(tmp.path() + "/src");
+    write(tmp.path() + "/single", "x");
+    auto copy = [&] {
+        core::TransferJob job({loc(tmp.path() + "/src"), loc(tmp.path() + "/single")}, loc(other.path()), false);
+        runJob(job);
+        return core::UndoEntry{QStringLiteral("copy"), std::move(job.undoItems())};
+    };
+
+    core::UndoEntry entry = copy();
+    QCOMPARE(entry.items.size(), 2u);
+    {
+        core::UndoJob undo(entry, false);
+        undo.setUnattended(true);
+        runJob(undo);
+        QCOMPARE(undo.log().size(), 2u);
+        QVERIFY(QFile::exists(other.path() + "/src/sub/deep/c.txt"));
+        QVERIFY(QFile::exists(other.path() + "/single"));
+    }
+    {
+        // Asked: the offer is there; "skip" leaves the item, "delete
+        // permanently" removes the folder with all that is in it.
+        core::UndoJob undo(entry, false);
+        QStringList asked;
+        connect(&undo, &core::Job::failure, [&](const core::Failure& f) {
+            QVERIFY(f.offerDelete);
+            asked << f.name;
+            undo.answerError(f.name == QLatin1String("single") ? core::ErrorAction::Skip
+                                                               : core::ErrorAction::DeletePermanently, false);
+        });
+        runJob(undo);
+        QCOMPARE(asked, QStringList({"single", "src"}));
+        QVERIFY(!QFile::exists(other.path() + "/src"));
+        QVERIFY(QFile::exists(other.path() + "/single"));
+        QVERIFY(undo.undoItems().empty());  // deleted for good: nothing to redo
+        QCOMPARE(read(tmp.path() + "/src/a.txt"), QByteArray("aaa"));  // the originals are not undo's business
+    }
+    // An item changed since the copy is not even asked about.
+    QVERIFY(QFile::remove(other.path() + "/single"));  // left by the skip above
+    entry = copy();
+    write(other.path() + "/single", "worked on since");
+    {
+        core::UndoJob undo(entry, false);
+        int asked = 0;
+        connect(&undo, &core::Job::failure, [&](const core::Failure&) {
+            ++asked;
+            undo.answerError(core::ErrorAction::DeletePermanently, true);
+        });
+        runJob(undo);
+        QCOMPARE(asked, 1);
+        QCOMPARE(read(other.path() + "/single"), QByteArray("worked on since"));
+        QVERIFY(!QFile::exists(other.path() + "/src"));
+    }
 }
 
 void JobsTest::undoAttributes()

@@ -71,7 +71,7 @@ QString describe(keymap::Command c)
     case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
     case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
     case Command::Columns: return QStringLiteral("the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it");
-    case Command::Undo: return QStringLiteral("undo the last copy, move, trash, rename, new folder or file, extract, pack or attribute change; what it created goes to the trash, never deleted");
+    case Command::Undo: return QStringLiteral("undo the last copy, move, trash, rename, new folder or file, extract, pack or attribute change; what it created goes to the trash; where there is none it asks before deleting");
     case Command::Redo: return QStringLiteral("redo what was undone");
     case Command::ToggleHighlight: return QStringLiteral("syntax colours in the viewer and the preview, on or off; they come from bat when it is installed, in the theme bat is set to");
     case Command::None: return {};
