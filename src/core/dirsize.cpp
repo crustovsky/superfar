@@ -13,9 +13,12 @@ namespace {
 
 const char* const kRootAttributes =
     "standard::type,unix::device,unix::inode,time::modified,time::modified-usec";
+// With the name: the local backend sends it unasked, a daemon backend
+// (admin://, sftp) does not, and the enumerator cannot hand out
+// children without it.
 const char* const kWalkAttributes =
-    "standard::type,standard::size,unix::device,unix::inode,unix::nlink";
-const char* const kCountAttributes = "standard::type";
+    "standard::name,standard::type,standard::size,unix::device,unix::inode,unix::nlink";
+const char* const kCountAttributes = "standard::name,standard::type";
 
 constexpr qint64 kPartialIntervalMs = 100;
 constexpr size_t kCacheLimit = 8192;

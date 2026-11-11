@@ -78,7 +78,7 @@ thumbnail; nothing else changes.
 | **As administrator** | Where permission is denied on a local folder or item, a bar offers to go on as administrator: opening the folder, the job's item (for all that follow, if you say so), a rename, a new folder or file. It goes through GVfs's `admin://` and polkit, so the password dialog is the system's own and nothing of superfar runs as root. Unattended jobs never escalate. | the bar, or `admin:///path` in Ctrl+L |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |
-| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it; nothing is deleted, and an item changed since is left alone. | Ctrl+Z, Ctrl+Shift+Z |
+| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it, and an item changed since is left alone. Nothing is deleted, except where there is no trash (a network share): there undo asks before it deletes. | Ctrl+Z, Ctrl+Shift+Z |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
 
 ### Looking and finding

@@ -69,7 +69,7 @@ struct DetailsRequest {
             GFileInfo* i = info.get();
             d.ok = true;
             d.isDir = g_file_info_get_file_type(i) == G_FILE_TYPE_DIRECTORY;
-            d.symlink = g_file_info_get_is_symlink(i);
+            d.symlink = infoIsSymlink(i);
             if (d.symlink && g_file_info_has_attribute(i, G_FILE_ATTRIBUTE_STANDARD_SYMLINK_TARGET))
                 d.symlinkTarget = QString::fromUtf8(g_file_info_get_symlink_target(i));
             if (const char* t = g_file_info_has_attribute(i, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE)

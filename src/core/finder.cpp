@@ -109,8 +109,8 @@ struct Finder::Run {
                         : type == G_FILE_TYPE_REGULAR    ? EntryType::File
                         : type == G_FILE_TYPE_SYMBOLIC_LINK ? EntryType::Symlink
                                                             : EntryType::Special;
-                    e.hidden = g_file_info_get_is_hidden(info);
-                    e.symlink = g_file_info_get_is_symlink(info);
+                    e.hidden = infoIsHidden(info);
+                    e.symlink = infoIsSymlink(info);
                     e.size = static_cast<quint64>(g_file_info_get_size(info));
                     e.modified = static_cast<qint64>(
                         g_file_info_get_attribute_uint64(info, G_FILE_ATTRIBUTE_TIME_MODIFIED));

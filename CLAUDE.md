@@ -192,7 +192,7 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       cancellable. A failed trash offers permanent delete.
                       Extract and pack run bsdtar; attributes is chmod -R with
                       X. Each records what it did (undo.h); undo inverts it,
-                      records its own inverse (redo), trashes, never deletes
+                      records the inverse (redo), trashes, asks before deleting
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal apps
   mounts.cpp          volumes, mount, unmount; admin.cpp: admin:// past denials
