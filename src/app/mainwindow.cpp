@@ -15,6 +15,7 @@
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "funcbar.h"
+#include "highlight.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
 #include "menu.h"
@@ -61,6 +62,7 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     , cmdline_(new CommandLine(this))
     , sessionTimer_(new QTimer(this))
 {
+    services_.jobs = strip_->queue();
     setWindowTitle(QStringLiteral("superfar"));
     resize(config->windowSize().isValid() ? config->windowSize() : QSize(1100, 700));
 
@@ -142,8 +144,11 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
         });
         connect(pane, &Pane::packRequested, this,
                 [this, pane](const core::Location& parent, const std::vector<QByteArray>& names,
-                             const core::Location& archive, const QByteArray& options) {
+                             const core::Location& archive, const QByteArray& options, bool queued) {
                     auto* job = new core::PackJob(parent, names, archive, options);
+                    job->setSubject(names.size() == 1 ? parent.child(names.front()).displayName()
+                                                      : counted(static_cast<qint64>(names.size()), tr("item"), tr("items")));
+                    job->setPlan(tr("%1 from %2 into %3").arg(job->subject(), parent.displayPath(), archive.displayPath()));
                     const core::Location dest = archive.parent();
                     const QByteArray name = archive.basename();
                     connect(job, &core::Job::finished, this, [this, dest, name] {
@@ -152,20 +157,23 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                                 if (t->location() == dest)
                                     t->reloadWithCursor(name);  // the new archive under the cursor
                     });
-                    runJob(job, pane->activeTab(), parent, dest);
+                    runJob(job, pane->activeTab(), parent, dest, queued);
                 });
         connect(pane, &Pane::attributesRequested, this,
-                [this, pane](const std::vector<core::Location>& items, const core::AttributeChange& change) {
+                [this, pane](const std::vector<core::Location>& items, const core::AttributeChange& change, bool queued) {
                     // A job, so a tree gets progress, Abort and a log of
                     // what was refused. The marks stay: the owner may
                     // follow the mode.
                     auto* job = new core::AttributesJob(items, change);
+                    job->setSubject(items.size() == 1 ? items.front().displayName()
+                                                      : counted(static_cast<qint64>(items.size()), tr("item"), tr("items")));
                     const core::Location dir = pane->activeTab()->location();
+                    job->setPlan(tr("%1 in %2").arg(job->subject(), dir.displayPath()));
                     connect(job, &core::Job::finished, this, [this, pane, dir] {
                         refreshAt(dir);
                         pane->refreshProperties();
                     });
-                    strip_->addJob(job);
+                    strip_->addJob(job, queued);
                 });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {
@@ -178,8 +186,11 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                 preview_->show(item);
         });
         connect(pane, &Pane::commandRequested, this, &MainWindow::execute);
+        connect(pane, &Pane::undoable, this, [this](const QString& what, const std::vector<core::UndoItem>& items) {
+            undo_.record({what, items});
+        });
     }
-    connect(strip_, &JobStrip::jobFinished, this, [](core::Job*) {});
+    connect(strip_, &JobStrip::jobFinished, this, &MainWindow::onJobFinished);
     connect(tree_, &Tree::folderChosen, this,
             [this](const core::Location& dir) { active_->activeTab()->navigate(dir); });
     // The tree's keys are the window's commands (Tab back to the pane,
@@ -229,6 +240,11 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
             config_->recordVisit(dir.uri(), QDateTime::currentSecsSinceEpoch());
         });
         connect(tab, &Tab::dropRequested, this, &MainWindow::transfer);
+        connect(tab, &Tab::undoable, this, [this](const QString& what, const core::UndoItem& item) {
+            undo_.record({what, {item}});
+        });
+        connect(tab, &Tab::adminNeeded, this, [this, tab](const core::Location& dir) { offerAdmin(tab, dir); });
+        connect(tab, &Tab::adminRenameNeeded, this, &MainWindow::offerAdminRename);
         connect(tab, &Tab::mountNeeded, this, [this, tab](const core::Location& dir) {
             QPointer<Tab> guard(tab);
             places_->mountFor(dir, [guard, dir] {
@@ -378,6 +394,22 @@ void MainWindow::execute(keymap::Command command)
     case Command::NewFile:
         promptNewFile();
         return;
+    case Command::ToggleHighlight: {
+        const bool on = !Highlight::enabled(config_);
+        Highlight::setEnabled(config_, on);
+        for (Pane* pane : {left_, right_})
+            pane->rehighlight();
+        if (preview_)
+            preview_->rehighlight();
+        active_->showMessage(on ? tr("Syntax colours on") : tr("Syntax colours off"));
+        return;
+    }
+    case Command::Undo:
+        undo(false);
+        return;
+    case Command::Redo:
+        undo(true);
+        return;
     case Command::MarkGlob:
         promptGlob(true);
         return;
@@ -507,67 +539,11 @@ void MainWindow::placePreview()
     host->setOverlay(preview_);
 }
 
-void MainWindow::saveSession()
-{
-    Config::Session s;
-    s.left = left_->tabStates();
-    s.right = right_->tabStates();
-    s.leftActive = left_->activeIndex();
-    s.rightActive = right_->activeIndex();
-    s.activePane = active_ == left_ ? QStringLiteral("left") : QStringLiteral("right");
-    s.tree = !tree_->isHidden();
-    config_->saveSession(s);
-    config_->sync();
-}
-
-void MainWindow::saveLayout()
-{
-    config_->setWindowSize(size());
-    if (!tree_->isHidden())  // hidden, the saved width is the one it comes back with
-        config_->setSplitterSizes(QStringLiteral("tree"), split_->sizes());
-    QList<int> panes = panes_->sizes();
-    if (panes.size() > 2)
-        panes.resize(2);  // the preview slot is transient
-    config_->setSplitterSizes(QStringLiteral("panes"), panes);
-}
-
-void MainWindow::closeEvent(QCloseEvent* event)
-{
-    saveLayout();
-    saveSession();
-    QMainWindow::closeEvent(event);
-}
-
 void MainWindow::runCommand(const QString& command)
 {
     QString error;
     if (!core::runInTerminal(active_->activeTab()->location(), command, true, &error))
         active_->showMessage(error);
-}
-
-void MainWindow::showFolder(const core::Location& dir)
-{
-    if (dir.isValid())
-        active_->activeTab()->navigate(dir);
-    raiseWindow();
-}
-
-void MainWindow::showItem(const core::Location& item)
-{
-    const core::Location parent = item.parent();
-    if (parent.isValid()) {
-        Tab* tab = active_->activeTab();
-        tab->navigate(parent);
-        tab->setCursorOnLoad(item.basename());
-    }
-    raiseWindow();
-}
-
-void MainWindow::raiseWindow()
-{
-    show();
-    raise();
-    activateWindow();
 }
 
 void MainWindow::paintEvent(QPaintEvent* event)

@@ -1,5 +1,6 @@
 #include "core/jobs/attributes.h"
 
+#include "core/admin.h"
 #include "core/fileops.h"
 #include "core/gobject.h"
 
@@ -7,7 +8,7 @@ namespace core {
 
 namespace {
 
-const char* const kAttrs = "standard::name,standard::type,unix::mode,unix::device";
+const char* const kAttrs = "standard::name,standard::type,unix::mode,unix::uid,unix::gid,unix::device";
 constexpr GFileQueryInfoFlags kNoFollow = G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS;
 
 // With links not followed a link to a folder is a link, not a folder.
@@ -21,17 +22,20 @@ quint32 deviceOf(GFileInfo* info)
     return g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_DEVICE);
 }
 
-QString takeMessage(GError* error)
-{
-    GErrorPtr err(error);
-    return err ? errorMessage(err.get()) : QStringLiteral("failed");
-}
-
 } // namespace
 
 struct AttributesJob::Impl {
     AttributesJob& job;
     JobProgress p;
+    Location top;  // the item named by the user that the walk is under
+    bool denied = false;  // the last refusal was for want of permission
+
+    QString takeMessage(GError* error)
+    {
+        GErrorPtr err(error);
+        denied = isDenied(err.get());
+        return err ? errorMessage(err.get()) : QStringLiteral("failed");
+    }
 
     // The items a run will touch, for the bar.
     void count(const Location& loc, GFileInfo* info)
@@ -54,6 +58,24 @@ struct AttributesJob::Impl {
     // One item. Empty when done, else the system's words.
     QString set(const Location& loc, GFileInfo* info, bool below)
     {
+        UndoItem was;
+        was.kind = UndoItem::Kind::Attributes;
+        was.at = top;
+        was.below = loc.relativePathFrom(top);
+        if (was.below.isNull())
+            was.at = loc;  // reached as administrator: not under top's own location
+        was.mode[0] = was.mode[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_MODE) & 07777;
+        was.uid[0] = was.uid[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_UID);
+        was.gid[0] = was.gid[1] = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_GID);
+        const QString message = change(loc, info, below, was);
+        // What changed is recorded even when a later step was refused.
+        if (was.mode[0] != was.mode[1] || was.uid[0] != was.uid[1] || was.gid[0] != was.gid[1])
+            job.record(std::move(was));
+        return message;
+    }
+
+    QString change(const Location& loc, GFileInfo* info, bool below, UndoItem& was)
+    {
         const AttributeChange& c = job.change_;
         const bool link = g_file_info_get_file_type(info) == G_FILE_TYPE_SYMBOLIC_LINK;
         quint32 old = g_file_info_get_attribute_uint32(info, G_FILE_ATTRIBUTE_UNIX_MODE);
@@ -66,7 +88,11 @@ struct AttributesJob::Impl {
                 g_file_info_set_attribute_uint32(change.get(), G_FILE_ATTRIBUTE_UNIX_GID, *c.owner.gid);
             if (!g_file_set_attributes_from_info(loc.gfile(), change.get(), kNoFollow, nullptr, &error))
                 return takeMessage(error);
-            if (c.mode && !link) {
+            if (c.owner.uid)
+                was.uid[1] = *c.owner.uid;
+            if (c.owner.gid)
+                was.gid[1] = *c.owner.gid;
+            if ((c.mode || (old & 06000)) && !link) {
                 // A change of owner drops setuid and setgid, on purpose:
                 // the mode is merged with what is there now, not with
                 // what was, so they are not put back behind its back.
@@ -74,6 +100,7 @@ struct AttributesJob::Impl {
                 if (!now)
                     return takeMessage(error);
                 old = g_file_info_get_attribute_uint32(now.get(), G_FILE_ATTRIBUTE_UNIX_MODE);
+                was.mode[1] = old & 07777;
             }
         }
         if (!c.mode || link)
@@ -86,22 +113,32 @@ struct AttributesJob::Impl {
             return {};
         if (!g_file_set_attribute_uint32(loc.gfile(), G_FILE_ATTRIBUTE_UNIX_MODE, mode, kNoFollow, nullptr, &error))
             return takeMessage(error);
+        was.mode[1] = mode;
         return {};
     }
 
     // Asks what to do about a refusal. False means abort; retry says
-    // whether to try the same thing again.
-    bool refused(const Location& loc, const QString& message, bool* retry)
+    // whether to try the same thing again, on loc or, when the answer
+    // was to go on as administrator, on its admin:// form.
+    bool refused(Location& loc, const QString& message, bool* retry)
     {
         Failure f;
         f.name = loc.displayName();
         f.path = loc.displayPath();
         f.message = message;
+        if (denied && admin::isAdmin(loc))
+            f.message = admin::refusal(message);
+        else
+            f.offerAdmin = denied && loc.isNative() && admin::available();
         *retry = false;
         switch (job.askError(f)) {
         case ErrorAction::Abort:
             job.abort();
             return false;
+        case ErrorAction::AsAdmin:
+            loc = admin::of(loc);
+            *retry = true;
+            return true;
         case ErrorAction::Retry:
             *retry = true;
             return true;
@@ -112,7 +149,7 @@ struct AttributesJob::Impl {
     }
 
     // loc, then what is below it. False means abort.
-    bool apply(const Location& loc, GFileInfo* info, bool below)
+    bool apply(Location loc, GFileInfo* info, bool below)
     {
         if (!job.waitIfPaused())
             return false;
@@ -173,7 +210,7 @@ AttributesJob::AttributesJob(std::vector<Location> items, AttributeChange change
 
 void AttributesJob::run()
 {
-    Impl impl{*this, {}};
+    Impl impl{*this, {}, {}, false};
     JobProgress& p = impl.p;
 
     std::vector<GPtr<GFileInfo>> infos;
@@ -184,13 +221,14 @@ void AttributesJob::run()
             impl.count(item, infos.back().get());
         } else {
             ++p.itemsTotal;
-            logFail(item.displayPath(), takeMessage(error));
+            logFail(item.displayPath(), impl.takeMessage(error));
         }
     }
     p.phase = JobProgress::Phase::Running;
     report(p, true);
 
     for (size_t i = 0; i < items_.size() && !isAborted(); ++i) {
+        impl.top = items_[i];
         if (!infos[i])
             ++p.itemsDone;  // gone before the job got to it; logged above
         else if (!impl.apply(items_[i], infos[i].get(), false))

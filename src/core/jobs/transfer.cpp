@@ -1,5 +1,6 @@
 #include "core/jobs/transfer.h"
 
+#include "core/admin.h"
 #include "core/fileops.h"
 #include "core/gobject.h"
 
@@ -34,6 +35,9 @@ struct TransferJob::Impl {
     TransferJob& job;
     JobProgress p;
     quint64 currentBase = 0;
+    // Inside a folder this copy made nothing is recorded: taking the
+    // folder back takes its contents with it.
+    int insideCreated = 0;
 
     void scanEntry(const Location& loc, bool isDir, quint64 size)
     {
@@ -76,7 +80,7 @@ struct TransferJob::Impl {
 
     // Decides what to do about an existing target. Returns false to skip.
     bool resolveConflict(const Location& src, bool srcIsDir, Location& dst, GFileInfo* dstInfo,
-                         bool& overwrite)
+                         bool& overwrite, bool& warned)
     {
         Conflict c;
         c.name = dst.displayName();
@@ -94,7 +98,11 @@ struct TransferJob::Impl {
             c.sourceModified = static_cast<qint64>(
                 g_file_info_get_attribute_uint64(si.get(), G_FILE_ATTRIBUTE_TIME_MODIFIED));
         }
-        switch (job.askConflict(c)) {
+        c.cannotUndo = !canTrash(dst);
+        bool asked = false;
+        const ConflictAction action = job.askConflict(c, &asked);
+        warned = asked && c.cannotUndo;
+        switch (action) {
         case ConflictAction::Overwrite:
             overwrite = true;
             return true;
@@ -116,19 +124,24 @@ struct TransferJob::Impl {
         return false;
     }
 
-    bool transferFile(const Location& src, Location dst, quint64 size)
+    bool transferFile(Location src, Location dst, quint64 size)
     {
+        bool forGood = false;
         for (;;) {
             GCancellable* c = job.beginItem();
             auto flags = static_cast<GFileCopyFlags>(G_FILE_COPY_NOFOLLOW_SYMLINKS);
             GPtr<GFileInfo> existing(g_file_query_info(dst.gfile(), kConflictAttrs,
                                                        G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, c, nullptr));
             if (existing) {
-                bool overwrite = false;
-                if (!resolveConflict(src, false, dst, existing.get(), overwrite))
+                bool overwrite = false, warned = false;
+                if (!resolveConflict(src, false, dst, existing.get(), overwrite, warned))
                     return finishItem(size, true);
-                if (overwrite)
+                // What is replaced goes to the trash, so undo can bring
+                // it back; without a trash it is overwritten in place.
+                if (overwrite && !job.keepReplaced(dst, c, warned)) {
                     flags = static_cast<GFileCopyFlags>(flags | G_FILE_COPY_OVERWRITE);
+                    forGood = true;  // nothing undo could give back
+                }
             }
             p.currentName = dst.displayName();
             p.from = src.displayPath();
@@ -143,8 +156,15 @@ struct TransferJob::Impl {
                 ? g_file_move(src.gfile(), dst.gfile(), flags, c, &onProgress, this, &error)
                 : g_file_copy(src.gfile(), dst.gfile(), flags, c, &onProgress, this, &error);
             GErrorPtr err(error);
-            if (ok)
+            if (ok) {
+                if (forGood)
+                    ;
+                else if (job.move_)
+                    job.record(UndoItem::moved(src, dst));
+                else if (insideCreated == 0)
+                    job.record(UndoItem::created(dst));
                 return finishItem(size, true);
+            }
             if (isCancelled(err.get())) {
                 if (job.isAborted())
                     return false;
@@ -154,9 +174,13 @@ struct TransferJob::Impl {
             Failure f;
             f.name = src.displayName();
             f.path = src.displayPath();
-            f.message = errorMessage(err.get());
+            job.describe(f, err.get(), src, dst);
             switch (job.askError(f)) {
             case ErrorAction::Retry:
+                continue;
+            case ErrorAction::AsAdmin:
+                src = admin::of(src);  // whichever side is local
+                dst = admin::of(dst);
                 continue;
             case ErrorAction::Abort:
                 job.abort();
@@ -184,37 +208,39 @@ struct TransferJob::Impl {
         GPtr<GFileInfo> existing(g_file_query_info(dst.gfile(), kConflictAttrs,
                                                    G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, c, nullptr));
         if (existing && !isDirInfo(existing.get())) {
-            bool overwrite = false;
-            if (!resolveConflict(src, true, dst, existing.get(), overwrite))
+            bool overwrite = false, warned = false;
+            if (!resolveConflict(src, true, dst, existing.get(), overwrite, warned))
                 return finishItem(0, true);
-            if (overwrite) {
+            if (overwrite && !job.keepReplaced(dst, c, warned))
                 g_file_delete(dst.gfile(), c, nullptr);
-                existing.reset();
-            } else {
-                existing.reset();  // renamed: the new name does not exist
-            }
+            existing.reset();  // out of the way, or renamed: the new name does not exist
         }
         p.currentName = dst.displayName();
         p.from = src.displayPath();
         p.to = dst.displayPath();
         job.report(p, true);
 
+        bool made = false;
         if (!existing) {
             GError* error = nullptr;
             if (job.move_) {
                 // A rename moves the whole tree at once when GIO can do it.
                 if (g_file_move(src.gfile(), dst.gfile(), G_FILE_COPY_NOFOLLOW_SYMLINKS, c,
-                                nullptr, nullptr, &error))
+                                nullptr, nullptr, &error)) {
+                    job.record(UndoItem::moved(src, dst));
                     return finishItem(0, true);
+                }
                 GErrorPtr err(error);
                 error = nullptr;
                 if (isCancelled(err.get()))
                     return !job.isAborted();
                 if (!g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_WOULD_RECURSE)
                     && !g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_WOULD_MERGE)) {
-                    if (!handleError(src, errorMessage(err.get())))
-                        return false;
-                    return finishItem(0, true);
+                    switch (folderError(src, dst, err.get())) {
+                    case Went::Abort: return false;
+                    case Went::Admin: return transferDir(admin::of(src), admin::of(dst));
+                    case Went::On: return finishItem(0, true);
+                    }
                 }
             }
             if (!g_file_make_directory(dst.gfile(), c, &error)) {
@@ -222,13 +248,41 @@ struct TransferJob::Impl {
                 if (!g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_EXISTS)) {
                     if (isCancelled(err.get()))
                         return !job.isAborted();
-                    if (!handleError(src, errorMessage(err.get())))
-                        return false;
-                    return finishItem(0, true);
+                    switch (folderError(src, dst, err.get())) {
+                    case Went::Abort: return false;
+                    case Went::Admin: return transferDir(admin::of(src), admin::of(dst));
+                    case Went::On: return finishItem(0, true);
+                    }
                 }
+            } else {
+                made = true;
             }
         }
         finishItem(0, true);
+
+        // What this folder's part comes to, on every way out, an abort
+        // included. A copy that made the folder records the folder and
+        // nothing inside it. A move records each file where it went,
+        // and here the folder it made and the one it emptied and
+        // removed, so undo can put the tree back as it was.
+        struct Note {
+            Impl& self;
+            const Location& src;
+            const Location& dst;
+            bool made;
+            bool removed = false;
+            ~Note()
+            {
+                if (self.job.move_) {
+                    if (made || removed)
+                        self.job.record(UndoItem::folder(made ? dst : Location(), removed ? src : Location()));
+                } else if (made && --self.insideCreated == 0) {
+                    self.job.record(UndoItem::created(dst));
+                }
+            }
+        } note{*this, src, dst, made};
+        if (made && !job.move_)
+            ++insideCreated;
 
         GError* error = nullptr;
         GPtr<GFileEnumerator> en(g_file_enumerate_children(src.gfile(), kScanAttrs,
@@ -237,7 +291,13 @@ struct TransferJob::Impl {
             GErrorPtr err(error);
             if (isCancelled(err.get()))
                 return !job.isAborted();
-            return handleError(src, errorMessage(err.get()));
+            switch (folderError(src, dst, err.get())) {
+            case Went::Abort: return false;
+            case Went::On: return true;
+            case Went::Admin:
+                --p.itemsDone;  // the folder is done over, and counted then
+                return transferDir(admin::of(src), admin::of(dst));
+            }
         }
         for (;;) {
             if (!job.waitIfPaused())
@@ -261,11 +321,32 @@ struct TransferJob::Impl {
         en.reset();
         g_file_copy_attributes(src.gfile(), dst.gfile(), G_FILE_COPY_NOFOLLOW_SYMLINKS, nullptr, nullptr);
         if (job.move_)
-            g_file_delete(src.gfile(), nullptr, nullptr);  // fails when something was skipped
+            note.removed = g_file_delete(src.gfile(), nullptr, nullptr);  // fails when something was skipped
         return true;
     }
 
-    // Asks about a non-file error; false means abort.
+    // A folder could not be moved, made or read. Asks; the answer is
+    // to abort, to go on without it, or to do it over as administrator.
+    enum class Went { Abort, On, Admin };
+    Went folderError(const Location& src, const Location& dst, const GError* error)
+    {
+        Failure f;
+        f.name = src.displayName();
+        f.path = src.displayPath();
+        job.describe(f, error, src, dst);
+        switch (job.askError(f)) {
+        case ErrorAction::Abort:
+            job.abort();
+            return Went::Abort;
+        case ErrorAction::AsAdmin:
+            return Went::Admin;
+        default:
+            job.logFail(f.path, f.message);
+            return Went::On;
+        }
+    }
+
+    // Asks about an error that is not the filesystem's; false means abort.
     bool handleError(const Location& where, const QString& message)
     {
         Failure f;
@@ -293,7 +374,7 @@ TransferJob::TransferJob(std::vector<Location> sources, Location destination, bo
 
 void TransferJob::run()
 {
-    Impl impl{*this, {}, 0};
+    Impl impl{*this, {}, 0, 0};
     JobProgress& p = impl.p;
 
     // Scan for totals, unless this is a move within one filesystem, where

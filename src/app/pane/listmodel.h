@@ -74,6 +74,9 @@ public:
     core::Thumbnailer* thumbnailer() const { return thumbs_; }
     bool thumbnails() const { return thumbnails_; }
     void requestSize(int row);
+    // Whether folder sizes and counts are worked out for this folder
+    // on their own: local ones, and administrator tabs when asked for.
+    bool walksHere() const;
     // Stops walks and counts in flight; rows ask again when painted.
     void pauseWork();
 

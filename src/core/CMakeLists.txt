@@ -2,6 +2,7 @@
 # GIO header can leak into app through this target.
 qt_add_library(superfar_core STATIC
   location.cpp
+  admin.cpp
   sort.cpp
   match.cpp
   listing.cpp
@@ -30,6 +31,9 @@ qt_add_library(superfar_core STATIC
   jobs/job.cpp
   jobs/transfer.cpp
   jobs/remove.cpp
+  jobs/undo.cpp
+  jobs/queue.cpp
+  undo.cpp
 )
 target_include_directories(superfar_core PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(superfar_core

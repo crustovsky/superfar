@@ -40,8 +40,11 @@ public:
     // argv is null terminated. done runs on the main thread, once,
     // unless cancel() or another run() comes first; when the program
     // cannot be started it runs before run() returns. It may start the
-    // next run or destroy the Child.
-    void run(const char* const* argv, std::function<void(const Result&)> done);
+    // next run or destroy the Child. input, when given, is written to
+    // the child's stdin, which is then closed; env is a null terminated
+    // list of names and values set for the child on top of ours.
+    void run(const char* const* argv, std::function<void(const Result&)> done, const QByteArray* input = nullptr,
+             const char* const* env = nullptr);
     void cancel();
     bool running() const { return process_ != nullptr; }
 

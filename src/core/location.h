@@ -37,6 +37,8 @@ public:
     QString displayName() const;
     Location parent() const;      // invalid at the top
     Location child(const QByteArray& name) const;
+    // Down a relative path with '/' separators; this itself when empty.
+    Location descendant(const QByteArray& relativePath) const;
     bool isNative() const;
 
     // Path from ancestor down to here, raw bytes with '/' separators.

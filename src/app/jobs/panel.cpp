@@ -98,10 +98,10 @@ JobPanel::JobPanel(core::Job* job, QWidget* parent)
     };
     auto* skip = add(tr("Skip"));
     pause_ = add(tr("Pause"));
-    auto* unattended = add(tr("Unattended"));
+    unattended_ = add(tr("Unattended"));
     auto* abort = add(tr("Abort"));
     pause_->setCheckable(true);
-    unattended->setCheckable(true);
+    unattended_->setCheckable(true);
     buttons->addStretch(1);
     grid->addLayout(buttons, row++, 0, 1, 2);
     grid->setColumnStretch(1, 1);
@@ -115,7 +115,7 @@ JobPanel::JobPanel(core::Job* job, QWidget* parent)
 
     connect(skip, &QToolButton::clicked, job_, &core::Job::skip);
     connect(pause_, &QToolButton::toggled, job_, &core::Job::setPaused);
-    connect(unattended, &QToolButton::toggled, job_, &core::Job::setUnattended);
+    connect(unattended_, &QToolButton::toggled, job_, &core::Job::setUnattended);
     connect(abort, &QToolButton::clicked, job_, &core::Job::abort);
 }
 
@@ -147,4 +147,5 @@ void JobPanel::update(const core::JobProgress& p, const JobStats& stats)
                              jobfmt::rate(stats.rate, stats.bytesUnit)));
     graph_->setHistory(stats.history, stats.bytesUnit);
     pause_->setChecked(job_->paused());
+    unattended_->setChecked(job_->unattended());  // it may have been set while the job waited
 }

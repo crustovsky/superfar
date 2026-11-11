@@ -37,7 +37,7 @@ PropertiesPanel::PropertiesPanel(core::DirSizePool* sizes, QWidget* parent)
     layout->addWidget(editor_);
     layout->addStretch(1);
     connect(editor_, &AttributesEditor::applyRequested, this,
-            [this](const core::AttributeChange& change) { Q_EMIT applyRequested(items_, change); });
+            [this](const core::AttributeChange& change, bool queued) { Q_EMIT applyRequested(items_, change, queued); });
     connect(editor_, &AttributesEditor::closeRequested, this, &PropertiesPanel::closed);
     connect(editor_, &AttributesEditor::message, this, &PropertiesPanel::message);
     setFocusPolicy(Qt::StrongFocus);
@@ -141,6 +141,11 @@ void PropertiesPanel::reread()
 {
     if (!items_.empty())
         show(std::vector<core::Location>(items_));
+}
+
+void PropertiesPanel::offerQueue(bool on)
+{
+    editor_->offerQueue(on);
 }
 
 void PropertiesPanel::keyPressEvent(QKeyEvent* event)

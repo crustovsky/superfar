@@ -18,14 +18,18 @@ target_include_directories(test_config PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMA
 target_link_libraries(test_config PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME config COMMAND test_config)
 
-qt_add_executable(test_hostile test_hostile.cpp)
+# With the reader of a highlighter's output: plain code, and what it is
+# handed is as untrusted as a file.
+qt_add_executable(test_hostile test_hostile.cpp ${CMAKE_SOURCE_DIR}/src/app/sgr.cpp)
+target_include_directories(test_hostile PRIVATE ${CMAKE_SOURCE_DIR}/src/app)
 target_link_libraries(test_hostile PRIVATE superfar_core Qt6::Test)
 add_test(NAME hostile COMMAND test_hostile)
 
-# The key table, the help, the column table and the mark store: app code
-# without widgets.
+# The key table, the help, the column table, the mark store and the
+# reader of a highlighter's colours: app code without widgets.
 qt_add_executable(test_app test_app.cpp ${CMAKE_SOURCE_DIR}/src/app/keymap.cpp ${CMAKE_SOURCE_DIR}/src/app/help.cpp
-  ${CMAKE_SOURCE_DIR}/src/app/archivetext.cpp ${CMAKE_SOURCE_DIR}/src/app/pane/columns.cpp)
+  ${CMAKE_SOURCE_DIR}/src/app/archivetext.cpp ${CMAKE_SOURCE_DIR}/src/app/pane/columns.cpp
+  ${CMAKE_SOURCE_DIR}/src/app/sgr.cpp)
 target_include_directories(test_app PRIVATE ${CMAKE_SOURCE_DIR}/src/app ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(test_app PRIVATE SUPERFAR_VERSION="test" SUPERFAR_BUILD_DATE="test")
 target_link_libraries(test_app PRIVATE superfar_core Qt6::Gui Qt6::Test)

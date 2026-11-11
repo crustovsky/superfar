@@ -51,11 +51,14 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     } else {
         layout->addStretch(1);
     }
-    auto* ok = button(okLabel, this);
+    auto* ok = ok_ = button(okLabel, this);
     auto* cancel = button(tr("&Cancel"), this);
     layout->addWidget(ok);
     layout->addWidget(cancel);
-    connect(ok, &QPushButton::clicked, this, [this] { Q_EMIT accepted(edit_ ? edit_->text() : QString()); });
+    connect(ok, &QPushButton::clicked, this, [this] {
+        queued_ = false;
+        Q_EMIT accepted(edit_ ? edit_->text() : QString());
+    });
     connect(cancel, &QPushButton::clicked, this, &PromptBar::rejected);
     if (edit_) {
         setFocusProxy(edit_);
@@ -63,6 +66,47 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     } else {
         setFocusProxy(ok);
     }
+}
+
+void PromptBar::offerQueue()
+{
+    auto* queue = button(tr("&Queue"), this);
+    queue->setToolTip(tr("Start when the jobs before it have ended (Enter)"));
+    ok_->setText(tr("Run &now"));
+    ok_->setToolTip(tr("Start at once, beside the others (Shift+Enter)"));
+    auto* row = static_cast<QHBoxLayout*>(layout());
+    row->insertWidget(row->indexOf(ok_), queue);
+    connect(queue, &QPushButton::clicked, this, [this] {
+        queued_ = true;
+        Q_EMIT accepted(edit_ ? edit_->text() : QString());
+    });
+    // Enter queues, the choice that can still be changed afterwards
+    // (a queued job has Start now; a running one cannot be made to
+    // wait). In the field Enter accepts; without one it is the button
+    // with the focus, which is Queue.
+    if (edit_) {
+        edit_->installEventFilter(this);
+    } else {
+        setFocusProxy(queue);
+        queue->installEventFilter(this);
+    }
+}
+
+bool PromptBar::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress) {
+        const auto* key = static_cast<QKeyEvent*>(event);
+        if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) {
+            const bool now = key->modifiers() & Qt::ShiftModifier;
+            if (watched == edit_) {
+                queued_ = !now;  // the field's Enter then accepts as it always does
+            } else if (now) {
+                ok_->click();    // on the Queue button: Shift+Enter is the other one
+                return true;
+            }
+        }
+    }
+    return QFrame::eventFilter(watched, event);
 }
 
 void PromptBar::keyPressEvent(QKeyEvent* event)
@@ -324,6 +368,8 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
                                this);
     details->setEnabled(false);
     layout->addWidget(details);
+    if (c.cannotUndo)
+        layout->addWidget(new QLabel(tr("There is no trash here to keep what is replaced: overwriting cannot be undone."), this));
 
     auto* row = new QHBoxLayout;
     auto* all = new QCheckBox(tr("Apply to &all"), this);
@@ -374,7 +420,9 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     auto* first = add(tr("&Retry"), core::ErrorAction::Retry);
     add(tr("&Skip"), core::ErrorAction::Skip);
     if (f.offerDelete)
-        first = add(tr("Delete &permanently"), core::ErrorAction::DeletePermanently);
+        first = add(tr("Delete &permanently (cannot be undone)"), core::ErrorAction::DeletePermanently);
+    if (f.offerAdmin)
+        add(tr("As a&dministrator"), core::ErrorAction::AsAdmin);
     add(tr("A&bort"), core::ErrorAction::Abort);
     row->addStretch(1);
     row->addWidget(all);
@@ -409,7 +457,8 @@ LogBar::LogBar(const QString& title, const std::vector<core::LogEntry>& log, QWi
     list->setFocusPolicy(Qt::NoFocus);
     list->setSelectionMode(QAbstractItemView::NoSelection);
     for (const core::LogEntry& e : log) {
-        const QString kind = e.kind == core::LogEntry::Kind::Skipped ? tr("skipped") : tr("failed");
+        const QString kind = e.kind == core::LogEntry::Kind::Skipped ? tr("skipped")
+                             : e.kind == core::LogEntry::Kind::Failed ? tr("failed") : tr("overwritten");
         list->addItem(e.message.isEmpty() ? QStringLiteral("%1: %2").arg(kind, e.path)
                                           : QStringLiteral("%1: %2 (%3)").arg(kind, e.path, e.message));
     }

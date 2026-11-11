@@ -58,7 +58,7 @@ void ListModel::requestSortValues()
     // only the painted ones; dirSize() asks for what is not known or
     // pending, and keeps rule 9 (local only). Hidden rows wait until
     // they are shown.
-    if (!sortNeedsFolders() || !dir_.isNative())
+    if (!sortNeedsFolders() || !walksHere())
         return;
     for (quint32 idx : rows_)
         if (entries_[idx].isDir())

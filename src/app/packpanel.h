@@ -12,6 +12,7 @@ class Config;
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 
 class PackPanel : public QWidget {
     Q_OBJECT
@@ -21,18 +22,22 @@ public:
     // what: the selection text; stem: the suggested name without an
     // extension; here and other: the two folders to choose between.
     void show(const QString& what, const QByteArray& stem, const core::Location& here, const core::Location& other);
+    // While other jobs are there the panel asks which it is to be:
+    // Queue (Enter) or Run now (Shift+Enter), as the job prompts do.
+    void offerQueue(bool on);
 
 Q_SIGNALS:
     void closed();
     // The archive name with its extension, bsdtar's --options value
     // (empty for none) and the folder it goes into.
-    void accepted(const QByteArray& archiveName, const QByteArray& options, const core::Location& destination);
+    void accepted(const QByteArray& archiveName, const QByteArray& options, const core::Location& destination,
+                  bool queued);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
-    void pack();
+    void pack(bool queued);
     QByteArray extension() const;
     QByteArray options() const;
 
@@ -45,4 +50,6 @@ private:
     QComboBox* format_;
     QComboBox* level_;
     QComboBox* destination_;
+    QPushButton* queue_;
+    QPushButton* packBtn_;
 };

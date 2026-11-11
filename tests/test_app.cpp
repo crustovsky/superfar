@@ -7,6 +7,7 @@
 #include "keymap.h"
 #include "pane/columns.h"
 #include "pane/markstore.h"
+#include "sgr.h"
 
 #include <QTest>
 
@@ -17,6 +18,8 @@ private Q_SLOTS:
     void propertiesKeys();
     void functionKeyLayers();
     void countsOfOne();
+    void coloursFromSgr();
+    void coloursInADocument();
     void keyShownInMenus();
     void oneCommandPerKey();
     void markStore();
@@ -78,9 +81,9 @@ void AppTest::functionKeyLayers()
     using keymap::Command;
     const struct { Qt::KeyboardModifier mod; QStringList row; } layers[] = {
         {Qt::NoModifier, {"Help", "Rename", "View", "Edit", "Copy", "Move", "Mkdir", "Trash", "Menu", "Quit"}},
-        {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "-", "-"}},
+        {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "Undo", "Redo"}},
         {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleSizes", "ToggleThumbnails", "ToggleTree", "Columns",
-                               "ToggleHidden", "Preview", "-", "-"}},
+                               "ToggleHidden", "Preview", "ToggleHighlight", "-"}},
         {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
     };
     for (const auto& layer : layers) {
@@ -207,6 +210,91 @@ void AppTest::columnLayout()
         QCOMPARE(widest(c).isEmpty(), c == NameColumn);
     }
     QCOMPARE(fromName(QStringLiteral("Name")), -1);
+}
+
+void AppTest::coloursFromSgr()
+{
+    using sgr::Span;
+    const QByteArray esc("\x1b[");
+    // 24-bit, the 256 and the 16, each over its stretch; plain text in
+    // between has no span.
+    {
+        const QByteArray text("int main() x");
+        const auto spans = sgr::spans(text, esc + "38;2;10;20;30mint" + esc + "0m " + esc + "38;5;196mmain" + esc + "0m()"
+                                                + esc + "31m " + esc + "94mx" + esc + "m");
+        QVERIFY(spans);
+        QCOMPARE(spans->size(), 4u);
+        QCOMPARE((*spans)[0].start, 0);
+        QCOMPARE((*spans)[0].length, 3);
+        QCOMPARE((*spans)[0].style.rgb, 0x0a141eu);
+        QCOMPARE((*spans)[1].start, 4);
+        QCOMPARE((*spans)[1].length, 4);
+        QCOMPARE((*spans)[1].style.rgb, 0xff0000u);  // 196 in the cube
+        QCOMPARE((*spans)[2].style.rgb, 0xcd0000u);  // red of the 16
+        QCOMPARE((*spans)[3].start, 11);
+        QCOMPARE((*spans)[3].style.rgb, 0x5555ffu);  // bright blue
+    }
+    // Bold, italic and underline with their ends; a grey of the ramp.
+    {
+        const auto spans = sgr::spans("abcd", esc + "1;3;4ma" + esc + "22mb" + esc + "23;24;38;5;244mc" + esc + "39md");
+        QVERIFY(spans);
+        QCOMPARE(spans->size(), 3u);
+        QVERIFY((*spans)[0].style.bold && (*spans)[0].style.italic && (*spans)[0].style.underline);
+        QVERIFY(!(*spans)[1].style.bold && (*spans)[1].style.italic);
+        QVERIFY(!(*spans)[2].style.italic && (*spans)[2].style.coloured);
+        QCOMPARE((*spans)[2].style.rgb, 0x808080u);
+    }
+    // A background and an unknown sequence are dropped, the text they
+    // sit in stays plain; the same style either side of them is one span.
+    {
+        const auto spans = sgr::spans("ab", esc + "48;2;1;2;3ma" + esc + "K" + esc + "?25l" + esc + "42mb");
+        QVERIFY(spans);
+        QVERIFY(spans->empty());
+        const auto joined = sgr::spans("ab", esc + "1ma" + esc + "K" + esc + "1mb");
+        QVERIFY(joined);
+        QCOMPARE(joined->size(), 1u);
+        QCOMPARE((*joined)[0].length, 2);
+    }
+    // A sequence cut at the end: what came before stands.
+    {
+        const auto spans = sgr::spans("ab", esc + "1ma" + esc + "0mb" + esc + "38;2;1");
+        QVERIFY(spans);
+        QCOMPARE(spans->size(), 1u);
+    }
+    // Positions count as the text decodes: two bytes of UTF-8 are one
+    // place, four are two.
+    {
+        const QByteArray text("caf\xc3\xa9 \xf0\x9f\x98\x80 x");
+        const auto spans = sgr::spans(text, "caf\xc3\xa9 \xf0\x9f\x98\x80 " + esc + "1mx" + esc + "0m");
+        QVERIFY(spans);
+        QCOMPARE((*spans)[0].start, 8);
+    }
+    // Output that is not the text: no colours at all.
+    QVERIFY(!sgr::spans("abc", esc + "1mabd" + esc + "0m"));  // a byte differs
+    QVERIFY(!sgr::spans("abc", esc + "1mab" + esc + "0m"));   // one is missing
+    QVERIFY(!sgr::spans("abc", esc + "1mabcd"));               // one too many
+    QVERIFY(!sgr::spans("ab", "a\x1b" "b"));                   // an escape that starts nothing
+    QVERIFY(sgr::spans("", "")->empty());
+}
+
+void AppTest::coloursInADocument()
+{
+    // A text document holds CR LF as one line break: spans after one
+    // move up by one, and a lone CR is a break as well.
+    const QString text = QStringLiteral("a\r\nbc\rd\ne");
+    const QString shown = QStringLiteral("a\nbc\nd\ne");
+    std::vector<sgr::Span> spans = {{0, 1, {}}, {3, 2, {}}, {6, 1, {}}, {8, 1, {}}};
+    const auto moved = sgr::forDocument(spans, text, shown);
+    QVERIFY(moved);
+    QCOMPARE(moved->size(), 4u);
+    QCOMPARE((*moved)[1].start, 2);  // bc
+    QCOMPARE((*moved)[1].length, 2);
+    QCOMPARE((*moved)[2].start, 5);  // d
+    QCOMPARE((*moved)[3].start, 7);  // e
+    // The same text: nothing moves. Another text: no colours.
+    QCOMPARE(sgr::forDocument(spans, shown, shown)->at(1).start, 3);
+    QVERIFY(!sgr::forDocument(spans, text, QStringLiteral("a\nbc\nd\nX")));
+    QVERIFY(!sgr::forDocument(spans, text, QStringLiteral("a\nbc")));
 }
 
 QTEST_GUILESS_MAIN(AppTest)

@@ -10,6 +10,7 @@
 
 class QCheckBox;
 class QLineEdit;
+class QPushButton;
 class QListWidget;
 
 class PromptBar : public QFrame {
@@ -18,15 +19,25 @@ public:
     PromptBar(const QString& message, const QString& okLabel, std::optional<QString> input,
               QWidget* parent = nullptr);
 
+    // Another job is there already, so this prompt asks which it is to
+    // be: Queue (Enter), behind the others, or Run now (Shift+Enter),
+    // beside them. Its own button becomes "Run now".
+    void offerQueue();
+    // Whether accepted() came by Queue; for the slot it is emitted to.
+    bool queued() const { return queued_; }
+
 Q_SIGNALS:
     void accepted(const QString& text);
     void rejected();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     QLineEdit* edit_ = nullptr;
+    QPushButton* ok_ = nullptr;
+    bool queued_ = false;
 };
 
 // A short list to pick from, Enter chooses, Esc cancels.

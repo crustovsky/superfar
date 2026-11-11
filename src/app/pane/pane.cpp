@@ -1,3 +1,6 @@
+#include "core/admin.h"
+#include "core/jobs/queue.h"
+#include "counted.h"
 #include "pane/pane.h"
 
 #include "core/sort.h"
@@ -107,8 +110,9 @@ bool Pane::eventFilter(QObject* watched, QEvent* event)
 
 QString Pane::title(const core::Location& dir)
 {
-    const QString name = dir.displayName();
-    return name.isEmpty() ? dir.displayPath() : name;
+    const QString name = dir.displayName().isEmpty() ? dir.displayPath() : dir.displayName();
+    // An administrator tab says so: what is done in it is done as root.
+    return core::admin::isAdmin(dir) ? tr("%1 (admin)").arg(name) : name;
 }
 
 Tab* Pane::activeTab() const
@@ -126,7 +130,9 @@ QList<Config::TabState> Pane::tabStates() const
     QList<Config::TabState> out;
     for (Tab* tab : tabs()) {
         Config::TabState t;
-        t.uri = tab->location().uri();
+        // An administrator tab comes back as the plain folder: a start
+        // that asks for a password nobody asked it to ask for is no start.
+        t.uri = core::admin::plain(tab->location()).uri();
         t.hidden = tab->showHidden();
         t.locked = tab->isLocked();
         t.sizes = tab->recursiveSizes();
@@ -345,7 +351,7 @@ void Pane::openPack(const core::Location& other)
         pack_ = new PackPanel(services_.config, this);
         connect(pack_, &PackPanel::closed, this, &Pane::closeOwnOverlay);
         connect(pack_, &PackPanel::accepted, this,
-                [this](const QByteArray& name, const QByteArray& options, const core::Location& destination) {
+                [this](const QByteArray& name, const QByteArray& options, const core::Location& destination, bool queued) {
                     Tab* t = activeTab();
                     if (!t)
                         return;
@@ -353,7 +359,7 @@ void Pane::openPack(const core::Location& other)
                     for (const core::Location& l : t->selectedLocations())
                         names.push_back(l.basename());
                     closeOwnOverlay();
-                    Q_EMIT packRequested(t->location(), names, destination.child(name), options);
+                    Q_EMIT packRequested(t->location(), names, destination.child(name), options, queued);
                 });
     }
     // One item names the archive after itself (a file without its
@@ -367,6 +373,7 @@ void Pane::openPack(const core::Location& other)
     }
     if (stem.isEmpty())
         stem = "archive";
+    pack_->offerQueue(services_.jobs && services_.jobs->busy());
     pack_->show(tab->selectionText(), stem, tab->location(), other);
     setOverlay(pack_);
     pack_->setFocus();
@@ -388,7 +395,8 @@ void Pane::closeOwnOverlay()
 Viewer* Pane::ensureViewer()
 {
     if (!viewer_) {
-        viewer_ = new Viewer(this);
+        viewer_ = new Viewer(services_.config, this);
+        connect(viewer_, &Viewer::commandRequested, this, &Pane::commandRequested);
         connect(viewer_, &Viewer::closed, this, [this] {
             setOverlay(nullptr);
             activeTab()->setFocus();
@@ -471,6 +479,17 @@ bool Pane::execute(keymap::Command command)
             rename_ = new MultiRenamePanel(services_.config, this);
             connect(rename_, &MultiRenamePanel::closed, this, &Pane::closeOwnOverlay);
             connect(rename_, &MultiRenamePanel::message, this, &Pane::showMessage);
+            connect(rename_, &MultiRenamePanel::batchDone, this,
+                    [this](const std::vector<std::pair<core::Location, core::Location>>& steps) {
+                        std::vector<core::UndoItem> items;
+                        int temporary = 0;
+                        for (const auto& [from, to] : steps) {
+                            items.push_back(core::UndoItem::moved(from, to, to.isNative()));
+                            temporary += to.basename().startsWith(".superfar-rename-") ? 1 : 0;
+                        }
+                        const auto renamed = static_cast<qint64>(steps.size()) - temporary;
+                        Q_EMIT undoable(tr("rename of %1").arg(counted(renamed, tr("item"), tr("items"))), items);
+                    });
             connect(rename_, &MultiRenamePanel::renamed, this, [this](const QByteArray& first) {
                 if (Tab* t = activeTab())
                     t->reloadWithCursor(first);
@@ -492,6 +511,7 @@ bool Pane::execute(keymap::Command command)
             connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
             connect(props_, &PropertiesPanel::applyRequested, this, &Pane::attributesRequested);
         }
+        props_->offerQueue(services_.jobs && services_.jobs->busy());
         props_->show(items);
         setOverlay(props_);
         props_->setFocus();
@@ -522,6 +542,12 @@ bool Pane::execute(keymap::Command command)
     default:
         return activeTab() && activeTab()->execute(command);
     }
+}
+
+void Pane::rehighlight()
+{
+    if (viewer_)
+        viewer_->rehighlight();
 }
 
 void Pane::showText(const QString& title, const QString& text)

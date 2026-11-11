@@ -12,7 +12,7 @@
 
 namespace core {
 
-enum class ListFailure { Other, NotMounted, NotDirectory, NotSupported };
+enum class ListFailure { Other, NotMounted, NotDirectory, NotSupported, Denied };
 
 class Listing : public QObject {
     Q_OBJECT

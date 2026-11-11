@@ -36,7 +36,6 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
     , table_(new QTreeWidget(this))
     , summary_(new QLabel(this))
     , apply_(new QPushButton(tr("&Apply"), this))
-    , undoBtn_(new QPushButton(tr("&Undo last batch"), this))
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
@@ -90,7 +89,6 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
     auto* bottom = new QHBoxLayout;
     bottom->addWidget(summary_, 1);
     auto* closeBtn = new QPushButton(tr("&Close"), this);
-    bottom->addWidget(undoBtn_);
     bottom->addWidget(apply_);
     bottom->addWidget(closeBtn);
     layout->addLayout(bottom);
@@ -100,7 +98,6 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
     replacement_->setText(QStringLiteral("*"));
     pattern_->setToolTip(tr("* and ? match and capture; the new name reuses them in order"));
     replacement_->setToolTip(tr("{n} numbers the items, {name} and {ext} are the original stem and extension"));
-    undoBtn_->setEnabled(false);
 
     for (QLineEdit* e : {pattern_, replacement_})
         connect(e, &QLineEdit::textChanged, this, &MultiRenamePanel::refresh);
@@ -112,7 +109,6 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
         connect(s, &QSpinBox::valueChanged, this, &MultiRenamePanel::refresh);
     connect(table_, &QTreeWidget::itemChanged, this, &MultiRenamePanel::refresh);
     connect(apply_, &QPushButton::clicked, this, &MultiRenamePanel::apply);
-    connect(undoBtn_, &QPushButton::clicked, this, &MultiRenamePanel::undo);
     connect(closeBtn, &QPushButton::clicked, this, &MultiRenamePanel::closed);
     connect(savePreset, &QPushButton::clicked, this, &MultiRenamePanel::savePreset);
     connect(delPreset, &QPushButton::clicked, this, &MultiRenamePanel::deletePreset);
@@ -130,8 +126,6 @@ void MultiRenamePanel::show(const std::vector<core::Location>& items, const QStr
 {
     items_ = items;
     existing_ = existing;
-    undo_.clear();
-    undoBtn_->setEnabled(false);
     {
         QSignalBlocker block(table_);
         table_->clear();
@@ -214,18 +208,10 @@ void MultiRenamePanel::apply()
         if (plan_.newNames[i] != items_[static_cast<size_t>(i)].displayName())
             moves.emplace_back(items_[static_cast<size_t>(i)], plan_.newNames[i]);
     }
-    runBatch(std::move(moves), true);
+    runBatch(std::move(moves));
 }
 
-void MultiRenamePanel::undo()
-{
-    std::vector<std::pair<core::Location, QString>> moves = undo_;
-    undo_.clear();
-    undoBtn_->setEnabled(false);
-    runBatch(std::move(moves), false);
-}
-
-void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> moves, bool recordUndo)
+void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> moves)
 {
     if (moves.empty())
         return;
@@ -241,10 +227,10 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
     struct State {
         std::vector<std::pair<core::Location, QString>> moves;  // current location -> final name
         std::vector<QString> originals;
-        std::vector<std::pair<core::Location, QString>> undo;   // final location -> original name
+        std::vector<std::pair<core::Location, QString>> finals;  // final location -> original name
+        std::vector<std::pair<core::Location, core::Location>> steps;  // each rename made, from -> to
         bool cycle = false;
         bool temporaries = false;  // phase one of a cycle
-        bool recordUndo = false;
         size_t index = 0;
         int failures = 0;
         QString firstNew;
@@ -254,7 +240,6 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
     for (const auto& [loc, name] : st->moves)
         st->originals.push_back(loc.displayName());
     st->cycle = st->temporaries = cycle;
-    st->recordUndo = recordUndo;
 
     QPointer<MultiRenamePanel> self(this);
     auto step = std::make_shared<std::function<void()>>();
@@ -266,11 +251,9 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
                 st->temporaries = false;  // second pass: temporaries to final names
                 st->index = 0;
             } else {
-                if (st->recordUndo) {
-                    self->undo_ = st->undo;
-                    self->undoBtn_->setEnabled(!self->undo_.empty());
-                }
-                self->adoptLocations(st->undo);
+                self->adoptLocations(st->finals);
+                if (!st->steps.empty())
+                    Q_EMIT self->batchDone(st->steps);
                 Q_EMIT self->message(st->failures > 0
                                          ? tr("%1 failed").arg(counted(st->failures, tr("rename"), tr("renames")))
                                          : tr("%1 renamed").arg(counted(static_cast<qint64>(st->moves.size()), tr("item"), tr("items"))));
@@ -289,11 +272,13 @@ void MultiRenamePanel::runBatch(std::vector<std::pair<core::Location, QString>> 
                               if (!error.isEmpty()) {
                                   ++st->failures;
                               } else {
-                                  st->moves[i].first = st->moves[i].first.parent().child(actual);
+                                  const core::Location from = st->moves[i].first;
+                                  st->moves[i].first = from.parent().child(actual);
+                                  st->steps.emplace_back(from, st->moves[i].first);
                                   if (!st->temporaries) {
                                       if (st->firstNew.isEmpty())
                                           st->firstNew = QString::fromUtf8(actual);
-                                      st->undo.emplace_back(st->moves[i].first, st->originals[i]);
+                                      st->finals.emplace_back(st->moves[i].first, st->originals[i]);
                                   }
                               }
                               ++st->index;

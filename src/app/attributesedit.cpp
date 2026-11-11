@@ -2,6 +2,7 @@
 
 #include "ownercompletion.h"
 
+#include <QGuiApplication>
 #include <QCheckBox>
 #include <QGridLayout>
 #include <QLabel>
@@ -66,8 +67,12 @@ AttributesEditor::AttributesEditor(QWidget* parent)
     layout->addWidget(recursiveNote_);
 
     auto* buttons = new QHBoxLayout;
-    auto* applyBtn = new QPushButton(tr("&Apply"), this);
+    auto* applyBtn = applyBtn_ = new QPushButton(tr("&Apply"), this);
     auto* closeBtn = new QPushButton(tr("C&lose"), this);
+    queue_ = new QPushButton(tr("&Queue"), this);
+    queue_->setToolTip(tr("Start when the jobs before it have ended"));
+    queue_->hide();
+    buttons->addWidget(queue_);
     buttons->addWidget(applyBtn);
     buttons->addWidget(closeBtn);
     buttons->addStretch(1);
@@ -77,10 +82,15 @@ AttributesEditor::AttributesEditor(QWidget* parent)
         setTabOrder(bits_[i], bits_[i + 1]);
     setTabOrder(bits_.back(), owner_);
     setTabOrder(owner_, recursive_);
-    setTabOrder(recursive_, applyBtn);
+    setTabOrder(recursive_, queue_);
+    setTabOrder(queue_, applyBtn);
     setTabOrder(applyBtn, closeBtn);
-    connect(applyBtn, &QPushButton::clicked, this, &AttributesEditor::apply);
-    connect(owner_, &QLineEdit::returnPressed, this, &AttributesEditor::apply);
+    connect(applyBtn, &QPushButton::clicked, this, [this] { apply(false); });
+    connect(queue_, &QPushButton::clicked, this, [this] { apply(true); });
+    // Enter queues while that is offered, Shift+Enter runs now, as in the job prompts.
+    connect(owner_, &QLineEdit::returnPressed, this, [this] {
+        apply(queue_->isVisibleTo(this) && !(QGuiApplication::keyboardModifiers() & Qt::ShiftModifier));
+    });
     connect(closeBtn, &QPushButton::clicked, this, &AttributesEditor::closeRequested);
 }
 
@@ -148,7 +158,13 @@ void AttributesEditor::showMode()
                               : tr("Mode %1").arg(mode, 4, 8, QLatin1Char('0')));
 }
 
-void AttributesEditor::apply()
+void AttributesEditor::offerQueue(bool on)
+{
+    queue_->setVisible(on);
+    applyBtn_->setText(on ? tr("Run &now") : tr("&Apply"));
+}
+
+void AttributesEditor::apply(bool queued)
 {
     if (!ready_)
         return;
@@ -189,5 +205,5 @@ void AttributesEditor::apply()
         return;
     }
     change.recursive = anyDir_ && recursive_->isChecked();
-    Q_EMIT applyRequested(change);
+    Q_EMIT applyRequested(change, queued);
 }

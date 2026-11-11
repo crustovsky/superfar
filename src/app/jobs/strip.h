@@ -6,6 +6,7 @@
 
 #include "core/apps.h"
 #include "core/jobs/job.h"
+#include "core/jobs/queue.h"
 #include "jobs/panel.h"
 
 #include <QElapsedTimer>
@@ -33,20 +34,28 @@ public:
 
     core::Job* job() const { return job_; }
     void addBar(QWidget* bar);
+    bool queued() const { return queued_; }
     // A conflict or error question is open under the row: the job is
     // blocked, so the clock stops and the panel does not open on its own.
     void setWaiting(bool on) { waiting_ = on; }
+
+Q_SIGNALS:
+    void startNowRequested();
 
 private:
     void onProgress(const core::JobProgress& p);
     void sample();
     void refresh();
+    // A job waiting in the queue has no progress to show: its row says
+    // what it will do and offers Start now, Unattended and Abort.
+    void setQueued(bool queued);
 
     core::Job* job_;
     core::JobProgress last_;
     QElapsedTimer runClock_;
     bool running_ = false;
     bool waiting_ = false;
+    bool queued_ = false;
     bool autoOpened_ = false;
     qint64 activeMs_ = 0;  // running time less pauses and questions
     quint64 sampleBytes_ = 0;
@@ -58,7 +67,10 @@ private:
     QLabel* name_;
     QProgressBar* bar_;
     QLabel* info_;
+    QToolButton* start_ = nullptr;
+    QToolButton* unattended_ = nullptr;
     QToolButton* pause_ = nullptr;
+    QToolButton* abort_ = nullptr;
     QToolButton* details_ = nullptr;
     JobPanel* panel_;
 };
@@ -68,11 +80,16 @@ class JobStrip : public QWidget {
 public:
     explicit JobStrip(QWidget* parent = nullptr);
 
-    // Takes ownership of the job and starts it.
-    void addJob(core::Job* job);
+    // Takes ownership of the job and starts it, or with queued puts it
+    // behind the jobs already there.
+    void addJob(core::Job* job, bool queued = false);
+    const core::JobQueue* queue() const { return queue_; }
     // A prompt; the caller connects accepted() / rejected(), the strip
-    // removes the bar afterwards and gives focus back.
-    PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input);
+    // removes the bar afterwards and gives focus back. A prompt for a
+    // job, while other jobs are there, asks whether to queue it or run
+    // it now; the bar's queued() then says which was chosen.
+    PromptBar* prompt(const QString& message, const QString& okLabel, std::optional<QString> input,
+                      bool forJob = false);
     ChoiceBar* choose(const QString& message, const QStringList& items);
     CheckBar* checks(const QString& message);  // the caller fills it
     AuthBar* auth(const QString& message, const QString& user, const QString& domain, bool needUser,
@@ -89,6 +106,7 @@ private:
     void updateVisibility();
 
     QVBoxLayout* layout_;
+    core::JobQueue* queue_;
     QPointer<QWidget> returnFocus_;
     int rows_ = 0;
     int bars_ = 0;

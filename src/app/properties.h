@@ -23,12 +23,14 @@ public:
     void show(const std::vector<core::Location>& items);
     // The same items again, after a change to them.
     void reread();
+    // While other jobs are there: a Queue button beside Apply.
+    void offerQueue(bool on);
 
 Q_SIGNALS:
     void closed();
     void message(const QString& text);
     // Apply: the window runs it as a job and calls reread() at its end.
-    void applyRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
+    void applyRequested(const std::vector<core::Location>& items, const core::AttributeChange& change, bool queued);
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

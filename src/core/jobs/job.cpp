@@ -1,5 +1,6 @@
 #include "core/jobs/job.h"
 
+#include "core/admin.h"
 #include "core/gobject.h"
 
 #include <QElapsedTimer>
@@ -52,14 +53,18 @@ QString Job::title() const
     case JobKind::Extract: return tr("Extract");
     case JobKind::Pack: return tr("Pack");
     case JobKind::Attributes: return tr("Set attributes");
+    case JobKind::Undo: return tr("Undo");
+    case JobKind::Redo: return tr("Redo");
     }
     return {};
 }
 
 void Job::start()
 {
-    if (thread_.joinable())
+    if (started_ || done_)
         return;
+    started_ = true;
+    Q_EMIT started();
     thread_ = std::thread([this] {
         run();
         done_ = true;
@@ -88,6 +93,12 @@ void Job::abort()
     paused_ = false;
     cancelCurrent();
     cv_.notify_all();
+    if (!started_ && !done_) {
+        // Aborted while it waited in the queue: it never ran, and this
+        // is its end.
+        done_ = true;
+        QMetaObject::invokeMethod(this, &Job::finished, Qt::QueuedConnection);
+    }
 }
 
 void Job::cancelCurrent()
@@ -141,8 +152,10 @@ GCancellable* Job::beginItem()
     return current_;
 }
 
-ConflictAction Job::askConflict(const Conflict& c)
+ConflictAction Job::askConflict(const Conflict& c, bool* asked)
 {
+    if (asked)
+        *asked = false;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (conflictPolicy_ != ConflictAction::Ask)
@@ -151,6 +164,8 @@ ConflictAction Job::askConflict(const Conflict& c)
             return ConflictAction::Skip;  // the caller logs the skip
         answered_ = false;
     }
+    if (asked)
+        *asked = true;
     Q_EMIT conflict(c);
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] { return answered_ || aborted_; });
@@ -161,7 +176,13 @@ ErrorAction Job::askError(const Failure& f)
 {
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (errorPolicy_ != ErrorAction::Ask)
+        // Unattended never escalates: a denied item is a failure in the
+        // log. "As administrator, for all" speaks for denied items
+        // only; any other failure is still asked about.
+        const bool admin = errorPolicy_ == ErrorAction::AsAdmin;
+        if (admin && f.offerAdmin && !unattended_)
+            return ErrorAction::AsAdmin;
+        if (errorPolicy_ != ErrorAction::Ask && !admin)
             return errorPolicy_;
         if (unattended_)
             return ErrorAction::Skip;  // the caller logs the failure
@@ -182,10 +203,47 @@ void Job::report(const JobProgress& p, bool force)
     Q_EMIT progress(p);
 }
 
-void Job::logSkip(const QString& path)
+void Job::logSkip(const QString& path, const QString& message)
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    log_.push_back({LogEntry::Kind::Skipped, path, QString()});
+    log_.push_back({LogEntry::Kind::Skipped, path, message});
+}
+
+void Job::describe(Failure& f, const GError* error, const Location& a, const Location& b)
+{
+    f.message = errorMessage(error);
+    if (!isDenied(error))
+        return;
+    if (admin::isAdmin(a) || admin::isAdmin(b))
+        f.message = admin::refusal(f.message);
+    else
+        f.offerAdmin = (a.isNative() || b.isNative()) && admin::available();
+}
+
+void Job::record(UndoItem item)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    undo_.push_back(std::move(item));
+}
+
+bool Job::canTrash(const Location& target)
+{
+    GPtr<GFileInfo> info(g_file_query_info(target.gfile(), G_FILE_ATTRIBUTE_ACCESS_CAN_TRASH,
+                                           G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nullptr, nullptr));
+    return info && g_file_info_get_attribute_boolean(info.get(), G_FILE_ATTRIBUTE_ACCESS_CAN_TRASH);
+}
+
+bool Job::keepReplaced(const Location& target, GCancellable* cancellable, bool warned)
+{
+    if (g_file_trash(target.gfile(), cancellable, nullptr)) {
+        record(UndoItem::trashed(target));
+        return true;
+    }
+    if (!warned) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        log_.push_back({LogEntry::Kind::Overwritten, target.displayPath(), tr("no trash there: this cannot be undone")});
+    }
+    return false;
 }
 
 void Job::logFail(const QString& path, const QString& message)

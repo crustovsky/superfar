@@ -14,6 +14,7 @@
 class QCheckBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 
 class AttributesEditor : public QWidget {
     Q_OBJECT
@@ -24,14 +25,15 @@ public:
     void clear();
     void add(const core::Details& d);
     void finish();
+    void offerQueue(bool on);
 
 Q_SIGNALS:
-    void applyRequested(const core::AttributeChange& change);
+    void applyRequested(const core::AttributeChange& change, bool queued);
     void closeRequested();
     void message(const QString& text);
 
 private:
-    void apply();
+    void apply(bool queued);
     void showMode();
 
     std::array<QCheckBox*, 9> bits_{};
@@ -39,6 +41,8 @@ private:
     QLineEdit* owner_;
     QCheckBox* recursive_;
     QLabel* recursiveNote_;
+    QPushButton* queue_;
+    QPushButton* applyBtn_;
     quint32 allSet_ = 0777;  // bits every item has
     quint32 anySet_ = 0;     // bits some item has
     QString user_;           // what the items share; empty when they differ

@@ -17,7 +17,7 @@ QString describe(keymap::Command c)
     case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next row, Tab to the row's permissions and owner when shown, Enter applies");
     case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
     case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
-    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them");
+    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them. While another job runs, the prompt asks: Queue (Enter) puts the new one behind it, Run now (Shift+Enter) beside it");
     case Command::Move: return QStringLiteral("move the marked items (or the cursor) to the other pane");
     case Command::Mkdir: return QStringLiteral("new folder");
     case Command::Trash: return QStringLiteral("move to trash; on a mount in the tree: unmount");
@@ -60,7 +60,7 @@ QString describe(keymap::Command c)
     case Command::Properties: return QStringLiteral("properties of the marked items or the cursor item; change their permissions and owner, down the folders if asked");
     case Command::Bookmark: return QStringLiteral("bookmark this folder (or remove the bookmark); bookmarks are tree roots");
     case Command::ToggleThumbnails: return QStringLiteral("thumbnails in this tab (from tumbler over D-Bus)");
-    case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview, presets and undo");
+    case Command::MultiRename: return QStringLiteral("rename the marked items by pattern, with preview and presets");
     case Command::Sync: return QStringLiteral("compare this folder with the other pane's and copy or delete the differences");
     case Command::About: return QStringLiteral("name, version and build date");
     case Command::ToggleTree: return QStringLiteral("hide or show the folder tree; hidden, it does no work");
@@ -71,6 +71,9 @@ QString describe(keymap::Command c)
     case Command::PreviewLast: return QStringLiteral("previewed PDF or video: last page, or the end");
     case Command::PreviewPlay: return QStringLiteral("previewed video: play or pause (no sound)");
     case Command::Columns: return QStringLiteral("the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it");
+    case Command::Undo: return QStringLiteral("undo the last copy, move, trash, rename, new folder or file, extract, pack or attribute change; what it created goes to the trash, never deleted");
+    case Command::Redo: return QStringLiteral("redo what was undone");
+    case Command::ToggleHighlight: return QStringLiteral("syntax colours in the viewer and the preview, on or off; they come from bat when it is installed, in the theme bat is set to");
     case Command::None: return {};
     }
     return {};

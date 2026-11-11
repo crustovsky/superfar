@@ -2,6 +2,7 @@
 
 #include "counted.h"
 #include "bench.h"
+#include "core/admin.h"
 #include "core/apps.h"
 #include "core/fileops.h"
 #include "core/sort.h"
@@ -187,13 +188,18 @@ void Tab::rename(const QByteArray& name, const QString& newName)
     const core::Location dir = location_;
     QPointer<Tab> guard(this);
     core::renameEntry(dir.child(name), newName,
-                      [guard, dir, name](const QString& error, const QByteArray& actual, const QString& display) {
+                      [guard, dir, name, newName](const QString& error, const QByteArray& actual, const QString& display) {
         if (!guard)
             return;
         if (!error.isEmpty()) {
-            Q_EMIT guard->message(error);
+            if (core::admin::offerFor(dir))
+                Q_EMIT guard->adminRenameNeeded(dir.child(name), newName, error);
+            else
+                Q_EMIT guard->message(error);
             return;
         }
+        Q_EMIT guard->undoable(tr("rename of %1").arg(dir.child(name).displayName()),
+                               core::UndoItem::moved(dir.child(name), dir.child(actual), dir.isNative()));
         if (guard->location_ != dir)
             return;
         // While a neighbouring row is being edited a reload would close
@@ -421,6 +427,16 @@ void Tab::onFailed(quint64 generation, const QString& error, core::ListFailure w
         const QString scheme = location_.uri().section(QLatin1Char(':'), 0, 0);
         fallBack(gvfs.contains(scheme) ? tr("%1 locations need gvfs, which is not installed").arg(scheme)
                                        : tr("%1: %2").arg(location_.displayPath(), error));
+        return;
+    }
+    if (why == core::ListFailure::Denied) {
+        // Not ours to read. Stay, so Backspace goes up; a local folder
+        // can be opened as administrator when GVfs has the backend, and
+        // a refusal that came back from there is polkit's.
+        const bool admin = core::admin::isAdmin(location_);
+        Q_EMIT statusChanged(admin ? core::admin::refusal(error) : error, QString());
+        if (location_.isNative() && core::admin::available())
+            Q_EMIT adminNeeded(location_);
         return;
     }
     if (location_.isNative() && !QFileInfo(location_.displayPath()).isDir()) {

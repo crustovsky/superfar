@@ -6,7 +6,9 @@
 #include "attributesedit.h"
 #include "config.h"
 #include "funcbar.h"
+#include "highlight.h"
 #include "jobs/bars.h"
+#include "jobs/strip.h"
 #include "mainwindow.h"
 #include "menu.h"
 #include "openwith.h"
@@ -14,8 +16,10 @@
 #include "pane/listview.h"
 #include "pane/pane.h"
 #include "pane/tabbar.h"
+#include "preview.h"
 #include "tree.h"
 #include "uris.h"
+#include "viewer.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -28,13 +32,17 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMimeData>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTextBlock>
+#include <QTextLayout>
 #include <QToolButton>
 #include <memory>
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 using keymap::Command;
 
@@ -114,6 +122,11 @@ private Q_SLOTS:
     void promptOutlivesItsTab();
     void cursorStaysWhereItsItemWas();
     void openWith();
+    void undoAndRedo();
+    void warningsSayWhatCannotBeUndone();
+    void queueBehindARunningJob();
+    void syntaxColoursFromBat();
+    void permissionDeniedOffersAdministrator();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -133,6 +146,59 @@ private:
     {
         const auto* bar = window_->findChild<PromptBar*>();
         return bar ? bar->findChild<QLineEdit*>() : nullptr;
+    }
+
+    // The button of that text among w's, a shown one first; null when none.
+    template <typename Button>
+    static Button* buttonOf(const QWidget* w, const QString& text)
+    {
+        Button* hidden = nullptr;
+        for (Button* b : w->findChildren<Button*>()) {
+            if (b->text() == text && b->isVisible())
+                return b;
+            if (b->text() == text)
+                hidden = b;
+        }
+        return hidden;
+    }
+    // The prompt that is up now: closed ones linger until they are deleted.
+    PromptBar* openPrompt() const
+    {
+        for (PromptBar* bar : window_->findChildren<PromptBar*>())
+            if (bar->isVisible())
+                return bar;
+        return nullptr;
+    }
+    // The row of the one job that waits in the queue.
+    JobRow* queuedRow() const
+    {
+        for (JobRow* row : window_->findChildren<JobRow*>())
+            if (row->isVisible() && !row->job()->hasStarted() && !row->job()->done())
+                return row;
+        return nullptr;
+    }
+
+    // The colour a highlighter gave the first character of a text
+    // view; invalid while it is plain.
+    static QColor firstColour(const QPlainTextEdit* edit)
+    {
+        const auto formats = edit->document()->firstBlock().layout()->formats();
+        return formats.isEmpty() ? QColor() : formats.first().format.foreground().color();
+    }
+
+    // Every job has ended and been taken note of, and the keys are the list's again.
+    void settle()
+    {
+        QTRY_VERIFY(window_->findChildren<core::Job*>().isEmpty());
+        QTRY_VERIFY(left()->activeTab()->view()->hasFocus());
+    }
+    // Whether some label under w reads text (the status line, a bar).
+    static bool shows(const QWidget* w, const QString& text)
+    {
+        for (const QLabel* label : w->findChildren<QLabel*>())
+            if (label->isVisible() && label->text().contains(text))
+                return true;
+        return false;
     }
 
     QTemporaryDir tmp_;
@@ -596,6 +662,343 @@ void WindowTest::openWith()
     QTRY_VERIFY(!window_->findChild<OpenWithBar*>());
 }
 
+void WindowTest::undoAndRedo()
+{
+    ListView* view = left()->activeTab()->view();
+    view->setCurrentIndex(view->model()->index(1, 0));
+    QCOMPARE(left()->activeTab()->currentName(), QByteArray("one.txt"));
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(shows(left(), QStringLiteral("Nothing to undo")));
+
+    // F5 and Enter copy it across; Ctrl+Z takes the copy back (to the
+    // trash), Ctrl+Shift+Z puts it there again.
+    QTest::keyClick(view, Qt::Key_F5);
+    QTRY_VERIFY(promptEdit());
+    QTest::keyClick(promptEdit(), Qt::Key_Return);
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(!QFile::exists(b_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: copy of one.txt")));
+    QVERIFY(QFile::exists(a_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Redid: copy of one.txt")));
+
+    // F8 and Enter trash it; Ctrl+Z brings it back from the trash.
+    settle();
+    QTRY_COMPARE(left()->activeTab()->currentName(), QByteArray("one.txt"));
+    QTest::keyClick(view, Qt::Key_F8);
+    QTRY_VERIFY(window_->findChild<PromptBar*>());
+    QVERIFY(shows(window_.get(), QStringLiteral("Move one.txt to the trash?")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTRY_VERIFY(!QFile::exists(a_ + "/one.txt"));
+    settle();
+    QTest::keyClick(view, Qt::Key_Z, Qt::ControlModifier);
+    QTRY_VERIFY(QFile::exists(a_ + "/one.txt"));
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: trash of one.txt")));
+    QTRY_VERIFY(left()->activeTab()->entryNames().contains(QStringLiteral("one.txt")));
+
+    // F7 makes a folder, F2 would rename: both are on the stack too.
+    // The last operation goes first.
+    window_->execute(Command::Mkdir);
+    QTRY_VERIFY(promptEdit());
+    promptEdit()->setText(QStringLiteral("made"));
+    QTest::keyClick(promptEdit(), Qt::Key_Return);
+    QTRY_VERIFY(left()->activeTab()->entryNames().contains(QStringLiteral("made")));  // made, and noted
+    window_->execute(Command::Undo);
+    QTRY_VERIFY(!QDir(a_ + "/made").exists());
+    QTRY_VERIFY(shows(left(), QStringLiteral("Undid: new folder made")));
+    // The menu has both, with their keys.
+    bool undo = false, redo = false;
+    for (const QAction* a : window_->findChildren<QAction*>()) {
+        undo = undo || a->text().startsWith(QStringLiteral("&Undo"));
+        redo = redo || a->text().startsWith(QStringLiteral("Redo"));
+    }
+    QVERIFY(undo && redo);
+}
+
+void WindowTest::warningsSayWhatCannotBeUndone()
+{
+    // Shift+F8 says so before it deletes.
+    ListView* view = left()->activeTab()->view();
+    view->setCurrentIndex(view->model()->index(1, 0));
+    window_->execute(Command::DeletePermanent);
+    QTRY_VERIFY(window_->findChild<PromptBar*>());
+    QVERIFY(shows(window_.get(), QStringLiteral("Delete one.txt permanently? This cannot be undone.")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QVERIFY(QFile::exists(a_ + "/one.txt"));
+
+    // So does the choice offered when the trash refuses an item, and
+    // the conflict question where what is replaced cannot be kept.
+    core::Failure failure;
+    failure.offerDelete = true;
+    ErrorBar error(QStringLiteral("trash"), failure);
+    bool said = false;
+    for (const QPushButton* b : error.findChildren<QPushButton*>())
+        said = said || b->text() == QLatin1String("Delete &permanently (cannot be undone)");
+    QVERIFY(said);
+    core::Conflict conflict;
+    ConflictBar plain(conflict);
+    conflict.cannotUndo = true;
+    ConflictBar warned(conflict);
+    plain.show();
+    warned.show();
+    QVERIFY(!shows(&plain, QStringLiteral("cannot be undone")));
+    QVERIFY(shows(&warned, QStringLiteral("overwriting cannot be undone")));
+}
+
+void WindowTest::queueBehindARunningJob()
+{
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    auto startCopy = [&](int row) {
+        view->setCurrentIndex(view->model()->index(row, 0));
+        window_->execute(Command::Copy);
+        QTRY_VERIFY(openPrompt());
+    };
+    // Nothing runs: the copy prompt has its one button.
+    write(b_ + "/two.txt", "there already");
+    startCopy(2);
+    QCOMPARE(tab->currentName(), QByteArray("two.txt"));
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    // The copy asks about two.txt and waits for an answer: a running job.
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ConflictBar*>());
+
+    // Now the prompt asks which it is to be: Queue or Run now. Queued,
+    // the job gets a row below the running one that says what it will
+    // do, with Start now, Unattended and Remove, and waits.
+    startCopy(1);
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("Run &now")));
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("Copy")));
+    buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
+    QTRY_VERIFY(queuedRow());
+    JobRow* row = queuedRow();
+    QVERIFY(shows(row, QStringLiteral("Queued: one.txt from %1 to %2").arg(a_, b_)));
+    for (const char* text : {"Start now", "Unattended", "Remove"})
+        QVERIFY2(buttonOf<QToolButton>(row, QString::fromLatin1(text))->isVisible(), text);
+    QVERIFY(!buttonOf<QToolButton>(row, QStringLiteral("Pause"))->isVisible());
+    QTest::qWait(100);
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+
+    // Remove takes it out of the queue: it never runs.
+    buttonOf<QToolButton>(row, QStringLiteral("Remove"))->click();
+    QTRY_VERIFY(!queuedRow());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+
+    // Enter queues from the keyboard; Unattended can be set ahead.
+    // When the job before it ends, it runs.
+    startCopy(1);
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(queuedRow());
+    row = queuedRow();
+    buttonOf<QToolButton>(row, QStringLiteral("Unattended"))->click();
+    QVERIFY(row->job()->unattended());
+    // Quitting now would drop both: the window asks first.
+    window_->close();
+    QVERIFY(window_->isVisible());
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(shows(openPrompt(), QStringLiteral("2 jobs are running or queued. Abort and quit?")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QVERIFY(window_->isVisible());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+    buttonOf<QPushButton>(window_->findChild<ConflictBar*>(), QStringLiteral("&Skip"))->click();
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    // The first job's log (two.txt was skipped) is up; Esc closes it.
+    QTRY_VERIFY(window_->findChild<LogBar*>());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    settle();
+
+    // Start now: the queued job runs beside the one it waited for.
+    QFile::remove(b_ + "/one.txt");
+    startCopy(2);
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));  // the queue is empty again
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ConflictBar*>() && window_->findChild<ConflictBar*>()->isVisible());
+    startCopy(1);
+    buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
+    QTRY_VERIFY(queuedRow());
+    // Shift+Enter is Run now: that job starts beside the first, and
+    // its row goes above the one that waits, not under it.
+    startCopy(0);
+    QCOMPARE(tab->currentName(), QByteArray("sub"));
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return, Qt::ShiftModifier);
+    QTRY_VERIFY(QDir(b_ + "/sub").exists());
+    QVERIFY(queuedRow());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+    {
+        const QList<JobRow*> rows = window_->findChildren<JobRow*>();
+        int lowest = 0;
+        for (const JobRow* r : rows)
+            if (r->isVisible())
+                lowest = std::max(lowest, r->mapTo(window_.get(), QPoint(0, 0)).y());
+        QCOMPARE(queuedRow()->mapTo(window_.get(), QPoint(0, 0)).y(), lowest);
+    }
+    buttonOf<QToolButton>(queuedRow(), QStringLiteral("Start now"))->click();
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    QVERIFY(window_->findChild<ConflictBar*>()->isVisible());  // the first still waits
+
+    // The trash prompt offers it too; confirmed, the window closes
+    // with jobs still there.
+    window_->execute(Command::Trash);
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    window_->close();
+    QTRY_VERIFY(openPrompt());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTRY_VERIFY(!window_->isVisible());
+}
+
+void WindowTest::syntaxColoursFromBat()
+{
+    // The bat on PATH is the test's own: it writes down its arguments
+    // and colours whatever it is fed in one colour.
+    write(a_ + "/code.c", "int main() { return 0; }\r\n// end\n");
+    Tab* tab = left()->activeTab();
+    QTRY_VERIFY(tab->entryNames().contains(QStringLiteral("code.c")));
+    ListView* view = tab->view();
+    view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(QStringLiteral("code.c")), 0));
+    QCOMPARE(tab->currentName(), QByteArray("code.c"));
+    auto batCall = [] {
+        QFile f(g_env + "/bat-call");
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts)
+                                           : QStringList();
+    };
+
+    // F3: the text is there at once, the colours when bat answers.
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_VERIFY(left()->findChild<Viewer*>());
+    auto* text = left()->findChild<Viewer*>()->findChild<QPlainTextEdit*>();
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
+    QVERIFY(batCall().contains(QStringLiteral("--file-name=code.c")));
+    QVERIFY(batCall().contains(text->palette().color(QPalette::Base).lightness() < 128 ? QStringLiteral("--theme=dark")
+                                                                                         : QStringLiteral("--theme=light")));
+    QVERIFY(batCall().contains(QStringLiteral("--style=plain")));
+    QCOMPARE(batCall().last(), QStringLiteral("-"));  // the text comes on stdin: bat opens nothing
+
+    // Ctrl+F9 in the viewer switches them off, and on again; the
+    // choice is kept in the state file.
+    QTest::keyClick(text, Qt::Key_F9, Qt::ControlModifier);
+    QTRY_VERIFY(!firstColour(text).isValid());
+    QVERIFY(!Highlight::enabled(config_.get()));
+    QCOMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::keyClick(text, Qt::Key_F9, Qt::ControlModifier);
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
+    QVERIFY(Highlight::enabled(config_.get()));
+    // The theme changes while the file is open: bat is asked again,
+    // for the other kind of theme.
+    const QPalette before = QApplication::palette();
+    const bool wasDark = before.color(QPalette::Base).lightness() < 128;
+    QPalette other = before;
+    other.setColor(QPalette::Base, wasDark ? Qt::white : Qt::black);
+    other.setColor(QPalette::Text, wasDark ? Qt::black : Qt::white);
+    QFile::remove(g_env + "/bat-call");
+    QApplication::setPalette(other);
+    QTRY_VERIFY(batCall().contains(wasDark ? QStringLiteral("--theme=light") : QStringLiteral("--theme=dark")));
+    QFile::remove(g_env + "/bat-call");
+    QApplication::setPalette(before);
+    QTRY_VERIFY(batCall().contains(wasDark ? QStringLiteral("--theme=dark") : QStringLiteral("--theme=light")));
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    // The preview's text gets them too.
+    window_->execute(Command::Preview);
+    QTRY_VERIFY(window_->findChild<Preview*>());
+    auto* shown = window_->findChild<Preview*>()->findChild<QPlainTextEdit*>();
+    QTRY_COMPARE(firstColour(shown), QColor(1, 2, 3));
+    window_->execute(Command::Preview);
+
+    // A bat that complains (one too old for --theme=dark does) is not
+    // believed, and with none on PATH nothing happens either: the text
+    // is shown plain, as it was before there were colours.
+    write(g_env + "/bat-warns", "");
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::qWait(300);
+    QVERIFY(!firstColour(text).isValid());
+    QTest::keyClick(text, Qt::Key_Escape);
+    QFile::remove(g_env + "/bat-warns");
+    const QByteArray path = qgetenv("PATH");
+    qputenv("PATH", QFile::encodeName(g_env + "/data"));
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::qWait(300);
+    QVERIFY(!firstColour(text).isValid());
+    qputenv("PATH", path);
+}
+
+void WindowTest::permissionDeniedOffersAdministrator()
+{
+    if (::geteuid() == 0)
+        QSKIP("root is never denied");
+    // The offers are looked at and turned down, never taken: taking
+    // one would ask the polkit agent of whoever runs the tests.
+    QVERIFY(QDir().mkpath(a_ + "/locked"));
+    QVERIFY(QDir().mkpath(b_ + "/ro"));
+    QCOMPARE(::chmod(QFile::encodeName(a_ + "/locked").constData(), 0), 0);
+    QCOMPARE(::chmod(QFile::encodeName(b_ + "/ro").constData(), 0555), 0);
+    struct Unlock {
+        QString a, b;
+        ~Unlock()
+        {
+            ::chmod(QFile::encodeName(a).constData(), 0755);
+            ::chmod(QFile::encodeName(b).constData(), 0755);
+        }
+    } unlock{a_ + "/locked", b_ + "/ro"};
+
+    // A folder that cannot be read: a bar in the window, and the tab
+    // stays where it is when the offer is turned down.
+    Tab* tab = left()->activeTab();
+    tab->navigate(loc(a_ + "/locked"));
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(shows(openPrompt(), QStringLiteral("Permission denied: %1. Open as administrator?").arg(a_ + "/locked")));
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("As &administrator")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_VERIFY(!openPrompt());
+    QCOMPARE(tab->location(), loc(a_ + "/locked"));
+    QVERIFY(shows(left(), QStringLiteral("denied")) || shows(left(), QStringLiteral("Permission")));
+    tab->navigate(loc(a_));
+    QTRY_COMPARE(tab->entryNames().size(), 4);
+
+    // A job item that is denied has one more choice on its error bar.
+    right()->activeTab()->navigate(loc(b_ + "/ro"));
+    QTRY_COMPARE(right()->activeTab()->location(), loc(b_ + "/ro"));
+    ListView* view = tab->view();
+    view->setFocus();
+    view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(QStringLiteral("one.txt")), 0));
+    QCOMPARE(tab->currentName(), QByteArray("one.txt"));
+    window_->execute(Command::Copy);
+    QTRY_VERIFY(openPrompt());
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ErrorBar*>());
+    auto* error = window_->findChild<ErrorBar*>();
+    QVERIFY(buttonOf<QPushButton>(error, QStringLiteral("As a&dministrator")));
+    buttonOf<QPushButton>(error, QStringLiteral("&Skip"))->click();
+    QTRY_VERIFY(window_->findChild<LogBar*>());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    settle();
+    QVERIFY(!QFile::exists(b_ + "/ro/one.txt"));
+
+    // A new folder where it may not be made: the same question, and
+    // nothing made when it is turned down.
+    right()->activeTab()->view()->setFocus();
+    QTRY_VERIFY(right()->isActive());
+    window_->execute(Command::Mkdir);
+    QTRY_VERIFY(promptEdit() && openPrompt());
+    openPrompt()->findChild<QLineEdit*>()->setText(QStringLiteral("made"));
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(openPrompt() && shows(openPrompt(), QStringLiteral("Create it as administrator? It will belong to root.")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QTRY_VERIFY(!openPrompt());
+    QVERIFY(!QDir(b_ + "/ro/made").exists());
+}
+
 int main(int argc, char** argv)
 {
     QTemporaryDir env;
@@ -609,6 +1012,16 @@ int main(int argc, char** argv)
         script.write("#!/bin/sh\n{ printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/viewer-call'\n");
         script.close();
         script.setPermissions(script.permissions() | QFile::ExeOwner);
+        // A stand-in for bat: its arguments written down, its input
+        // back in one colour; with bat-warns there, a warning as well.
+        QFile bat(g_env + "/bin/bat");
+        if (!bat.open(QIODevice::WriteOnly))
+            return 1;
+        bat.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + QFile::encodeName(g_env) + "/bat-call'\n"
+                  "[ -e '" + QFile::encodeName(g_env) + "/bat-warns' ] && echo '[bat warning]: Unknown theme' >&2\n"
+                  "printf '\\033[38;2;1;2;3m'; cat; printf '\\033[0m'\n");
+        bat.close();
+        bat.setPermissions(bat.permissions() | QFile::ExeOwner);
         QFile entry(g_env + "/data/applications/zzqview.desktop");
         if (!entry.open(QIODevice::WriteOnly))
             return 1;
@@ -618,7 +1031,15 @@ int main(int argc, char** argv)
             return 1;
         cache.write("[MIME Cache]\ntext/plain=zzqview.desktop;\n");
     }
+    // The home trash serves the home's filesystem: with the home here,
+    // beside the test folders, F8 has a trash wherever the temp dir is.
+    qputenv("HOME", QFile::encodeName(g_env));
     qputenv("XDG_DATA_HOME", QFile::encodeName(g_env + "/data"));
+    // GVfs's admin backend counts as installed wherever the tests run.
+    QDir().mkpath(g_env + "/sys/gvfs/mounts");
+    if (QFile backend(g_env + "/sys/gvfs/mounts/admin.mount"); !backend.open(QIODevice::WriteOnly))
+        return 1;
+    qputenv("XDG_DATA_DIRS", QFile::encodeName(g_env + "/sys") + ":/usr/local/share:/usr/share");
     qputenv("XDG_CONFIG_HOME", QFile::encodeName(g_env + "/config"));
     qputenv("PATH", QFile::encodeName(g_env + "/bin") + ':' + qgetenv("PATH"));
     QApplication app(argc, argv);

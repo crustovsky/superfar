@@ -1,5 +1,6 @@
 #include "core/jobs/remove.h"
 
+#include "core/admin.h"
 #include "core/gobject.h"
 
 namespace core {
@@ -38,13 +39,12 @@ struct RemoveJob::Impl {
         }
     }
 
-    bool handleError(const Location& where, const QString& message, bool offerDelete,
-                     ErrorAction* chosen)
+    bool handleError(const Location& where, const GError* error, bool offerDelete, ErrorAction* chosen)
     {
         Failure f;
         f.name = where.displayName();
         f.path = where.displayPath();
-        f.message = message;
+        job.describe(f, error, where);
         f.offerDelete = offerDelete;
         const ErrorAction a = job.askError(f);
         if (chosen)
@@ -55,6 +55,7 @@ struct RemoveJob::Impl {
             return false;
         case ErrorAction::Retry:
         case ErrorAction::DeletePermanently:
+        case ErrorAction::AsAdmin:
             return true;
         default:
             job.logFail(f.path, f.message);
@@ -110,16 +111,18 @@ struct RemoveJob::Impl {
                 return true;
             }
             ErrorAction a = ErrorAction::Skip;
-            if (!handleError(loc, errorMessage(err.get()), false, &a))
+            if (!handleError(loc, err.get(), false, &a))
                 return false;
             if (a == ErrorAction::Retry)
                 continue;
+            if (a == ErrorAction::AsAdmin)
+                return deleteTree(admin::of(loc), isDir);  // what is inside may have been out of reach too
             itemDone();
             return true;
         }
     }
 
-    bool trash(const Location& loc, bool isDir)
+    bool trash(Location loc, bool isDir)
     {
         if (!job.waitIfPaused())
             return false;
@@ -130,6 +133,7 @@ struct RemoveJob::Impl {
             GCancellable* c = job.beginItem();
             GError* error = nullptr;
             if (g_file_trash(loc.gfile(), c, &error)) {
+                job.record(UndoItem::trashed(loc));
                 itemDone();
                 return true;
             }
@@ -143,10 +147,16 @@ struct RemoveJob::Impl {
             }
             const bool unsupported = g_error_matches(err.get(), G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED);
             ErrorAction a = ErrorAction::Skip;
-            if (!handleError(loc, errorMessage(err.get()), unsupported, &a))
+            if (!handleError(loc, err.get(), unsupported, &a))
                 return false;
             if (a == ErrorAction::Retry)
                 continue;
+            if (a == ErrorAction::AsAdmin) {
+                // There is no trash through admin://: the next try says
+                // so and offers permanent delete, as on any such volume.
+                loc = admin::of(loc);
+                continue;
+            }
             if (a == ErrorAction::DeletePermanently)
                 return deleteTree(loc, isDir);
             itemDone();

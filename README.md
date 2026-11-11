@@ -52,7 +52,8 @@ thumbnail; nothing else changes.
 | tumbler | thumbnails |
 | pdftoppm and pdfinfo (poppler) | PDF pages in the preview |
 | ffmpeg and ffprobe | video in the preview |
-| gvfs | the trash, mounts and network shares |
+| bat (0.25 or newer) | syntax colours in the viewer and the preview |
+| gvfs | the trash, mounts and network shares; going on as administrator (with a polkit agent running) |
 | xdg-terminal-exec or `$TERMINAL` | F4 and the command line |
 
 ## Features
@@ -72,10 +73,12 @@ thumbnail; nothing else changes.
 | | What you get | Where |
 |---|---|---|
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
-| **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
+| **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. While a job runs, the next one asks whether to queue behind it (Enter) or run now beside it (Shift+Enter); queued jobs are listed under the running ones, each with Start now and Remove. | F5, F6, F8 |
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
+| **As administrator** | Where permission is denied on a local folder or item, a bar offers to go on as administrator: opening the folder, the job's item (for all that follow, if you say so), a rename, a new folder or file. It goes through GVfs's `admin://` and polkit, so the password dialog is the system's own and nothing of superfar runs as root. Unattended jobs never escalate. | the bar, or `admin:///path` in Ctrl+L |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
-| **Multi-rename** | Wildcards, regex, find and replace, numbering, case, presets and undo, with a live preview that calls out clashes. | Shift+F2 |
+| **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |
+| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it; nothing is deleted, and an item changed since is left alone. | Ctrl+Z, Ctrl+Shift+Z |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
 
 ### Looking and finding
@@ -84,7 +87,7 @@ thumbnail; nothing else changes.
 |---|---|---|
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
-| **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
+| **Viewer** | Any file of any size, read in windows; hex for binaries. Source and config files up to 1 MiB in syntax colours when `bat` is installed, in the theme bat is set to for dark or light. | F3, Ctrl+F9 |
 | **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
 | **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
@@ -149,7 +152,9 @@ use kept as second keys:
 | Shift+F5 | folder sync panel |
 | Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
 | F7, Shift+F4 | new folder, new file |
-| F8, Shift+F8 | trash, delete permanently |
+| F8, Shift+F8 | trash, delete permanently (which cannot be undone, and says so) |
+| Ctrl+Z, Shift+F9 | undo the last file operation of this window |
+| Ctrl+Shift+Z, Shift+F10 | redo it |
 | Alt+F2, Alt+Enter | properties, with permissions and owner for every marked item |
 | Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
 

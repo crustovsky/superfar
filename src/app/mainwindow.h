@@ -2,6 +2,7 @@
 
 #include "core/jobs/job.h"
 #include "core/location.h"
+#include "core/undo.h"
 #include "keymap.h"
 #include "services.h"
 
@@ -54,10 +55,23 @@ private:
     void confirmRemove(bool permanent);
     // source is the tab whose marks the job spends, if it is still there
     // when the job ends; sourceDir is the folder they were in.
+    // queued: behind the jobs already there, not beside them.
     void runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
-                const core::Location& destination);
+                const core::Location& destination, bool queued = false);
     void refreshAt(const core::Location& dir);
+    // Ctrl+Z and Ctrl+Shift+Z: the last entry of that side, taken back
+    // by a job like any other.
+    void undo(bool redo);
+    void onJobFinished(core::Job* job);
     void promptNewFile();
+    // F7 and Shift+F4 once the name is known. Denied in a local folder,
+    // it asks whether to go on as administrator and comes back here
+    // with the folder's admin:// form.
+    void createEntry(const core::Location& dir, const QByteArray& name, bool folder, const QPointer<Tab>& tab);
+    // A tab met "Permission denied": offer to open the folder, or to
+    // rename the item, as administrator.
+    void offerAdmin(Tab* tab, const core::Location& dir);
+    void offerAdminRename(const core::Location& file, const QString& newName, const QString& error);
     void promptGlob(bool on);
     void chooseColumns();
     void openWith();
@@ -90,7 +104,9 @@ private:
     CommandLine* cmdline_;
     Places* places_;
     Preview* preview_ = nullptr;  // exists while Ctrl+Q is on
+    core::UndoStack undo_;        // this window's operations, until it closes
     QTimer* sessionTimer_;
     QList<int> treeSizes_;  // tree | panes while the tree is shown
     bool painted_ = false;
+    bool quitConfirmed_ = false;  // jobs were running or queued, and the user said quit anyway
 };

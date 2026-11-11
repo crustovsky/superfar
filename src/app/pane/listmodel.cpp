@@ -1,5 +1,6 @@
 #include "pane/listmodel.h"
 
+#include "core/admin.h"
 #include "core/match.h"
 #include "core/sort.h"
 #include "uris.h"
@@ -435,6 +436,16 @@ const core::Metadata* ListModel::metadata(const core::Entry& entry) const
     return nullptr;
 }
 
+bool ListModel::walksHere() const
+{
+    // An administrator tab is the local disk read as root: the sizes
+    // asked for with Ctrl+F3 are walked there too. The item counts
+    // that come unasked are not: each goes through the admin daemon,
+    // and once its authorisation has lapsed a mere repaint would put
+    // up the password dialog.
+    return dir_.isNative() || (recursive_ && core::admin::isAdmin(dir_));
+}
+
 const core::DirSize* ListModel::dirSize(const core::Entry& entry) const
 {
     const auto it = dirCache_.constFind(entry.name);
@@ -443,7 +454,7 @@ const core::DirSize* ListModel::dirSize(const core::Entry& entry) const
         return have;
     // Automatic work stays on local filesystems (rule 9); F3 may still
     // ask for a remote folder explicitly.
-    if (!dir_.isNative())
+    if (!walksHere())
         return have;
     const auto pending = dirPending_.constFind(entry.name);
     if (pending == dirPending_.cend() || (recursive_ && !pending.value())) {

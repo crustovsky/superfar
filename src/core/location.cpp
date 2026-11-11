@@ -151,6 +151,13 @@ Location Location::child(const QByteArray& name) const
     return adopt(g_file_get_child(file_, name.constData()));
 }
 
+Location Location::descendant(const QByteArray& relativePath) const
+{
+    if (!file_ || relativePath.isEmpty())
+        return *this;
+    return adopt(g_file_resolve_relative_path(file_, relativePath.constData()));
+}
+
 bool Location::isNative() const
 {
     return file_ && g_file_is_native(file_);

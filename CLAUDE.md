@@ -96,7 +96,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
   copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
 - Shift+F2 multi-rename panel for the marked items (wildcard, regex,
-  find and replace, {n} numbering, case, presets, undo)
+  find and replace, {n} numbering, case, presets)
 - Shift+F5 folder sync panel: compares the active tab with the other
   pane's by size, time and optional SHA-256; copies or trashes the
   checked differences through the job engine
@@ -105,10 +105,11 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows the
   direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus, taller
-  rows); Ctrl+F5 the tree; Ctrl+F6 the column list (show, hide, move);
-  Ctrl+F7 (Ctrl+H) hidden files; a header click sorts, a drag moves it
+  rows); Ctrl+F5 the tree; Ctrl+F6 the column list; Ctrl+F7 (Ctrl+H) hidden
+  files; Ctrl+F9 syntax colours (bat); a header click sorts, a drag moves it
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
-  Alt+F7 find in tree (fuzzy over names, results in a tab)
+  Alt+F7 find in tree (fuzzy over names, results in a tab); Ctrl+Z
+  (Shift+F9) undoes the window's last file operation, Ctrl+Shift+Z redoes
 - Insert or Shift+Down selects and moves down, Shift+Up selects and
   moves up; Space selects when the filter is empty;
   Alt+F9 (Ctrl+=) / Alt+F10 (Ctrl+-) select and deselect by glob;
@@ -126,9 +127,9 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   Enter on an archive (zip, tar.*, 7z, rar, iso, ...) opens it as a
   read-only folder listed by bsdtar in a child process, F5 extracts the
   marked members to the other pane
-- Ctrl+L edits the path (accepts remote URIs; an unmounted one is mounted
-  with credentials asked in the window); Alt+F1 (Ctrl+G) go to folder, fuzzy
-  over history by frecency; Ctrl+R reloads
+- Ctrl+L edits the path (accepts remote URIs and admin:///path, root by
+  polkit; an unmounted one is mounted, credentials asked in the window);
+  Alt+F1 (Ctrl+G) go to folder, fuzzy over history by frecency; Ctrl+R reloads
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
@@ -183,23 +184,22 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   sort.cpp            natural sort by GLib collation key, dirs first
   unixattrs.cpp       mode and owner as text and back, id names cached
   dirsize.cpp         recursive size and count walker (see rule 9)
-  jobs/               copy, move, trash, delete, extract, pack, attributes:
-                      one worker thread each, progress, pause, skip, cancel,
-                      conflict policy, error log. Copy is g_file_copy with a
-                      progress callback (reflinks, splice, metadata and
-                      server-side copy for free): Pause blocks in the
-                      callback, Skip cancels the per-file cancellable. Move
-                      is g_file_move. A trash failure on another volume
-                      offers permanent delete. Extract and pack run bsdtar;
-                      attributes is chmod and chown down a tree with chmod's
-                      X
+  jobs/               copy, move, trash, delete, extract, pack, attributes,
+                      undo: one worker thread each, progress, pause, skip,
+                      cancel, conflict policy, error log. Copy and move are
+                      g_file_copy and g_file_move with a progress callback:
+                      Pause blocks in it, Skip cancels the per-file
+                      cancellable. A failed trash offers permanent delete.
+                      Extract and pack run bsdtar; attributes is chmod -R with
+                      X. Each records what it did (undo.h); undo inverts it,
+                      records its own inverse (redo), trashes, never deletes
   monitor.cpp         directory change events, coalesced by timer
   apps.cpp            GAppInfo: default app, open-with list, terminal apps
-  mounts.cpp          volumes, mount, unmount; prompts go to the window
+  mounts.cpp          volumes, mount, unmount; admin.cpp: admin:// past denials
   compare.cpp         folder sync engine: name, size, mtime, hash
   child.cpp           a program run for its output, killed on cancel
 src/app/
-  mainwindow*.cpp     tree, two panes, preview slot, keys; _jobs, _prompts
+  mainwindow*.cpp     tree, two panes, preview, keys; _jobs, _prompts, _session
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
   pane/tab*.cpp       one folder view: location, history, filter, marks
@@ -208,9 +208,9 @@ src/app/
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
   menu.cpp            the F9 menus and the right-click menus, one table
-  jobs/strip.cpp      collapsed job strip, conflict and confirm bars
+  jobs/strip.cpp      job strip: running and queued rows, conflict, confirm bars
   jobs/panel.cpp      expanded job panel; throughput graph via QPainter
-  viewer.cpp          F3 viewer, in-window, windowed reads, Esc closes
+  viewer.cpp          F3 viewer, windowed reads; highlight.cpp: bat's colours
   preview.cpp         the preview, placed in whichever slot config says
   cmdline.cpp         command line
   keymap.cpp          FAR table, remappable from config
@@ -252,8 +252,8 @@ src/app/
 10. **One toplevel window.** Anything that would be a dialog is an
     in-window bar or overlay, including mount passwords and open-with.
 11. **No colour literals.** Painting uses palette roles from the style
-    option; stylesheets, if any, set spacing only. The acceptance test is
-    switching the system theme while the app runs.
+    option; stylesheets, if any, set spacing only; syntax colours are bat's.
+    The acceptance test is switching the system theme while the app runs.
 12. **Columns are sized from font metrics.** Size, count and date get a
     fixed width from their widest string; Name takes the rest, down to a floor,
     then the list scrolls. Never resize-to-contents on a virtualized view.

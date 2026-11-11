@@ -33,6 +33,8 @@ const std::vector<Group>& groups()
             {Command::MultiRename, "Multi-rename"}, {Command::Mkdir, "New &folder"}, {Command::NewFile, "New f&ile"},
             {Command::Trash, "&Trash"}, {Command::DeletePermanent, "&Delete permanently"},
             {Command::None, ""},
+            {Command::Undo, "&Undo the last operation"}, {Command::Redo, "Redo wh&at was undone"},
+            {Command::None, ""},
             {Command::Quit, "&Quit"},
         }},
         {"&Select", {
@@ -52,6 +54,7 @@ const std::vector<Group>& groups()
         {"&View", {
             {Command::ToggleHidden, "&Hidden files"}, {Command::ToggleSizes, "Recursive &sizes"},
             {Command::ToggleThumbnails, "&Thumbnails"}, {Command::Columns, "Col&umns"},
+            {Command::ToggleHighlight, "S&yntax colours"},
             {Command::None, ""},
             {Command::HideLeft, "&Left pane"}, {Command::HideRight, "&Right pane"},
             {Command::SwitchPane, "Switch &pane"}, {Command::ToggleTree, "Folder &tree"},

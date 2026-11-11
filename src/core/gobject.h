@@ -38,6 +38,11 @@ inline QString errorMessage(const GError* e)
     return e ? QString::fromUtf8(e->message) : QString();
 }
 
+inline bool isDenied(const GError* e)
+{
+    return e && g_error_matches(e, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED);
+}
+
 inline bool isCancelled(const GError* e)
 {
     return e && g_error_matches(e, G_IO_ERROR, G_IO_ERROR_CANCELLED);

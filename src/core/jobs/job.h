@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/location.h"
+#include "core/undo.h"
 
 #include <QObject>
 #include <QString>
@@ -17,10 +18,11 @@
 #include <vector>
 
 typedef struct _GCancellable GCancellable;
+typedef struct _GError GError;
 
 namespace core {
 
-enum class JobKind { Copy, Move, Trash, Delete, Extract, Pack, Attributes };
+enum class JobKind { Copy, Move, Trash, Delete, Extract, Pack, Attributes, Undo, Redo };
 
 struct JobProgress {
     enum class Phase { Scanning, Running, Done };
@@ -37,7 +39,9 @@ struct JobProgress {
 };
 
 enum class ConflictAction { Ask, Skip, Overwrite, OverwriteIfNewer, Rename };
-enum class ErrorAction { Ask, Skip, Retry, Abort, DeletePermanently };
+// AsAdmin: try the item again through admin:// (core/admin.h). As a
+// policy it covers every later item that is denied, and only those.
+enum class ErrorAction { Ask, Skip, Retry, Abort, DeletePermanently, AsAdmin };
 
 struct Conflict {
     QString name;
@@ -49,6 +53,9 @@ struct Conflict {
     qint64 targetModified = 0;
     bool sourceIsDir = false;
     bool targetIsDir = false;
+    // The target has no trash to keep what an overwrite replaces, so
+    // that overwrite could not be undone.
+    bool cannotUndo = false;
 };
 
 struct Failure {
@@ -56,10 +63,12 @@ struct Failure {
     QString path;
     QString message;
     bool offerDelete = false;  // trash refused; permanent delete is an option
+    bool offerAdmin = false;   // permission denied on a local path, and admin:// is there
 };
 
 struct LogEntry {
-    enum class Kind { Skipped, Failed };
+    // Overwritten: replaced for good, where the target has no trash.
+    enum class Kind { Skipped, Failed, Overwritten };
     Kind kind = Kind::Skipped;
     QString path;
     QString message;
@@ -73,7 +82,10 @@ public:
     JobKind kind() const { return kind_; }
     QString title() const;
 
+    // Once: a job that has started, or was aborted while it waited in
+    // the queue, does not start again.
     void start();
+    bool hasStarted() const { return started_; }
     void setPaused(bool paused);
     bool paused() const { return paused_; }
     void skip();
@@ -89,8 +101,19 @@ public:
     bool done() const { return done_; }
     // Valid once finished() has been emitted.
     const std::vector<LogEntry>& log() const { return log_; }
+    // What the job did, for the undo stack: valid once finished() has
+    // been emitted, and the taker's to move from.
+    std::vector<UndoItem>& undoItems() { return undo_; }
+    // What the job is about, in the user's words ("12 items", a name).
+    void setSubject(const QString& subject) { subject_ = subject; }
+    const QString& subject() const { return subject_; }
+    // What it will do, for the row of a job that waits in the queue
+    // ("12 items from /a to /b").
+    void setPlan(const QString& plan) { plan_ = plan; }
+    const QString& plan() const { return plan_; }
 
 Q_SIGNALS:
+    void started();
     void progress(const core::JobProgress& p);
     void conflict(const core::Conflict& c);
     void failure(const core::Failure& f);
@@ -109,10 +132,23 @@ protected:
     // A fresh cancellable for the next item. The previous one is released,
     // so never hold the pointer across a nested item.
     GCancellable* beginItem();
-    ConflictAction askConflict(const Conflict& c);
+    // asked tells an answer given to this very question from a policy.
+    ConflictAction askConflict(const Conflict& c, bool* asked = nullptr);
     ErrorAction askError(const Failure& f);
     void report(const JobProgress& p, bool force = false);
-    void logSkip(const QString& path);
+    void logSkip(const QString& path, const QString& message = QString());
+    void record(UndoItem item);
+    // Fills in a failure from the error on an operation between a and
+    // b (b may be invalid): the system's words and, when permission was
+    // denied on a local path, the offer to go on as administrator. A
+    // denial that came back through admin:// is worded as polkit's.
+    void describe(Failure& f, const GError* error, const Location& a, const Location& b = Location());
+    // An overwrite is about to replace target: it goes to the trash
+    // first, which is what makes the overwrite undoable. False when
+    // there is no trash for it; the caller then overwrites for good,
+    // and the log says so unless the user was warned when asked.
+    bool keepReplaced(const Location& target, GCancellable* cancellable, bool warned);
+    static bool canTrash(const Location& target);
     void logFail(const QString& path, const QString& message);
 
 private:
@@ -133,6 +169,10 @@ private:
     ErrorAction errorPolicy_ = ErrorAction::Ask;
     GCancellable* current_ = nullptr;
     std::vector<LogEntry> log_;
+    std::vector<UndoItem> undo_;
+    QString subject_;
+    QString plan_;
+    bool started_ = false;
     qint64 lastReport_ = 0;
 };
 

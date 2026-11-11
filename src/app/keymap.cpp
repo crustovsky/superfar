@@ -91,6 +91,11 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_PageDown), Command::PreviewNext},
         {QKeySequence(Qt::CTRL | Qt::Key_End), Command::PreviewLast},
         {QKeySequence(Qt::CTRL | Qt::Key_P), Command::PreviewPlay},
+        {QKeySequence(Qt::CTRL | Qt::Key_F9), Command::ToggleHighlight},
+        {QKeySequence(Qt::SHIFT | Qt::Key_F9), Command::Undo},
+        {QKeySequence(Qt::CTRL | Qt::Key_Z), Command::Undo},
+        {QKeySequence(Qt::SHIFT | Qt::Key_F10), Command::Redo},
+        {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), Command::Redo},
     };
     return t;
 }
@@ -191,6 +196,9 @@ QString label(Command command)
     case Command::PreviewLast: return QStringLiteral("Last page");
     case Command::PreviewPlay: return QStringLiteral("Play");
     case Command::Columns: return QStringLiteral("Columns");
+    case Command::Undo: return QStringLiteral("Undo");
+    case Command::Redo: return QStringLiteral("Redo");
+    case Command::ToggleHighlight: return QStringLiteral("Syntax");
     case Command::None: return {};
     }
     return {};
@@ -221,6 +229,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::PreviewFirst, "PreviewFirst"}, {Command::PreviewPrev, "PreviewPrev"},
         {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
         {Command::PreviewPlay, "PreviewPlay"}, {Command::Columns, "Columns"},
+        {Command::Undo, "Undo"}, {Command::Redo, "Redo"}, {Command::ToggleHighlight, "ToggleHighlight"},
     };
     return n;
 }

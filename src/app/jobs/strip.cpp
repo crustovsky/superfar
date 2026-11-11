@@ -34,7 +34,9 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     auto* row = new QHBoxLayout(line);
     row->setContentsMargins(6, 2, 6, 2);
     row->setSpacing(6);
-    auto* title = new QLabel(job->title(), this);
+    // An undo says what it takes back.
+    const bool back = job->kind() == core::JobKind::Undo || job->kind() == core::JobKind::Redo;
+    auto* title = new QLabel(back ? tr("%1: %2").arg(job->title(), job->subject()) : job->title(), this);
     title->setMinimumWidth(title->fontMetrics().horizontalAdvance(QStringLiteral("Delete")) + 4);
     row->addWidget(title);
     name_->setTextFormat(Qt::PlainText);
@@ -53,9 +55,12 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
         row->addWidget(b);
         return b;
     };
+    start_ = add(tr("Start now"));
+    unattended_ = add(tr("Unattended"));
+    unattended_->setCheckable(true);
     pause_ = add(tr("Pause"));
     pause_->setCheckable(true);
-    auto* abort = add(tr("Abort"));
+    auto* abort = abort_ = add(tr("Abort"));
     details_ = add(tr("Details"));
     details_->setCheckable(true);
 
@@ -63,6 +68,9 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     layout_->addWidget(panel_);
     panel_->hide();
 
+    connect(start_, &QToolButton::clicked, this, &JobRow::startNowRequested);
+    connect(unattended_, &QToolButton::toggled, job_, &core::Job::setUnattended);
+    connect(job_, &core::Job::started, this, [this] { setQueued(false); });
     connect(pause_, &QToolButton::toggled, job_, &core::Job::setPaused);
     connect(abort, &QToolButton::clicked, job_, &core::Job::abort);
     connect(details_, &QToolButton::toggled, this, [this](bool on) {
@@ -77,7 +85,19 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     timer->setInterval(kSampleMs);
     connect(timer, &QTimer::timeout, this, &JobRow::sample);
     timer->start();
-    name_->setText(tr("Scanning"));
+    setQueued(!job_->hasStarted());
+}
+
+void JobRow::setQueued(bool queued)
+{
+    for (QWidget* w : {static_cast<QWidget*>(start_), static_cast<QWidget*>(unattended_)})
+        w->setVisible(queued);
+    for (QWidget* w : {static_cast<QWidget*>(bar_), static_cast<QWidget*>(info_), static_cast<QWidget*>(pause_),
+                       static_cast<QWidget*>(details_)})
+        w->setVisible(!queued);
+    name_->setText(queued ? tr("Queued: %1").arg(job_->plan()) : tr("Scanning"));
+    abort_->setText(queued ? tr("Remove") : tr("Abort"));  // out of the queue: it never ran
+    queued_ = queued;
 }
 
 void JobRow::addBar(QWidget* bar)
@@ -169,19 +189,31 @@ void JobRow::refresh()
 JobStrip::JobStrip(QWidget* parent)
     : QWidget(parent)
     , layout_(new QVBoxLayout(this))
+    , queue_(new core::JobQueue(this))
 {
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(1);
     hide();
 }
 
-void JobStrip::addJob(core::Job* job)
+void JobStrip::addJob(core::Job* job, bool queued)
 {
     job->setParent(this);
     auto* row = new JobRow(job, this);
-    layout_->addWidget(row);
+    // The list reads top down: what runs, then what waits, in the order
+    // it will start. A job started beside the others goes above the
+    // queue, not under it.
+    int at = layout_->count();
+    if (!queued)
+        for (int i = 0; i < layout_->count(); ++i)
+            if (auto* other = qobject_cast<JobRow*>(layout_->itemAt(i)->widget()); other && other->queued()) {
+                at = i;
+                break;
+            }
+    layout_->insertWidget(at, row);
     ++rows_;
     updateVisibility();
+    connect(row, &JobRow::startNowRequested, this, [this, job] { queue_->startNow(job); });
 
     connect(job, &core::Job::conflict, this, [this, job, row](const core::Conflict& c) {
         auto* bar = new ConflictBar(c, this);
@@ -209,12 +241,15 @@ void JobStrip::addJob(core::Job* job)
         row->deleteLater();
         --rows_;
         if (!job->log().empty()) {
-            int skipped = 0, failed = 0;
+            int skipped = 0, failed = 0, overwritten = 0;
             for (const auto& e : job->log())
-                (e.kind == core::LogEntry::Kind::Skipped ? skipped : failed)++;
-            const QString title = tr("%1 %2: %3 skipped, %4 failed")
-                                      .arg(job->title(), job->aborted() ? tr("aborted") : tr("finished"))
-                                      .arg(skipped).arg(failed);
+                (e.kind == core::LogEntry::Kind::Skipped ? skipped
+                 : e.kind == core::LogEntry::Kind::Failed ? failed : overwritten)++;
+            QString title = tr("%1 %2: %3 skipped, %4 failed")
+                                .arg(job->title(), job->aborted() ? tr("aborted") : tr("finished"))
+                                .arg(skipped).arg(failed);
+            if (overwritten > 0)
+                title += tr(", %1 overwritten for good").arg(overwritten);
             auto* bar = new LogBar(title, job->log(), this);
             connect(bar, &LogBar::closed, this, [this, bar] { removeBar(bar); });
             showBar(bar);
@@ -223,12 +258,15 @@ void JobStrip::addJob(core::Job* job)
         Q_EMIT jobFinished(job);
         job->deleteLater();
     });
-    job->start();
+    queue_->add(job, queued);
 }
 
-PromptBar* JobStrip::prompt(const QString& message, const QString& okLabel, std::optional<QString> input)
+PromptBar* JobStrip::prompt(const QString& message, const QString& okLabel, std::optional<QString> input,
+                            bool forJob)
 {
     auto* bar = new PromptBar(message, okLabel, std::move(input), this);
+    if (forJob && queue_->busy())
+        bar->offerQueue();
     connect(bar, &PromptBar::accepted, this, [this, bar] { removeBar(bar); });
     connect(bar, &PromptBar::rejected, this, [this, bar] { removeBar(bar); });
     showBar(bar);
