@@ -99,6 +99,9 @@ bool Tab::execute(keymap::Command command)
     case Command::ToggleSizes:
         model_->setRecursiveSizes(!model_->recursiveSizes());
         updateStatus();
+        // Switched on where nothing will come of it: say so, and what does work.
+        if (model_->recursiveSizes() && !model_->walksHere())
+            Q_EMIT message(tr("Sizes are walked on local folders only; F3 walks the folder under the cursor"));
         return true;
     case Command::ToggleThumbnails:
         setThumbnails(!thumbnails());
