@@ -6,6 +6,7 @@
 #include "attributesedit.h"
 #include "config.h"
 #include "funcbar.h"
+#include "highlight.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
 #include "mainwindow.h"
@@ -15,8 +16,10 @@
 #include "pane/listview.h"
 #include "pane/pane.h"
 #include "pane/tabbar.h"
+#include "preview.h"
 #include "tree.h"
 #include "uris.h"
+#include "viewer.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -29,9 +32,12 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMimeData>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTextBlock>
+#include <QTextLayout>
 #include <QToolButton>
 #include <memory>
 
@@ -118,6 +124,7 @@ private Q_SLOTS:
     void undoAndRedo();
     void warningsSayWhatCannotBeUndone();
     void queueBehindARunningJob();
+    void syntaxColoursFromBat();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -167,6 +174,14 @@ private:
             if (row->isVisible() && !row->job()->hasStarted() && !row->job()->done())
                 return row;
         return nullptr;
+    }
+
+    // The colour a highlighter gave the first character of a text
+    // view; invalid while it is plain.
+    static QColor firstColour(const QPlainTextEdit* edit)
+    {
+        const auto formats = edit->document()->firstBlock().layout()->formats();
+        return formats.isEmpty() ? QColor() : formats.first().format.foreground().color();
     }
 
     // Every job has ended and been taken note of, and the keys are the list's again.
@@ -817,6 +832,72 @@ void WindowTest::queueBehindARunningJob()
     QTRY_VERIFY(!window_->isVisible());
 }
 
+void WindowTest::syntaxColoursFromBat()
+{
+    // The bat on PATH is the test's own: it writes down its arguments
+    // and colours whatever it is fed in one colour.
+    write(a_ + "/code.c", "int main() { return 0; }\r\n// end\n");
+    Tab* tab = left()->activeTab();
+    QTRY_VERIFY(tab->entryNames().contains(QStringLiteral("code.c")));
+    ListView* view = tab->view();
+    view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(QStringLiteral("code.c")), 0));
+    QCOMPARE(tab->currentName(), QByteArray("code.c"));
+    auto batCall = [] {
+        QFile f(g_env + "/bat-call");
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts)
+                                           : QStringList();
+    };
+
+    // F3: the text is there at once, the colours when bat answers.
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_VERIFY(left()->findChild<Viewer*>());
+    auto* text = left()->findChild<Viewer*>()->findChild<QPlainTextEdit*>();
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
+    QVERIFY(batCall().contains(QStringLiteral("--file-name=code.c")));
+    QVERIFY(batCall().contains(text->palette().color(QPalette::Base).lightness() < 128 ? QStringLiteral("--theme=dark")
+                                                                                         : QStringLiteral("--theme=light")));
+    QVERIFY(batCall().contains(QStringLiteral("--style=plain")));
+    QCOMPARE(batCall().last(), QStringLiteral("-"));  // the text comes on stdin: bat opens nothing
+
+    // Ctrl+F9 in the viewer switches them off, and on again; the
+    // choice is kept in the state file.
+    QTest::keyClick(text, Qt::Key_F9, Qt::ControlModifier);
+    QTRY_VERIFY(!firstColour(text).isValid());
+    QVERIFY(!Highlight::enabled(config_.get()));
+    QCOMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::keyClick(text, Qt::Key_F9, Qt::ControlModifier);
+    QTRY_COMPARE(firstColour(text), QColor(1, 2, 3));
+    QVERIFY(Highlight::enabled(config_.get()));
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    // The preview's text gets them too.
+    window_->execute(Command::Preview);
+    QTRY_VERIFY(window_->findChild<Preview*>());
+    auto* shown = window_->findChild<Preview*>()->findChild<QPlainTextEdit*>();
+    QTRY_COMPARE(firstColour(shown), QColor(1, 2, 3));
+    window_->execute(Command::Preview);
+
+    // A bat that complains (one too old for --theme=dark does) is not
+    // believed, and with none on PATH nothing happens either: the text
+    // is shown plain, as it was before there were colours.
+    write(g_env + "/bat-warns", "");
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::qWait(300);
+    QVERIFY(!firstColour(text).isValid());
+    QTest::keyClick(text, Qt::Key_Escape);
+    QFile::remove(g_env + "/bat-warns");
+    const QByteArray path = qgetenv("PATH");
+    qputenv("PATH", QFile::encodeName(g_env + "/data"));
+    QTest::keyClick(view, Qt::Key_F3);
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("int main() { return 0; }\n// end\n"));
+    QTest::qWait(300);
+    QVERIFY(!firstColour(text).isValid());
+    qputenv("PATH", path);
+}
+
 int main(int argc, char** argv)
 {
     QTemporaryDir env;
@@ -830,6 +911,16 @@ int main(int argc, char** argv)
         script.write("#!/bin/sh\n{ printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/viewer-call'\n");
         script.close();
         script.setPermissions(script.permissions() | QFile::ExeOwner);
+        // A stand-in for bat: its arguments written down, its input
+        // back in one colour; with bat-warns there, a warning as well.
+        QFile bat(g_env + "/bin/bat");
+        if (!bat.open(QIODevice::WriteOnly))
+            return 1;
+        bat.write("#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + QFile::encodeName(g_env) + "/bat-call'\n"
+                  "[ -e '" + QFile::encodeName(g_env) + "/bat-warns' ] && echo '[bat warning]: Unknown theme' >&2\n"
+                  "printf '\\033[38;2;1;2;3m'; cat; printf '\\033[0m'\n");
+        bat.close();
+        bat.setPermissions(bat.permissions() | QFile::ExeOwner);
         QFile entry(g_env + "/data/applications/zzqview.desktop");
         if (!entry.open(QIODevice::WriteOnly))
             return 1;

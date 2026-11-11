@@ -5,6 +5,7 @@ qt_add_library(superfar_app STATIC
   mainwindow.cpp
   mainwindow_jobs.cpp
   mainwindow_prompts.cpp
+  mainwindow_session.cpp
   tree.cpp
   keymap.cpp
   funcbar.cpp
@@ -22,6 +23,8 @@ qt_add_library(superfar_app STATIC
   uris.cpp
   fm1.cpp
   viewer.cpp
+  sgr.cpp
+  highlight.cpp
   preview.cpp
   pagestrip.cpp
   pdfpages.cpp

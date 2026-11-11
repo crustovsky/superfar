@@ -52,6 +52,7 @@ thumbnail; nothing else changes.
 | tumbler | thumbnails |
 | pdftoppm and pdfinfo (poppler) | PDF pages in the preview |
 | ffmpeg and ffprobe | video in the preview |
+| bat (0.25 or newer) | syntax colours in the viewer and the preview |
 | gvfs | the trash, mounts and network shares |
 | xdg-terminal-exec or `$TERMINAL` | F4 and the command line |
 
@@ -85,7 +86,7 @@ thumbnail; nothing else changes.
 |---|---|---|
 | **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
 | **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
-| **Viewer** | Any file of any size, read in windows; hex for binaries. | F3 |
+| **Viewer** | Any file of any size, read in windows; hex for binaries. Source and config files up to 1 MiB in syntax colours when `bat` is installed, in the theme bat is set to for dark or light. | F3, Ctrl+F9 |
 | **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
 | **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |

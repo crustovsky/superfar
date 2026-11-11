@@ -391,7 +391,8 @@ void Pane::closeOwnOverlay()
 Viewer* Pane::ensureViewer()
 {
     if (!viewer_) {
-        viewer_ = new Viewer(this);
+        viewer_ = new Viewer(services_.config, this);
+        connect(viewer_, &Viewer::commandRequested, this, &Pane::commandRequested);
         connect(viewer_, &Viewer::closed, this, [this] {
             setOverlay(nullptr);
             activeTab()->setFocus();
@@ -537,6 +538,12 @@ bool Pane::execute(keymap::Command command)
     default:
         return activeTab() && activeTab()->execute(command);
     }
+}
+
+void Pane::rehighlight()
+{
+    if (viewer_)
+        viewer_->rehighlight();
 }
 
 void Pane::showText(const QString& title, const QString& text)

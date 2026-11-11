@@ -105,8 +105,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
   bsdtar in a child, with progress, conflict and abort like a copy
 - Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows the
   direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus, taller
-  rows); Ctrl+F5 the tree; Ctrl+F6 the column list (show, hide, move);
-  Ctrl+F7 (Ctrl+H) hidden files; a header click sorts, a drag moves it
+  rows); Ctrl+F5 the tree; Ctrl+F6 the column list; Ctrl+F7 (Ctrl+H) hidden
+  files; Ctrl+F9 syntax colours (bat); a header click sorts, a drag moves it
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab); Ctrl+Z
   (Shift+F9) undoes the window's last file operation, Ctrl+Shift+Z redoes
@@ -199,7 +199,7 @@ src/core/             no widgets, GIO only, tested headless with QtTest
   compare.cpp         folder sync engine: name, size, mtime, hash
   child.cpp           a program run for its output, killed on cancel
 src/app/
-  mainwindow*.cpp     tree, two panes, preview slot, keys; _jobs, _prompts
+  mainwindow*.cpp     tree, two panes, preview, keys; _jobs, _prompts, _session
   tree.cpp            QTreeView over a lazy model, folders only
   pane/pane.cpp       tab strip, active tab, path bar, status line
   pane/tab*.cpp       one folder view: location, history, filter, marks
@@ -210,7 +210,7 @@ src/app/
   menu.cpp            the F9 menus and the right-click menus, one table
   jobs/strip.cpp      job strip: running and queued rows, conflict, confirm bars
   jobs/panel.cpp      expanded job panel; throughput graph via QPainter
-  viewer.cpp          F3 viewer, in-window, windowed reads, Esc closes
+  viewer.cpp          F3 viewer, windowed reads; highlight.cpp: bat's colours
   preview.cpp         the preview, placed in whichever slot config says
   cmdline.cpp         command line
   keymap.cpp          FAR table, remappable from config
@@ -252,8 +252,8 @@ src/app/
 10. **One toplevel window.** Anything that would be a dialog is an
     in-window bar or overlay, including mount passwords and open-with.
 11. **No colour literals.** Painting uses palette roles from the style
-    option; stylesheets, if any, set spacing only. The acceptance test is
-    switching the system theme while the app runs.
+    option; stylesheets, if any, set spacing only; syntax colours are bat's.
+    The acceptance test is switching the system theme while the app runs.
 12. **Columns are sized from font metrics.** Size, count and date get a
     fixed width from their widest string; Name takes the rest, down to a floor,
     then the list scrolls. Never resize-to-contents on a virtualized view.

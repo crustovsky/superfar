@@ -67,6 +67,8 @@ public:
     bool hasOverlay() const { return overlay_ != nullptr; }
     // A job changed what the properties panel shows: it reads again.
     void refreshProperties();
+    // Syntax colours were switched: the viewer follows.
+    void rehighlight();
 
 Q_SIGNALS:
     void locationChanged(const core::Location& dir);  // of the active tab

@@ -65,12 +65,15 @@ QString Child::Result::why(const char* tool, bool lastLineOnly) const
     return message;
 }
 
-void Child::run(const char* const* argv, std::function<void(const Result&)> done)
+void Child::run(const char* const* argv, std::function<void(const Result&)> done, const QByteArray* input,
+                const char* const* env)
 {
     cancel();
-    GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(
-        static_cast<GSubprocessFlags>(G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE)));
+    GPtr<GSubprocessLauncher> launcher(g_subprocess_launcher_new(static_cast<GSubprocessFlags>(
+        G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE | (input ? G_SUBPROCESS_FLAGS_STDIN_PIPE : 0))));
     g_subprocess_launcher_setenv(launcher.get(), "LC_ALL", "C.UTF-8", TRUE);
+    for (; env && env[0] && env[1]; env += 2)
+        g_subprocess_launcher_setenv(launcher.get(), env[0], env[1], TRUE);
     GError* error = nullptr;
     GSubprocess* process = g_subprocess_launcher_spawnv(launcher.get(), argv, &error);
     if (!process) {
@@ -84,7 +87,10 @@ void Child::run(const char* const* argv, std::function<void(const Result&)> done
     process_ = process;
     cancellable_ = g_cancellable_new();
     auto* call = new Call{this, GPtr<GCancellable>(G_CANCELLABLE(g_object_ref(cancellable_))), std::move(done)};
-    g_subprocess_communicate_async(process, nullptr, cancellable_, &Call::onDone, call);
+    GBytes* bytes = input ? g_bytes_new(input->constData(), static_cast<gsize>(input->size())) : nullptr;
+    g_subprocess_communicate_async(process, bytes, cancellable_, &Call::onDone, call);
+    if (bytes)
+        g_bytes_unref(bytes);
 }
 
 void Child::cancel()

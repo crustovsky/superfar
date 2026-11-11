@@ -21,6 +21,7 @@
 
 struct Services;
 
+class Highlight;
 class ImageView;
 class PdfPages;
 class QLabel;
@@ -41,6 +42,12 @@ public:
     // list meaning. Play toggles a video; false otherwise.
     bool step(Step step);
     bool togglePlay();
+    // The text's syntax colours again: the switch was flipped, or the
+    // theme changed.
+    void rehighlight();
+
+protected:
+    void changeEvent(QEvent* event) override;
 
 private:
     void onDetails(const core::Details& d);
@@ -71,5 +78,8 @@ private:
     QWidget* empty_;
     ImageView* picture_;
     QPlainTextEdit* text_;
+    Highlight* colours_;
+    QByteArray textBytes_;   // the text shown, when it is the whole file
+    quint64 textSize_ = 0;   // the size of the file being read
     QFont textFont_;  // the text view's own; the archive tree needs a fixed pitch
 };

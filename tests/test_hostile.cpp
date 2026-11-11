@@ -18,6 +18,7 @@
 #include "core/reader.h"
 #include "core/rename.h"
 #include "core/sort.h"
+#include "sgr.h"
 
 #include <QDir>
 #include <QProcess>
@@ -147,6 +148,8 @@ private Q_SLOTS:
     void archiveMembersStayInside();
     void pdfToolOutput();
     void videoProbeOutput();
+    void escapesInAFileAreBytes();
+    void highlighterOutputIsNotTrusted();
 
 private:
     QTemporaryDir tmp_;
@@ -473,6 +476,82 @@ void HostileTest::videoProbeOutput()
     QCOMPARE(core::parseVideoInfo(R"({"streams":[{"width":16,"height":9,"avg_frame_rate":"100000/1"}]})").frameRate, 0.0);
     QCOMPARE(core::fitFrame(0, 0, 100, 100).width, 1u);
     QCOMPARE(core::fitFrame(16384, 16384, 0, 0).width, 1u);
+}
+
+void HostileTest::escapesInAFileAreBytes()
+{
+    // A file with escape codes of its own. bat passes them through, so
+    // its output cannot be told from colours it added: such a file is
+    // shown plain. What is displayed is the file's bytes either way;
+    // the codes in it are never obeyed.
+    const QByteArray esc("\x1b[");
+    const QByteArray file = "safe " + esc + "31mlooks red" + esc + "0m " + esc + "2J" + "\x1b]0;title\x07 end\n";
+    QVERIFY(!sgr::spans(file, file));
+    QVERIFY(!sgr::spans(file, esc + "38;2;1;2;3m" + file + esc + "0m"));
+    // As bat really answers for such a file: its own code, then the
+    // file's, then its own again.
+    QVERIFY(!sgr::spans("b" + esc + "31mred\n", esc + "38;2;73;72;62mb" + esc + "0m" + esc + "31m" + esc
+                                                    + "38;2;73;72;62m" + esc + "31mred" + esc + "0m\n"));
+    // A lone escape byte, and one at the very end.
+    QVERIFY(!sgr::spans("a\x1b", "a\x1b"));
+    QVERIFY(!sgr::spans("\x1b", esc + "1m\x1b"));
+}
+
+void HostileTest::highlighterOutputIsNotTrusted()
+{
+    // Whatever a child prints, the answer is spans inside the text or
+    // nothing: never a crash, never a position past the end.
+    const QByteArray text("int x = 1;\n\tcaf\xc3\xa9 \xff\xfe bad utf8\n");
+    const qsizetype length = QString::fromUtf8(text).size();
+    const QByteArray esc("\x1b[");
+    const QList<QByteArray> outputs = {
+        QByteArray(),
+        esc,
+        "\x1b",
+        esc + "38;2;999999999999999999999;1;1m" + text,
+        esc + "38;2m" + text,
+        esc + "38;5m" + text,
+        esc + ";;;;;;;;m" + text,
+        esc + QByteArray(100000, ';') + "m" + text,
+        esc + QByteArray(100000, '9') + "m" + text,
+        esc + "1" + QByteArray(1, '\0') + "m" + text,
+        text.left(20) + esc + "1m" + text.mid(20),          // a code inside a character
+        text.left(19) + esc + "1m" + text.mid(19) + esc,
+        text + text,
+        esc + "38;5;300m" + text,
+        esc + "4:3m" + text,
+    };
+    for (const QByteArray& out : outputs) {
+        const auto spans = sgr::spans(text, out);
+        if (!spans)
+            continue;
+        qsizetype last = 0;
+        for (const sgr::Span& span : *spans) {
+            QVERIFY(span.start >= last);
+            QVERIFY(span.length > 0);
+            last = span.start + span.length;
+        }
+        QVERIFY(last <= length);
+    }
+    // Bytes at random, with codes sprinkled in.
+    quint32 seed = 12345;
+    auto next = [&seed] { return seed = seed * 1664525u + 1013904223u; };
+    for (int round = 0; round < 2000; ++round) {
+        QByteArray original, out;
+        for (int i = 0, n = static_cast<int>(next() % 40); i < n; ++i) {
+            const char c = static_cast<char>(next() % 5 == 0 ? next() % 256 : 'a' + next() % 26);
+            original += c;
+            if (next() % 4 == 0)
+                out += esc + QByteArray::number(next() % 120) + (next() % 3 ? "m" : ";");
+            out += next() % 50 == 0 ? static_cast<char>(next() % 256) : c;
+        }
+        const auto spans = sgr::spans(original, out);
+        if (!spans)
+            continue;
+        const qsizetype end = QString::fromUtf8(original).size();
+        for (const sgr::Span& span : *spans)
+            QVERIFY(span.start >= 0 && span.length > 0 && span.start + span.length <= end);
+    }
 }
 
 QTEST_GUILESS_MAIN(HostileTest)

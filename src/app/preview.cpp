@@ -4,6 +4,7 @@
 #include "archivetext.h"
 #include "core/unixattrs.h"
 #include "elidedlabel.h"
+#include "highlight.h"
 #include "jobs/format.h"
 #include "pagestrip.h"
 #include "pdfpages.h"
@@ -101,6 +102,7 @@ Preview::Preview(const Services& services, QWidget* parent)
     , empty_(new QWidget(this))
     , picture_(new ImageView(this))
     , text_(new QPlainTextEdit(this))
+    , colours_(new Highlight(services.config, text_->document()))
 {
     pdf_ = new PdfPages(stack_, strip_, this);
     video_ = new VideoPlayer(stack_, strip_, this);
@@ -142,7 +144,10 @@ Preview::Preview(const Services& services, QWidget* parent)
         if (uri == thumbUri_)
             thumbUri_.clear();
     });
-    connect(reader_, &core::Reader::opened, this, [this](quint64) { reader_->read(0, kTextCap); });
+    connect(reader_, &core::Reader::opened, this, [this](quint64 size) {
+        textSize_ = size;
+        reader_->read(0, kTextCap);
+    });
     connect(reader_, &core::Reader::data, this, [this](quint64, const QByteArray& bytes) {
         reader_->close();
         if (bytes.contains('\0')) {
@@ -153,6 +158,12 @@ Preview::Preview(const Services& services, QWidget* parent)
         text_->setFont(textFont_);
         text_->setPlainText(QString::fromUtf8(bytes));
         stack_->setCurrentWidget(text_);
+        // Colours for a text that is all here; a head cut at the cap
+        // stays plain.
+        if (static_cast<quint64>(bytes.size()) == textSize_) {
+            textBytes_ = bytes;
+            rehighlight();
+        }
     });
     connect(lister_, &core::ArchiveLister::listed, this,
             [this](quint64 gen, const std::vector<core::ArchiveEntry>& entries, const core::ArchiveDropped& dropped) {
@@ -206,6 +217,8 @@ void Preview::clear()
     pdf_->cancel();
     video_->cancel();
     picture_->clear();
+    colours_->clear();
+    textBytes_.clear();
     text_->clear();
     info_->clear();
     title_->clear();
@@ -230,6 +243,18 @@ bool Preview::togglePlay()
         return false;
     video_->togglePlay();
     return true;
+}
+
+void Preview::rehighlight()
+{
+    colours_->highlight(textBytes_, item_.basename(), text_->palette().color(QPalette::Base).lightness() < 128);
+}
+
+void Preview::changeEvent(QEvent* event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange && !textBytes_.isEmpty())
+        rehighlight();
 }
 
 void Preview::showPicture(const QImage& image)

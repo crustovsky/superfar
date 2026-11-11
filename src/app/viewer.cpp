@@ -1,6 +1,7 @@
 #include "viewer.h"
 
 #include "elidedlabel.h"
+#include "highlight.h"
 #include "jobs/format.h"
 
 #include <QKeyEvent>
@@ -14,12 +15,13 @@ namespace {
 constexpr quint32 kWindow = 1024 * 1024;
 }
 
-Viewer::Viewer(QWidget* parent)
+Viewer::Viewer(Config* config, QWidget* parent)
     : QWidget(parent)
     , reader_(new core::Reader(this))
     , title_(new ElidedLabel(this))
     , text_(new QPlainTextEdit(this))
     , status_(new QLabel(this))
+    , colours_(new Highlight(config, text_->document()))
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -51,6 +53,7 @@ void Viewer::open(const core::Location& file)
 {
     clear();
     title_->setText(file.displayPath());
+    name_ = file.basename();
     reader_->open(file);
 }
 
@@ -65,6 +68,9 @@ void Viewer::showText(const QString& title, const QString& text)
 void Viewer::clear()
 {
     reader_->close();
+    colours_->clear();
+    whole_.clear();
+    name_.clear();
     text_->clear();
     size_ = loaded_ = 0;
     hex_ = loading_ = false;
@@ -94,6 +100,23 @@ void Viewer::onData(quint64 offset, const QByteArray& bytes)
     updateStatus();
     if (bytes.isEmpty())
         loaded_ = size_;  // short read: treat as the end
+    // The whole file in one window, as text: bat can colour it.
+    if (offset == 0 && !hex_ && static_cast<quint64>(bytes.size()) == size_) {
+        whole_ = bytes;
+        rehighlight();
+    }
+}
+
+void Viewer::rehighlight()
+{
+    colours_->highlight(whole_, name_, text_->palette().color(QPalette::Base).lightness() < 128);
+}
+
+void Viewer::changeEvent(QEvent* event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange && !whole_.isEmpty())
+        rehighlight();  // a dark theme's colours do not read on a light one
 }
 
 void Viewer::updateStatus()
@@ -130,6 +153,10 @@ void Viewer::keyPressEvent(QKeyEvent* event)
 {
     if (event->key() == Qt::Key_Escape || event->key() == Qt::Key_F3 || event->key() == Qt::Key_F1) {
         Q_EMIT closed();
+        return;
+    }
+    if (keymap::lookup(event) == keymap::Command::ToggleHighlight) {
+        Q_EMIT commandRequested(keymap::Command::ToggleHighlight);
         return;
     }
     QWidget::keyPressEvent(event);
