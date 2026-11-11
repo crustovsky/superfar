@@ -61,6 +61,7 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
     , cmdline_(new CommandLine(this))
     , sessionTimer_(new QTimer(this))
 {
+    services_.jobs = strip_->queue();
     setWindowTitle(QStringLiteral("superfar"));
     resize(config->windowSize().isValid() ? config->windowSize() : QSize(1100, 700));
 
@@ -142,10 +143,11 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
         });
         connect(pane, &Pane::packRequested, this,
                 [this, pane](const core::Location& parent, const std::vector<QByteArray>& names,
-                             const core::Location& archive, const QByteArray& options) {
+                             const core::Location& archive, const QByteArray& options, bool queued) {
                     auto* job = new core::PackJob(parent, names, archive, options);
                     job->setSubject(names.size() == 1 ? parent.child(names.front()).displayName()
                                                       : counted(static_cast<qint64>(names.size()), tr("item"), tr("items")));
+                    job->setPlan(tr("%1 from %2 into %3").arg(job->subject(), parent.displayPath(), archive.displayPath()));
                     const core::Location dest = archive.parent();
                     const QByteArray name = archive.basename();
                     connect(job, &core::Job::finished, this, [this, dest, name] {
@@ -154,10 +156,10 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                                 if (t->location() == dest)
                                     t->reloadWithCursor(name);  // the new archive under the cursor
                     });
-                    runJob(job, pane->activeTab(), parent, dest);
+                    runJob(job, pane->activeTab(), parent, dest, queued);
                 });
         connect(pane, &Pane::attributesRequested, this,
-                [this, pane](const std::vector<core::Location>& items, const core::AttributeChange& change) {
+                [this, pane](const std::vector<core::Location>& items, const core::AttributeChange& change, bool queued) {
                     // A job, so a tree gets progress, Abort and a log of
                     // what was refused. The marks stay: the owner may
                     // follow the mode.
@@ -165,11 +167,12 @@ MainWindow::MainWindow(Config* config, const core::Location& left, const core::L
                     job->setSubject(items.size() == 1 ? items.front().displayName()
                                                       : counted(static_cast<qint64>(items.size()), tr("item"), tr("items")));
                     const core::Location dir = pane->activeTab()->location();
+                    job->setPlan(tr("%1 in %2").arg(job->subject(), dir.displayPath()));
                     connect(job, &core::Job::finished, this, [this, pane, dir] {
                         refreshAt(dir);
                         pane->refreshProperties();
                     });
-                    strip_->addJob(job);
+                    strip_->addJob(job, queued);
                 });
         connect(pane, &Pane::locationChanged, this, [this, pane](const core::Location& dir) {
             if (pane == active_) {
@@ -549,6 +552,21 @@ void MainWindow::saveLayout()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    // Closing ends every job, the queued ones unrun: ask first.
+    if (const int jobs = strip_->queue()->count(); jobs > 0 && !quitConfirmed_) {
+        event->ignore();
+        if (strip_->findChild<PromptBar*>(QStringLiteral("quit")))
+            return;  // asked already
+        PromptBar* bar = strip_->prompt(tr("%1 running or queued. Abort and quit?")
+                                            .arg(counted(jobs, tr("job is"), tr("jobs are"))),
+                                        tr("&Quit"), std::nullopt);
+        bar->setObjectName(QStringLiteral("quit"));
+        connect(bar, &PromptBar::accepted, this, [this] {
+            quitConfirmed_ = true;
+            close();
+        });
+        return;
+    }
     saveLayout();
     saveSession();
     QMainWindow::closeEvent(event);

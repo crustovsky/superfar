@@ -55,8 +55,9 @@ private:
     void confirmRemove(bool permanent);
     // source is the tab whose marks the job spends, if it is still there
     // when the job ends; sourceDir is the folder they were in.
+    // queued: behind the jobs already there, not beside them.
     void runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
-                const core::Location& destination);
+                const core::Location& destination, bool queued = false);
     void refreshAt(const core::Location& dir);
     // Ctrl+Z and Ctrl+Shift+Z: the last entry of that side, taken back
     // by a job like any other.
@@ -99,4 +100,5 @@ private:
     QTimer* sessionTimer_;
     QList<int> treeSizes_;  // tree | panes while the tree is shown
     bool painted_ = false;
+    bool quitConfirmed_ = false;  // jobs were running or queued, and the user said quit anyway
 };

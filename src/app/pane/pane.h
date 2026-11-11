@@ -76,9 +76,10 @@ Q_SIGNALS:
     void runJobs(std::vector<core::Job*> jobs);  // from the sync panel
     // From the pack panel: names in parent go into archive.
     void packRequested(const core::Location& parent, const std::vector<QByteArray>& names,
-                       const core::Location& archive, const QByteArray& options);
+                       const core::Location& archive, const QByteArray& options, bool queued);
     // From the properties panel: permissions and owner for the items.
-    void attributesRequested(const std::vector<core::Location>& items, const core::AttributeChange& change);
+    void attributesRequested(const std::vector<core::Location>& items, const core::AttributeChange& change,
+                             bool queued);
     // From the multi-rename panel: a batch, for the undo stack.
     void undoable(const QString& what, const std::vector<core::UndoItem>& items);
     void sessionChanged();  // tabs opened, closed, moved to, or locked

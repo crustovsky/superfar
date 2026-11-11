@@ -1,3 +1,4 @@
+#include "core/jobs/queue.h"
 #include "counted.h"
 #include "pane/pane.h"
 
@@ -346,7 +347,7 @@ void Pane::openPack(const core::Location& other)
         pack_ = new PackPanel(services_.config, this);
         connect(pack_, &PackPanel::closed, this, &Pane::closeOwnOverlay);
         connect(pack_, &PackPanel::accepted, this,
-                [this](const QByteArray& name, const QByteArray& options, const core::Location& destination) {
+                [this](const QByteArray& name, const QByteArray& options, const core::Location& destination, bool queued) {
                     Tab* t = activeTab();
                     if (!t)
                         return;
@@ -354,7 +355,7 @@ void Pane::openPack(const core::Location& other)
                     for (const core::Location& l : t->selectedLocations())
                         names.push_back(l.basename());
                     closeOwnOverlay();
-                    Q_EMIT packRequested(t->location(), names, destination.child(name), options);
+                    Q_EMIT packRequested(t->location(), names, destination.child(name), options, queued);
                 });
     }
     // One item names the archive after itself (a file without its
@@ -368,6 +369,7 @@ void Pane::openPack(const core::Location& other)
     }
     if (stem.isEmpty())
         stem = "archive";
+    pack_->offerQueue(services_.jobs && services_.jobs->busy());
     pack_->show(tab->selectionText(), stem, tab->location(), other);
     setOverlay(pack_);
     pack_->setFocus();
@@ -504,6 +506,7 @@ bool Pane::execute(keymap::Command command)
             connect(props_, &PropertiesPanel::message, this, &Pane::showMessage);
             connect(props_, &PropertiesPanel::applyRequested, this, &Pane::attributesRequested);
         }
+        props_->offerQueue(services_.jobs && services_.jobs->busy());
         props_->show(items);
         setOverlay(props_);
         props_->setFocus();

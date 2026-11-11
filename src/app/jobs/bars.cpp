@@ -51,7 +51,7 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     } else {
         layout->addStretch(1);
     }
-    auto* ok = button(okLabel, this);
+    auto* ok = ok_ = button(okLabel, this);
     auto* cancel = button(tr("&Cancel"), this);
     layout->addWidget(ok);
     layout->addWidget(cancel);
@@ -63,6 +63,30 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     } else {
         setFocusProxy(ok);
     }
+}
+
+void PromptBar::offerQueue()
+{
+    auto* queue = button(tr("&Queue"), this);
+    queue->setToolTip(tr("Start when the jobs before it have ended (Shift+Enter)"));
+    auto* row = static_cast<QHBoxLayout*>(layout());
+    row->insertWidget(row->indexOf(ok_) + 1, queue);
+    connect(queue, &QPushButton::clicked, this, [this] {
+        queued_ = true;
+        Q_EMIT accepted(edit_ ? edit_->text() : QString());
+    });
+    // Shift+Enter where Enter accepts: the field, or the button.
+    (edit_ ? static_cast<QWidget*>(edit_) : static_cast<QWidget*>(ok_))->installEventFilter(this);
+}
+
+bool PromptBar::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress) {
+        const auto* key = static_cast<QKeyEvent*>(event);
+        if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && (key->modifiers() & Qt::ShiftModifier))
+            queued_ = true;  // the Enter then accepts as it always does
+    }
+    return QFrame::eventFilter(watched, event);
 }
 
 void PromptBar::keyPressEvent(QKeyEvent* event)

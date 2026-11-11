@@ -72,7 +72,7 @@ thumbnail; nothing else changes.
 | | What you get | Where |
 |---|---|---|
 | **Quick filter and marks** | Just type to filter. Marks are separate from the cursor and come back when you return to a folder. | typing, Insert, Space, Ctrl+A |
-| **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. | F5, F6, F8 |
+| **Copy, move, trash** | A job strip inside the window: progress for items and bytes, a throughput graph, Pause, Skip and Abort, conflicts and errors as bars, and an unattended mode that logs instead of asking. Jobs run side by side; while one runs, a new one can be queued behind it instead (the Queue button, or Shift+Enter). | F5, F6, F8 |
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |

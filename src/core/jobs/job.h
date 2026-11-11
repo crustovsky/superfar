@@ -78,7 +78,10 @@ public:
     JobKind kind() const { return kind_; }
     QString title() const;
 
+    // Once: a job that has started, or was aborted while it waited in
+    // the queue, does not start again.
     void start();
+    bool hasStarted() const { return started_; }
     void setPaused(bool paused);
     bool paused() const { return paused_; }
     void skip();
@@ -100,8 +103,13 @@ public:
     // What the job is about, in the user's words ("12 items", a name).
     void setSubject(const QString& subject) { subject_ = subject; }
     const QString& subject() const { return subject_; }
+    // What it will do, for the row of a job that waits in the queue
+    // ("12 items from /a to /b").
+    void setPlan(const QString& plan) { plan_ = plan; }
+    const QString& plan() const { return plan_; }
 
 Q_SIGNALS:
+    void started();
     void progress(const core::JobProgress& p);
     void conflict(const core::Conflict& c);
     void failure(const core::Failure& f);
@@ -154,6 +162,8 @@ private:
     std::vector<LogEntry> log_;
     std::vector<UndoItem> undo_;
     QString subject_;
+    QString plan_;
+    bool started_ = false;
     qint64 lastReport_ = 0;
 };
 

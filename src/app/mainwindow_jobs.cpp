@@ -28,18 +28,19 @@ void MainWindow::startTransfer(bool move)
         if (members.empty())
             return;
         const core::Location dest = otherPane()->activeTab()->location();
-        PromptBar* bar = strip_->prompt(tr("Extract %1 to").arg(tab->selectionText()), tr("Extract"), dest.displayPath());
+        PromptBar* bar = strip_->prompt(tr("Extract %1 to").arg(tab->selectionText()), tr("Extract"), dest.displayPath(), true);
         const core::Location archive = tab->archiveFile();
         const int depth = tab->archiveDepth();
         const core::Location from = tab->location();
         connect(bar, &PromptBar::accepted, this,
-                [this, tab = QPointer<Tab>(tab), from, archive, members, depth](const QString& text) {
+                [this, bar, tab = QPointer<Tab>(tab), from, archive, members, depth](const QString& text) {
             const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
             if (!target.isValid())
                 return;
             auto* job = new core::ExtractJob(archive, members, target, depth);
             job->setSubject(counted(static_cast<qint64>(members.size()), tr("item"), tr("items")));
-            runJob(job, tab, from, target);
+            job->setPlan(tr("%1 from %2 to %3").arg(job->subject(), archive.displayPath(), target.displayPath()));
+            runJob(job, tab, from, target, bar->queued());
         });
         return;
     }
@@ -49,12 +50,12 @@ void MainWindow::startTransfer(bool move)
     const core::Location dest = otherPane()->activeTab()->location();
     const QString verb = move ? tr("Move") : tr("Copy");
     const QString what = tab->selectionText();
-    PromptBar* bar = strip_->prompt(tr("%1 %2 to").arg(verb, what), verb, dest.displayPath());
+    PromptBar* bar = strip_->prompt(tr("%1 %2 to").arg(verb, what), verb, dest.displayPath(), true);
     // The folder the items were taken from, as it was when the prompt
     // opened: the tab may have moved on, or closed, by the time it is
     // accepted.
     const core::Location from = tab->location();
-    connect(bar, &PromptBar::accepted, this, [this, tab = QPointer<Tab>(tab), from, sources, move, what](const QString& text) {
+    connect(bar, &PromptBar::accepted, this, [this, bar, tab = QPointer<Tab>(tab), from, sources, move, what](const QString& text) {
         const core::Location target = core::Location::fromCommandLine(QFile::encodeName(text.trimmed()));
         if (!target.isValid())
             return;
@@ -62,7 +63,8 @@ void MainWindow::startTransfer(bool move)
             tab->aboutToRemove(sources);
         auto* job = new core::TransferJob(sources, target, move);
         job->setSubject(what);
-        runJob(job, tab, from, target);
+        job->setPlan(tr("%1 from %2 to %3").arg(what, from.displayPath(), target.displayPath()));
+        runJob(job, tab, from, target, bar->queued());
     });
 }
 
@@ -112,6 +114,7 @@ void MainWindow::transfer(const std::vector<core::Location>& sources, const core
     auto* job = new core::TransferJob(sources, target, move);
     job->setSubject(sources.size() == 1 ? sources.front().displayName()
                                         : counted(static_cast<qint64>(sources.size()), tr("item"), tr("items")));
+    job->setPlan(tr("%1 from %2 to %3").arg(job->subject(), parent.displayPath(), target.displayPath()));
     runJob(job, from, from->location(), target);
 }
 
@@ -128,19 +131,20 @@ void MainWindow::confirmRemove(bool permanent)
     const QString what = tab->selectionText();
     PromptBar* bar = strip_->prompt(permanent ? tr("Delete %1 permanently? This cannot be undone.").arg(what)
                                               : tr("Move %1 to the trash?").arg(what),
-                                    permanent ? tr("Delete") : tr("Trash"), std::nullopt);
+                                    permanent ? tr("Delete") : tr("Trash"), std::nullopt, true);
     const core::Location from = tab->location();
-    connect(bar, &PromptBar::accepted, this, [this, tab = QPointer<Tab>(tab), from, sources, permanent, what] {
+    connect(bar, &PromptBar::accepted, this, [this, bar, tab = QPointer<Tab>(tab), from, sources, permanent, what] {
         if (tab && tab->location() == from)
             tab->aboutToRemove(sources);
         auto* job = new core::RemoveJob(sources, permanent);
         job->setSubject(what);
-        runJob(job, tab, from, from);
+        job->setPlan(tr("%1 in %2").arg(what, from.displayPath()));
+        runJob(job, tab, from, from, bar->queued());
     });
 }
 
 void MainWindow::runJob(core::Job* job, const QPointer<Tab>& source, const core::Location& sourceDir,
-                        const core::Location& destination)
+                        const core::Location& destination, bool queued)
 {
     connect(job, &core::Job::finished, this, [this, source, sourceDir, destination] {
         if (source)
@@ -150,7 +154,7 @@ void MainWindow::runJob(core::Job* job, const QPointer<Tab>& source, const core:
         tree_->refresh(sourceDir);
         tree_->refresh(destination);
     });
-    strip_->addJob(job);
+    strip_->addJob(job, queued);
 }
 
 void MainWindow::refreshAt(const core::Location& dir)

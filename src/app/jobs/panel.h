@@ -51,4 +51,5 @@ private:
     QLabel* times_;
     ThroughputGraph* graph_;
     QToolButton* pause_ = nullptr;
+    QToolButton* unattended_ = nullptr;
 };

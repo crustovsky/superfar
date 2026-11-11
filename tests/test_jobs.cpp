@@ -4,6 +4,7 @@
 #include "core/jobs/attributes.h"
 #include "core/jobs/extract.h"
 #include "core/jobs/pack.h"
+#include "core/jobs/queue.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
 #include "core/jobs/undo.h"
@@ -109,6 +110,7 @@ private Q_SLOTS:
     void undoPackAndExtract();
     void undoOfAnAbortedJob();
     void permanentDeleteRecordsNothing();
+    void queuedJobsWaitTheirTurn();
 };
 
 void JobsTest::copyIntoItself()
@@ -1008,6 +1010,83 @@ void JobsTest::permanentDeleteRecordsNothing()
     runJob(job);
     QVERIFY(!QFile::exists(tmp.path() + "/src"));
     QVERIFY(job.undoItems().empty());
+}
+
+void JobsTest::queuedJobsWaitTheirTurn()
+{
+    QTemporaryDir tmp;
+    QVERIFY(QDir().mkpath(tmp.path() + "/dst"));
+    for (const char* name : {"a", "b", "c", "d", "e", "f"})
+        write(tmp.path() + "/" + name, name);
+    write(tmp.path() + "/dst/a", "there already");
+    write(tmp.path() + "/dst/f", "there already");
+    const core::Location dst = loc(tmp.path() + "/dst");
+    auto copyOf = [&](const char* name) { return new core::TransferJob({loc(tmp.path() + "/" + name)}, dst, false, this); };
+    auto there = [&](const char* name) { return read(tmp.path() + "/dst/" + name) == QByteArray(name); };
+
+    core::JobQueue queue;
+    // The first job asks about a and waits for an answer: it is running.
+    core::Job* first = copyOf("a");
+    QSignalSpy asked(first, &core::Job::conflict);
+    queue.add(first, false);
+    QTRY_COMPARE(asked.size(), 1);
+
+    // Queued behind it: not started. Started the usual way: beside it.
+    core::Job* second = copyOf("b");
+    queue.add(second, true);
+    core::Job* beside = copyOf("c");
+    queue.add(beside, false);
+    QTRY_VERIFY(there("c"));
+    QTRY_COMPARE(queue.count(), 2);
+    QVERIFY(!second->hasStarted());
+    QVERIFY(!there("b"));
+
+    // Start now stops the waiting.
+    core::Job* eager = copyOf("e");
+    queue.add(eager, true);
+    QVERIFY(!eager->hasStarted());
+    queue.startNow(eager);
+    QTRY_VERIFY(there("e"));
+
+    // An aborted queued job ends without having run.
+    core::Job* dropped = copyOf("d");
+    queue.add(dropped, true);
+    QSignalSpy droppedEnded(dropped, &core::Job::finished);
+    dropped->abort();
+    QTRY_COMPARE(droppedEnded.size(), 1);
+    QVERIFY(dropped->aborted());
+    QVERIFY(!dropped->hasStarted());
+    dropped->start();  // and cannot be started after
+    QVERIFY(!dropped->hasStarted());
+
+    // The first one ends: the one queued behind it runs.
+    QVERIFY(!second->hasStarted());
+    first->answerConflict(core::ConflictAction::Skip, false);
+    QTRY_VERIFY(there("b"));
+    QTRY_COMPARE(queue.count(), 0);
+    QVERIFY(!there("d"));
+
+    // A job that ends by abort lets the next one go as well, and a
+    // paused one holds it: it has not ended.
+    core::Job* blocked = copyOf("f");
+    QSignalSpy blockedAsked(blocked, &core::Job::conflict);
+    queue.add(blocked, false);
+    QTRY_COMPARE(blockedAsked.size(), 1);
+    core::Job* after = copyOf("d");
+    queue.add(after, true);
+    blocked->setPaused(true);
+    QTest::qWait(50);
+    QVERIFY(!after->hasStarted());
+    blocked->abort();
+    QTRY_VERIFY(there("d"));
+    QTRY_COMPARE(queue.count(), 0);
+    // With nothing ahead a queued job starts at once.
+    QFile::remove(tmp.path() + "/dst/b");
+    core::Job* alone = copyOf("b");
+    queue.add(alone, true);
+    QVERIFY(alone->hasStarted());
+    QTRY_VERIFY(there("b"));
+    QTRY_COMPARE(queue.count(), 0);
 }
 
 int main(int argc, char** argv)

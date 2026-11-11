@@ -60,8 +60,10 @@ QString Job::title() const
 
 void Job::start()
 {
-    if (thread_.joinable())
+    if (started_ || done_)
         return;
+    started_ = true;
+    Q_EMIT started();
     thread_ = std::thread([this] {
         run();
         done_ = true;
@@ -90,6 +92,12 @@ void Job::abort()
     paused_ = false;
     cancelCurrent();
     cv_.notify_all();
+    if (!started_ && !done_) {
+        // Aborted while it waited in the queue: it never ran, and this
+        // is its end.
+        done_ = true;
+        QMetaObject::invokeMethod(this, &Job::finished, Qt::QueuedConnection);
+    }
 }
 
 void Job::cancelCurrent()

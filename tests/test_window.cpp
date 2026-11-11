@@ -7,6 +7,7 @@
 #include "config.h"
 #include "funcbar.h"
 #include "jobs/bars.h"
+#include "jobs/strip.h"
 #include "mainwindow.h"
 #include "menu.h"
 #include "openwith.h"
@@ -116,6 +117,7 @@ private Q_SLOTS:
     void openWith();
     void undoAndRedo();
     void warningsSayWhatCannotBeUndone();
+    void queueBehindARunningJob();
 
 private:
     // Shift+F8 on the left tab's selection, confirmed.
@@ -135,6 +137,36 @@ private:
     {
         const auto* bar = window_->findChild<PromptBar*>();
         return bar ? bar->findChild<QLineEdit*>() : nullptr;
+    }
+
+    // The button of that text among w's, a shown one first; null when none.
+    template <typename Button>
+    static Button* buttonOf(const QWidget* w, const QString& text)
+    {
+        Button* hidden = nullptr;
+        for (Button* b : w->findChildren<Button*>()) {
+            if (b->text() == text && b->isVisible())
+                return b;
+            if (b->text() == text)
+                hidden = b;
+        }
+        return hidden;
+    }
+    // The prompt that is up now: closed ones linger until they are deleted.
+    PromptBar* openPrompt() const
+    {
+        for (PromptBar* bar : window_->findChildren<PromptBar*>())
+            if (bar->isVisible())
+                return bar;
+        return nullptr;
+    }
+    // The row of the one job that waits in the queue.
+    JobRow* queuedRow() const
+    {
+        for (JobRow* row : window_->findChildren<JobRow*>())
+            if (row->isVisible() && !row->job()->hasStarted() && !row->job()->done())
+                return row;
+        return nullptr;
     }
 
     // Every job has ended and been taken note of, and the keys are the list's again.
@@ -698,6 +730,91 @@ void WindowTest::warningsSayWhatCannotBeUndone()
     warned.show();
     QVERIFY(!shows(&plain, QStringLiteral("cannot be undone")));
     QVERIFY(shows(&warned, QStringLiteral("overwriting cannot be undone")));
+}
+
+void WindowTest::queueBehindARunningJob()
+{
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    auto startCopy = [&](int row) {
+        view->setCurrentIndex(view->model()->index(row, 0));
+        window_->execute(Command::Copy);
+        QTRY_VERIFY(openPrompt());
+    };
+    // Nothing runs: the copy prompt has its one button.
+    write(b_ + "/two.txt", "there already");
+    startCopy(2);
+    QCOMPARE(tab->currentName(), QByteArray("two.txt"));
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    // The copy asks about two.txt and waits for an answer: a running job.
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ConflictBar*>());
+
+    // Now the prompt offers Queue. The job gets a row that says what
+    // it will do, with Start now, Unattended and Abort, and waits.
+    startCopy(1);
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
+    QTRY_VERIFY(queuedRow());
+    JobRow* row = queuedRow();
+    QVERIFY(shows(row, QStringLiteral("Queued: one.txt from %1 to %2").arg(a_, b_)));
+    for (const char* text : {"Start now", "Unattended", "Abort"})
+        QVERIFY2(buttonOf<QToolButton>(row, QString::fromLatin1(text))->isVisible(), text);
+    QVERIFY(!buttonOf<QToolButton>(row, QStringLiteral("Pause"))->isVisible());
+    QTest::qWait(100);
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+
+    // Abort takes it out of the queue: it never runs.
+    buttonOf<QToolButton>(row, QStringLiteral("Abort"))->click();
+    QTRY_VERIFY(!queuedRow());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+
+    // Shift+Enter queues from the keyboard; Unattended can be set
+    // ahead. When the job before it ends, it runs.
+    startCopy(1);
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return, Qt::ShiftModifier);
+    QTRY_VERIFY(queuedRow());
+    row = queuedRow();
+    buttonOf<QToolButton>(row, QStringLiteral("Unattended"))->click();
+    QVERIFY(row->job()->unattended());
+    // Quitting now would drop both: the window asks first.
+    window_->close();
+    QVERIFY(window_->isVisible());
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(shows(openPrompt(), QStringLiteral("2 jobs are running or queued. Abort and quit?")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    QVERIFY(window_->isVisible());
+    QVERIFY(!QFile::exists(b_ + "/one.txt"));
+    buttonOf<QPushButton>(window_->findChild<ConflictBar*>(), QStringLiteral("&Skip"))->click();
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    // The first job's log (two.txt was skipped) is up; Esc closes it.
+    QTRY_VERIFY(window_->findChild<LogBar*>());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    settle();
+
+    // Start now: the queued job runs beside the one it waited for.
+    QFile::remove(b_ + "/one.txt");
+    startCopy(2);
+    QVERIFY(!buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));  // the queue is empty again
+    QTest::keyClick(openPrompt()->findChild<QLineEdit*>(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ConflictBar*>() && window_->findChild<ConflictBar*>()->isVisible());
+    startCopy(1);
+    buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue"))->click();
+    QTRY_VERIFY(queuedRow());
+    buttonOf<QToolButton>(queuedRow(), QStringLiteral("Start now"))->click();
+    QTRY_VERIFY(QFile::exists(b_ + "/one.txt"));
+    QVERIFY(window_->findChild<ConflictBar*>()->isVisible());  // the first still waits
+
+    // The trash prompt offers it too; confirmed, the window closes
+    // with jobs still there.
+    window_->execute(Command::Trash);
+    QTRY_VERIFY(openPrompt());
+    QVERIFY(buttonOf<QPushButton>(openPrompt(), QStringLiteral("&Queue")));
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    window_->close();
+    QTRY_VERIFY(openPrompt());
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTRY_VERIFY(!window_->isVisible());
 }
 
 int main(int argc, char** argv)

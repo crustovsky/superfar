@@ -17,7 +17,7 @@ QString describe(keymap::Command c)
     case Command::Rename: return QStringLiteral("rename inline; Up and Down move to the next row, Tab to the row's permissions and owner when shown, Enter applies");
     case Command::View: return QStringLiteral("view a file (windowed, hex for binaries); on a folder compute its size");
     case Command::Edit: return QStringLiteral("edit in $VISUAL or $EDITOR in a terminal");
-    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them");
+    case Command::Copy: return QStringLiteral("copy the marked items (or the cursor) to the other pane; inside an archive: extract them. While a job runs, Shift+Enter in a job's prompt queues the new one behind it");
     case Command::Move: return QStringLiteral("move the marked items (or the cursor) to the other pane");
     case Command::Mkdir: return QStringLiteral("new folder");
     case Command::Trash: return QStringLiteral("move to trash; on a mount in the tree: unmount");

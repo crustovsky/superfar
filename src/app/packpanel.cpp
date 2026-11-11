@@ -2,6 +2,7 @@
 
 #include "config.h"
 
+#include <QGuiApplication>
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -38,6 +39,7 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     , format_(new QComboBox(this))
     , level_(new QComboBox(this))
     , destination_(new QComboBox(this))
+    , queue_(new QPushButton(tr("&Queue"), this))
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
@@ -73,7 +75,10 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     auto* packBtn = new QPushButton(tr("&Pack"), this);
     auto* closeBtn = new QPushButton(tr("Clos&e"), this);
     actions->addWidget(packBtn);
+    actions->addWidget(queue_);
     actions->addWidget(closeBtn);
+    queue_->setToolTip(tr("Start when the jobs before it have ended (Shift+Enter)"));
+    queue_->hide();
     layout->addLayout(actions);
     layout->addStretch(1);
 
@@ -92,8 +97,11 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     destination_->setCurrentIndex(std::max(0, destination_->findData(config_->choice(kGroup, QStringLiteral("destination"), QStringLiteral("other")))));
 
     connect(format_, &QComboBox::currentIndexChanged, this, [this] { ext_->setText(QString::fromLatin1(extension())); });
-    connect(name_, &QLineEdit::returnPressed, this, &PackPanel::pack);
-    connect(packBtn, &QPushButton::clicked, this, &PackPanel::pack);
+    connect(name_, &QLineEdit::returnPressed, this, [this] {
+        pack(queue_->isVisibleTo(this) && (QGuiApplication::keyboardModifiers() & Qt::ShiftModifier));
+    });
+    connect(packBtn, &QPushButton::clicked, this, [this] { pack(false); });
+    connect(queue_, &QPushButton::clicked, this, [this] { pack(true); });
     connect(closeBtn, &QPushButton::clicked, this, &PackPanel::closed);
     ext_->setText(QString::fromLatin1(extension()));
     setFocusProxy(name_);
@@ -124,7 +132,12 @@ QByteArray PackPanel::options() const
     return QByteArray(kFormats[i].best);
 }
 
-void PackPanel::pack()
+void PackPanel::offerQueue(bool on)
+{
+    queue_->setVisible(on);
+}
+
+void PackPanel::pack(bool queued)
 {
     const QByteArray stem = name_->text().trimmed().toUtf8();
     if (stem.isEmpty() || stem.contains('/')) {
@@ -135,7 +148,7 @@ void PackPanel::pack()
     config_->setChoice(kGroup, QStringLiteral("level"), level_->currentData().toString());
     config_->setChoice(kGroup, QStringLiteral("destination"), destination_->currentData().toString());
     const bool other = destination_->currentData().toString() == QLatin1String("other");
-    Q_EMIT accepted(stem + extension(), options(), other ? other_ : here_);
+    Q_EMIT accepted(stem + extension(), options(), other ? other_ : here_, queued);
 }
 
 void PackPanel::keyPressEvent(QKeyEvent* event)
@@ -145,7 +158,7 @@ void PackPanel::keyPressEvent(QKeyEvent* event)
         return;
     }
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        pack();  // from a combo box too
+        pack(queue_->isVisibleTo(this) && (event->modifiers() & Qt::ShiftModifier));  // from a combo box too
         return;
     }
     QWidget::keyPressEvent(event);

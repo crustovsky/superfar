@@ -208,7 +208,7 @@ src/app/
   pane/delegate.cpp   row painting: cursor outline, marks, palette roles
   funcbar.cpp         function key bar, modifier-aware labels
   menu.cpp            the F9 menus and the right-click menus, one table
-  jobs/strip.cpp      collapsed job strip, conflict and confirm bars
+  jobs/strip.cpp      job strip: running and queued rows, conflict, confirm bars
   jobs/panel.cpp      expanded job panel; throughput graph via QPainter
   viewer.cpp          F3 viewer, in-window, windowed reads, Esc closes
   preview.cpp         the preview, placed in whichever slot config says
