@@ -54,7 +54,8 @@ QLayoutItem* FlowLayout::takeAt(int index)
 
 int FlowLayout::heightForWidth(int width) const
 {
-    return arrange(QRect(0, 0, width, 0), false);
+    const QMargins m = contentsMargins();
+    return arrange(QRect(0, 0, width - m.left() - m.right(), 0), false) + m.top() + m.bottom();
 }
 
 QSize FlowLayout::sizeHint() const
@@ -67,7 +68,8 @@ QSize FlowLayout::sizeHint() const
         width += item->sizeHint().width() + (width > 0 ? spacing_ : 0);
         height = std::max(height, item->sizeHint().height());
     }
-    return {width, height};
+    const QMargins m = contentsMargins();
+    return {width + m.left() + m.right(), height + m.top() + m.bottom()};
 }
 
 QSize FlowLayout::minimumSize() const
@@ -76,13 +78,14 @@ QSize FlowLayout::minimumSize() const
     for (const QLayoutItem* item : items_)
         if (!item->isEmpty())
             size = size.expandedTo(item->minimumSize());
-    return size;
+    const QMargins m = contentsMargins();
+    return size + QSize(m.left() + m.right(), m.top() + m.bottom());
 }
 
 void FlowLayout::setGeometry(const QRect& rect)
 {
     QLayout::setGeometry(rect);
-    arrange(rect, true);
+    arrange(rect.marginsRemoved(contentsMargins()), true);
 }
 
 // Fills lines from the left, each as tall as its tallest item; returns
