@@ -476,6 +476,8 @@ void WindowTest::functionBarLayers()
         return out;
     };
     QCOMPARE(row().mid(0, 3), QStringList({"F1 Help", "F2 Rename", "F3 View"}));
+    QVERIFY(bar->sizeHint().width() <= window_->width());
+    QCOMPARE(bar->height(), buttons[0]->sizeHint().height());  // with room, one row
 
     QTest::keyPress(focus, Qt::Key_Alt);
     QCOMPARE(row().value(0), QStringLiteral("F1 Go to"));
@@ -500,26 +502,59 @@ void WindowTest::functionBarLayers()
     QTest::keyRelease(focus, Qt::Key_Control);
     QTest::keyPress(focus, Qt::Key_Control);
     QCOMPARE(window_->width(), narrow);
-    // What does not fit is cut at the end: the key and the start of
-    // the word stay (#104). The window is given three quarters of what
-    // the Ctrl layer's labels alone would take, whatever the font.
-    const int tight = std::max(window_->minimumSizeHint().width(), labels * 3 / 4);
+    // Where the widest layer does not fit one row the bar takes two,
+    // F1 to F5 over F6 to F10, and every label is whole (#108). The
+    // window is given three quarters of what one row asks for.
+    const int oneRow = bar->sizeHint().width();
+    const int rowHeight = buttons[0]->sizeHint().height();
+    const int tight = oneRow * 3 / 4;
+    QVERIFY(window_->minimumSizeHint().width() <= tight);
     window_->resize(tight, before.height());
-    QTRY_COMPARE(window_->width(), tight);
-    bool cut = false;
-    for (int i = 0; i < buttons.size(); ++i) {
-        const QString shown = bar->shownLabel(i);
-        QVERIFY2(shown.startsWith(QStringLiteral("F%1").arg(i + 1)), qPrintable(shown));
-        QString head = shown;
-        if (head.endsWith(QChar(0x2026))) {
-            head.chop(1);
-            cut = true;
-        }
-        QVERIFY2(buttons[i]->text().startsWith(head), qPrintable(shown));
+    QTRY_COMPARE(bar->height(), 2 * rowHeight);
+    auto whole = [&] {
+        for (int i = 0; i < buttons.size(); ++i)
+            if (bar->shownLabel(i) != buttons[i]->text())
+                return false;
+        return true;
+    };
+    QVERIFY(whole());  // the Ctrl layer
+    for (int i = 0; i < 5; ++i) {
+        QCOMPARE(buttons[i]->y(), 0);
+        QCOMPARE(buttons[i + 5]->y(), rowHeight);
+        QCOMPARE(buttons[i + 5]->x(), buttons[i]->x());  // the keys in columns
     }
-    QVERIFY(cut);
+    // The height is the widest layer's, not the held one's: letting go
+    // of the modifier does not move what is above the bar.
+    QTest::keyRelease(focus, Qt::Key_Control);
+    QTest::qWait(50);
+    QCOMPARE(bar->height(), 2 * rowHeight);
+    QVERIFY(whole());
+    QTest::keyPress(focus, Qt::Key_Control);
+    window_->resize(oneRow + 20, before.height());
+    QTRY_COMPARE(bar->height(), rowHeight);
+    QVERIFY(whole());
     window_->resize(before);
-    QTRY_COMPARE(bar->shownLabel(9), buttons[9]->text());  // with room, whole
+    QTRY_COMPARE(window_->size(), before);
+    // Too narrow even for two rows, what does not fit is cut at the
+    // end: the key and the start of the word stay (#104).
+    {
+        FuncBar narrow;
+        narrow.resize(oneRow * 2 / 5, 2 * rowHeight);
+        narrow.show();
+        const auto own = narrow.findChildren<QToolButton*>();
+        bool cut = false;
+        for (int i = 0; i < own.size(); ++i) {
+            const QString shown = narrow.shownLabel(i);
+            QVERIFY2(shown.startsWith(QStringLiteral("F%1").arg(i + 1)), qPrintable(shown));
+            QString head = shown;
+            if (head.endsWith(QChar(0x2026))) {
+                head.chop(1);
+                cut = true;
+            }
+            QVERIFY2(own[i]->text().startsWith(head), qPrintable(shown));
+        }
+        QVERIFY(cut);
+    }
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);
