@@ -1263,9 +1263,12 @@ void WindowTest::jobStripFitsANarrowWindow()
         return out.join(QStringLiteral("; "));
     };
     auto top = [&](const QWidget* w) { return w->mapTo(strip, QPoint(0, 0)).y(); };
+    // The row's own line: its bar, not the ones of the job's panel.
     auto* details = buttonOf<QToolButton>(strip, QStringLiteral("Details"));
-    auto* progress = strip->findChild<QProgressBar*>();
-    QVERIFY(details && progress);
+    QVERIFY(details);
+    const QWidget* line = details->parentWidget()->parentWidget();
+    auto* progress = line->findChild<QProgressBar*>();
+    QVERIFY(progress && progress->isVisible());
     const int bound = 75 * window_->fontMetrics().averageCharWidth();
 
     // With room: one line for the row, one for the answers.
@@ -1282,7 +1285,6 @@ void WindowTest::jobStripFitsANarrowWindow()
     QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
     // Whether the row needs its second line there is the font's to
     // say: a small one fits it in the least the panes allow.
-    const QWidget* line = details->parentWidget()->parentWidget();
     const bool wraps = line->sizeHint().width() > line->width();
     QCOMPARE(top(details) >= top(progress) + progress->height(), wraps);
     if (wraps)
