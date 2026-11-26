@@ -1158,6 +1158,15 @@ void WindowTest::longPathsDoNotWidenTheWindow()
         if (deep[i].second > plain[i].second)
             wider << QStringLiteral("%1: %2, was %3").arg(deep[i].first).arg(deep[i].second).arg(plain[i].second);
     QVERIFY2(wider.isEmpty(), qPrintable(wider.join(QStringLiteral("; "))));
+    // Nor do a panel's own rows of controls: they wrap (#96). No panel
+    // or bar makes the window ask for more than this many average
+    // characters; the sync and multi-rename panels asked for about 110.
+    const int bound = 75 * window_->fontMetrics().averageCharWidth();
+    QStringList wide;
+    for (const auto& [what, width] : plain)
+        if (width > bound)
+            wide << QStringLiteral("%1: %2").arg(what).arg(width);
+    QVERIFY2(wide.isEmpty(), qPrintable(QStringLiteral("over %1: ").arg(bound) + wide.join(QStringLiteral("; "))));
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()

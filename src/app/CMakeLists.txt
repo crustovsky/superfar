@@ -8,6 +8,7 @@ qt_add_library(superfar_app STATIC
   mainwindow_session.cpp
   tree.cpp
   keymap.cpp
+  flowlayout.cpp
   funcbar.cpp
   menu.cpp
   cmdline.cpp

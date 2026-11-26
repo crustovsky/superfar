@@ -24,7 +24,11 @@ protected:
         QPainter p(this);
         const QRect r = contentsRect();
         p.setPen(palette().color(foregroundRole()));
-        p.drawText(r, Qt::AlignLeft | Qt::AlignVCenter, fontMetrics().elidedText(text(), mode_, r.width()));
+        // Line by line: each is cut on its own, none wraps.
+        QString shown;
+        for (const QString& line : text().split(QLatin1Char('\n')))
+            shown += (shown.isEmpty() ? QString() : QStringLiteral("\n")) + fontMetrics().elidedText(line, mode_, r.width());
+        p.drawText(r, Qt::AlignLeft | Qt::AlignVCenter, shown);
     }
 
 private:

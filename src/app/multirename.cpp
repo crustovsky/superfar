@@ -1,5 +1,7 @@
 #include "multirename.h"
 
+#include "flowlayout.h"
+
 #include "counted.h"
 #include "config.h"
 #include "core/fileops.h"
@@ -41,44 +43,37 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(4);
 
-    auto* grid = new QGridLayout;
     mode_->addItems({tr("Wildcard (* and ?)"), tr("Regular expression"), tr("Find and replace")});
     caseChange_->addItems({tr("Keep case"), tr("lower case"), tr("UPPER CASE"), tr("Title Case"), tr("Sentence case")});
     start_->setRange(0, 1000000);
     step_->setRange(-1000, 1000);
     digits_->setRange(1, 8);
-    grid->addWidget(new QLabel(tr("Mode"), this), 0, 0);
-    grid->addWidget(mode_, 0, 1);
-    grid->addWidget(new QLabel(tr("Old name"), this), 0, 2);
-    grid->addWidget(pattern_, 0, 3);
-    grid->addWidget(new QLabel(tr("New name"), this), 0, 4);
-    grid->addWidget(replacement_, 0, 5);
-    grid->addWidget(ignoreExt_, 1, 1);
-    grid->addWidget(caseSensitive_, 1, 2);
-    grid->addWidget(caseChange_, 1, 3);
-    auto* numbers = new QHBoxLayout;
-    numbers->addWidget(new QLabel(tr("{n} from"), this));
-    numbers->addWidget(start_);
-    numbers->addWidget(new QLabel(tr("step"), this));
-    numbers->addWidget(step_);
-    numbers->addWidget(new QLabel(tr("digits"), this));
-    numbers->addWidget(digits_);
-    numbers->addStretch(1);
-    grid->addLayout(numbers, 1, 4, 1, 2);
-    auto* presetRow = new QHBoxLayout;
-    presetRow->addWidget(new QLabel(tr("Preset"), this));
-    presetRow->addWidget(presets_, 1);
+    // Three rows of controls, each wrapping where the pane is narrow: a
+    // label stays with its field, and the fields take the room there is.
+    auto cell = [this](std::initializer_list<QWidget*> widgets) { return FlowLayout::cell(widgets, this); };
+    auto label = [this](const QString& text) { return new QLabel(text, this); };
+    auto* names = new FlowLayout;
+    names->addWidget(cell({label(tr("Mode")), mode_}));
+    names->addWidget(cell({label(tr("Old name")), pattern_}));
+    names->addWidget(cell({label(tr("New name")), replacement_}));
+    layout->addLayout(names);
+    auto* options = new FlowLayout;
+    options->addWidget(ignoreExt_);
+    options->addWidget(caseSensitive_);
+    options->addWidget(caseChange_);
+    options->addWidget(cell({label(tr("{n} from")), start_}));
+    options->addWidget(cell({label(tr("step")), step_}));
+    options->addWidget(cell({label(tr("digits")), digits_}));
+    layout->addLayout(options);
+    auto* presetRow = new FlowLayout;
+    presets_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    presetRow->addWidget(cell({label(tr("Preset")), presets_}));
     presetName_ = new QLineEdit(this);
     presetName_->setPlaceholderText(tr("name for a new preset"));
-    presetRow->addWidget(presetName_, 1);
     auto* savePreset = new QPushButton(tr("Sa&ve"), this);
     auto* delPreset = new QPushButton(tr("&Delete"), this);
-    presetRow->addWidget(savePreset);
-    presetRow->addWidget(delPreset);
-    grid->addLayout(presetRow, 2, 0, 1, 6);
-    grid->setColumnStretch(3, 1);
-    grid->setColumnStretch(5, 1);
-    layout->addLayout(grid);
+    presetRow->addWidget(cell({presetName_, savePreset, delPreset}));
+    layout->addLayout(presetRow);
 
     table_->setHeaderLabels({tr("Old"), tr("New")});
     table_->setRootIsDecorated(false);
@@ -87,6 +82,7 @@ MultiRenamePanel::MultiRenamePanel(Config* config, QWidget* parent)
     layout->addWidget(table_, 1);
 
     auto* bottom = new QHBoxLayout;
+    summary_->setMinimumWidth(1);
     bottom->addWidget(summary_, 1);
     auto* closeBtn = new QPushButton(tr("&Close"), this);
     bottom->addWidget(apply_);

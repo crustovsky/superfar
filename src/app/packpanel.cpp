@@ -1,6 +1,7 @@
 #include "packpanel.h"
 
 #include "elidedlabel.h"
+#include "flowlayout.h"
 
 #include "config.h"
 
@@ -56,23 +57,22 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     auto* nameLabel = static_cast<QLabel*>(nameRow->itemAt(0)->widget());
     nameLabel->setBuddy(name_);
 
-    auto* choices = new QHBoxLayout;
+    // The choices wrap where the pane is narrow, each with its label.
+    auto* choices = new FlowLayout;
     auto* formatLabel = new QLabel(tr("&Format"), this);
     formatLabel->setBuddy(format_);
-    choices->addWidget(formatLabel);
-    choices->addWidget(format_);
+    choices->addWidget(FlowLayout::cell({formatLabel, format_}, this));
     auto* levelLabel = new QLabel(tr("&Level"), this);
     levelLabel->setBuddy(level_);
-    choices->addWidget(levelLabel);
-    choices->addWidget(level_);
+    choices->addWidget(FlowLayout::cell({levelLabel, level_}, this));
     auto* intoLabel = new QLabel(tr("&Into"), this);
     intoLabel->setBuddy(destination_);
-    choices->addWidget(intoLabel);
     // The other pane's path is an item's text: the box takes the room
     // there is and cuts the text, it does not ask for its width.
     destination_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     destination_->setMinimumContentsLength(12);
-    choices->addWidget(destination_, 1);
+    destination_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    choices->addWidget(FlowLayout::cell({intoLabel, destination_}, this));
     layout->addLayout(choices);
 
     auto* actions = new QHBoxLayout;
