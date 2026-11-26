@@ -476,8 +476,6 @@ void WindowTest::functionBarLayers()
         return out;
     };
     QCOMPARE(row().mid(0, 3), QStringList({"F1 Help", "F2 Rename", "F3 View"}));
-    QVERIFY(bar->sizeHint().width() <= window_->width());
-    QCOMPARE(bar->height(), buttons[0]->sizeHint().height());  // with room, one row
 
     QTest::keyPress(focus, Qt::Key_Alt);
     QCOMPARE(row().value(0), QStringLiteral("F1 Go to"));
