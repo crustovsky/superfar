@@ -1,5 +1,7 @@
 #include "jobs/strip.h"
 
+#include "elidedlabel.h"
+
 #include "jobs/bars.h"
 #include "jobs/format.h"
 #include "openwith.h"
@@ -22,7 +24,7 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     : QWidget(parent)
     , job_(job)
     , layout_(new QVBoxLayout(this))
-    , name_(new QLabel(this))
+    , name_(new ElidedLabel(this, Qt::ElideMiddle))
     , bar_(new QProgressBar(this))
     , info_(new QLabel(this))
     , panel_(new JobPanel(job, this))
@@ -36,7 +38,7 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     row->setSpacing(6);
     // An undo says what it takes back.
     const bool back = job->kind() == core::JobKind::Undo || job->kind() == core::JobKind::Redo;
-    auto* title = new QLabel(back ? tr("%1: %2").arg(job->title(), job->subject()) : job->title(), this);
+    auto* title = new FittedLabel(back ? tr("%1: %2").arg(job->title(), job->subject()) : job->title(), this);
     title->setMinimumWidth(title->fontMetrics().horizontalAdvance(QStringLiteral("Delete")) + 4);
     row->addWidget(title);
     name_->setTextFormat(Qt::PlainText);

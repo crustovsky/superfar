@@ -1,5 +1,7 @@
 #include "packpanel.h"
 
+#include "elidedlabel.h"
+
 #include "config.h"
 
 #include <QGuiApplication>
@@ -33,7 +35,7 @@ const Format kFormats[] = {
 PackPanel::PackPanel(Config* config, QWidget* parent)
     : QWidget(parent)
     , config_(config)
-    , title_(new QLabel(this))
+    , title_(new ElidedLabel(this, Qt::ElideMiddle))
     , name_(new QLineEdit(this))
     , ext_(new QLabel(this))
     , format_(new QComboBox(this))
@@ -44,7 +46,6 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(4);
-    title_->setWordWrap(true);
     layout->addWidget(title_);
 
     auto* nameRow = new QHBoxLayout;
@@ -67,6 +68,10 @@ PackPanel::PackPanel(Config* config, QWidget* parent)
     auto* intoLabel = new QLabel(tr("&Into"), this);
     intoLabel->setBuddy(destination_);
     choices->addWidget(intoLabel);
+    // The other pane's path is an item's text: the box takes the room
+    // there is and cuts the text, it does not ask for its width.
+    destination_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    destination_->setMinimumContentsLength(12);
     choices->addWidget(destination_, 1);
     layout->addLayout(choices);
 

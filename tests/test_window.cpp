@@ -134,6 +134,7 @@ private Q_SLOTS:
     void viewerFonts();
     void terminalInTheTabsFolder();
     void growingFileUpdatesItsRow();
+    void longPathsDoNotWidenTheWindow();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -1093,6 +1094,70 @@ void WindowTest::growingFileUpdatesItsRow()
     QCOMPARE(tab->currentName(), cursor);
     QCOMPARE(tab->markedCount(), 1);
     QCOMPARE(listed.size(), 0);
+}
+
+void WindowTest::longPathsDoNotWidenTheWindow()
+{
+    // Whatever names a folder or an item on screen elides; it never
+    // sets the least the window may be (#93). Every panel and bar is
+    // opened twice, in two short folders and in two some 230
+    // characters deep around a file with a 120 character name: the
+    // window asks for the same width both times.
+    using Widths = QList<QPair<QString, int>>;
+    auto measure = [&](const QString& l, const QString& r, const QString& name) {
+        write(l + QLatin1Char('/') + name, "1");
+        write(r + QLatin1Char('/') + name, "22");  // a conflict, and a difference to sync
+        left()->activeTab()->navigate(loc(l));
+        right()->activeTab()->navigate(loc(r));
+        [&] { QTRY_VERIFY(left()->activeTab()->entryNames().contains(name)); }();
+        [&] { QTRY_VERIFY(right()->activeTab()->entryNames().contains(name)); }();
+        ListView* view = left()->activeTab()->view();
+        view->setCurrentIndex(view->model()->index(static_cast<int>(left()->activeTab()->entryNames().indexOf(name)), 0));
+        Widths out;
+        auto note = [&](const char* what) {
+            QTest::qWait(120);
+            out.append({QLatin1String(what), window_->minimumSizeHint().width()});
+        };
+        auto escape = [&] {
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+            QTest::qWait(40);
+        };
+        note("the panes");
+        for (const auto& [command, what] : std::initializer_list<std::pair<Command, const char*>>{
+                 {Command::Pack, "pack"}, {Command::Sync, "sync"}, {Command::MultiRename, "multi-rename"},
+                 {Command::Properties, "properties"}, {Command::Mkdir, "new folder"}, {Command::NewFile, "new file"},
+                 {Command::DeletePermanent, "delete"}, {Command::Trash, "trash"}, {Command::Move, "move"},
+                 {Command::Find, "find"}, {Command::GoTo, "go to"}, {Command::OpenWith, "open with"},
+                 {Command::MarkGlob, "mark by pattern"}, {Command::Columns, "columns"}, {Command::Preview, "preview"},
+                 {Command::View, "viewer"}, {Command::EditPath, "path"}}) {
+            window_->execute(command);
+            note(what);
+            escape();
+        }
+        // A copy onto the same name: the prompt, then the conflict bar.
+        window_->execute(Command::Copy);
+        note("copy");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        [&] { QTRY_VERIFY(window_->findChild<ConflictBar*>()); }();
+        note("conflict");
+        escape();
+        [&] { QTRY_VERIFY(window_->findChildren<core::Job*>().isEmpty()); }();
+        return out;
+    };
+    QString deepA = a_, deepB = b_;
+    for (int i = 0; i < 4; ++i) {
+        deepA += QStringLiteral("/a-folder-with-quite-a-long-name-to-fill-the-path-%1").arg(i);
+        deepB += QStringLiteral("/b-folder-with-quite-a-long-name-to-fill-the-path-%1").arg(i);
+    }
+    QVERIFY(QDir().mkpath(deepA) && QDir().mkpath(deepB));
+    const Widths plain = measure(a_, b_, QStringLiteral("n.txt"));
+    const Widths deep = measure(deepA, deepB, QString(120, QLatin1Char('n')) + QStringLiteral(".txt"));
+    QCOMPARE(deep.size(), plain.size());
+    QStringList wider;
+    for (qsizetype i = 0; i < deep.size(); ++i)
+        if (deep[i].second > plain[i].second)
+            wider << QStringLiteral("%1: %2, was %3").arg(deep[i].first).arg(deep[i].second).arg(plain[i].second);
+    QVERIFY2(wider.isEmpty(), qPrintable(wider.join(QStringLiteral("; "))));
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()

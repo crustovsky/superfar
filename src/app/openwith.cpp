@@ -1,5 +1,7 @@
 #include "openwith.h"
 
+#include "elidedlabel.h"
+
 #include "core/match.h"
 
 #include <QApplication>
@@ -26,7 +28,7 @@ OpenWithBar::OpenWithBar(const QString& title, std::vector<core::AppChoice> apps
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
     auto* row = new QHBoxLayout;
-    row->addWidget(new QLabel(title, this));
+    row->addWidget(new FittedLabel(title, this));
     row->addWidget(edit_, 1);
     layout->addLayout(row);
     layout->addWidget(list_);

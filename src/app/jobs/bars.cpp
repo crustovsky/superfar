@@ -1,5 +1,7 @@
 #include "jobs/bars.h"
 
+#include "elidedlabel.h"
+
 #include "jobs/format.h"
 
 #include <QApplication>
@@ -43,7 +45,7 @@ PromptBar::PromptBar(const QString& message, const QString& okLabel, std::option
     frame(this);
     auto* layout = new QHBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
-    layout->addWidget(new QLabel(message, this));
+    layout->addWidget(new FittedLabel(message, this));
     if (input) {
         edit_ = new QLineEdit(*input, this);
         layout->addWidget(edit_, 1);
@@ -126,7 +128,7 @@ ChoiceBar::ChoiceBar(const QString& message, const QStringList& items, QWidget* 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
-    layout->addWidget(new QLabel(message, this));
+    layout->addWidget(new FittedLabel(message, this));
     list_->addItems(items);
     list_->setCurrentRow(0);
     const int rows = std::min(static_cast<int>(items.size()), 8);
@@ -153,7 +155,7 @@ CheckBar::CheckBar(const QString& message, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
-    layout->addWidget(new QLabel(message, this));
+    layout->addWidget(new FittedLabel(message, this));
     layout->addWidget(list_);
     connect(list_, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
         Q_EMIT toggled(list_->row(item), item->checkState() == Qt::Checked);
@@ -232,7 +234,7 @@ AuthBar::AuthBar(const QString& message, const QString& user, const QString& dom
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
-    layout->addWidget(new QLabel(message, this));
+    layout->addWidget(new FittedLabel(message, this));
     auto* row = new QHBoxLayout;
     auto field = [&](const QString& label, const QString& value, bool password) {
         row->addWidget(new QLabel(label, this));
@@ -361,7 +363,7 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
 
     const QString what = c.targetIsDir ? tr("Folder %1 already exists in %2")
                                        : tr("%1 already exists in %2");
-    layout->addWidget(new QLabel(what.arg(c.name, c.targetPath.left(c.targetPath.size() - c.name.size())), this));
+    layout->addWidget(new FittedLabel(what.arg(c.name, c.targetPath.left(c.targetPath.size() - c.name.size())), this));
     auto* details = new QLabel(tr("Source: %1, %2    Target: %3, %4")
                                    .arg(jobfmt::bytes(c.sourceSize), when(c.sourceModified),
                                         jobfmt::bytes(c.targetSize), when(c.targetModified)),
@@ -405,9 +407,8 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(2);
-    auto* text = new QLabel(tr("Could not %1 %2: %3").arg(verb, f.path, f.message), this);
-    text->setWordWrap(true);
-    layout->addWidget(text);
+    // Cut in the middle: what failed and why both stay, whatever the path.
+    layout->addWidget(new FittedLabel(tr("Could not %1 %2: %3").arg(verb, f.path, f.message), this));
 
     auto* row = new QHBoxLayout;
     auto* all = new QCheckBox(tr("Apply to &all"), this);
@@ -448,7 +449,7 @@ LogBar::LogBar(const QString& title, const std::vector<core::LogEntry>& log, QWi
     layout->setSpacing(2);
 
     auto* head = new QHBoxLayout;
-    head->addWidget(new QLabel(title, this), 1);
+    head->addWidget(new FittedLabel(title, this), 1);
     auto* close = button(tr("&Close"), this);
     head->addWidget(close);
     layout->addLayout(head);
