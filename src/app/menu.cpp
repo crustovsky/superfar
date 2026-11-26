@@ -50,6 +50,7 @@ const std::vector<Group>& groups()
             {Command::GoUp, "&Up"}, {Command::EditPath, "&Path"}, {Command::GoTo, "&Go to"},
             {Command::Find, "&Find in tree"}, {Command::Bookmark, "&Bookmark this folder"},
             {Command::Sync, "&Sync with the other pane"}, {Command::Reload, "&Reload"},
+            {Command::OpenTerminal, "T&erminal here"},
         }},
         {"&View", {
             {Command::ToggleHidden, "&Hidden files"}, {Command::ToggleSizes, "Recursive &sizes"},
@@ -103,7 +104,7 @@ const std::vector<Entry>& contextEntries(Context context)
         {Command::Reload}, {Command::ToggleHidden}, {Command::ToggleSizes}, {Command::ToggleThumbnails},
         {Command::Columns},
         {Command::None},
-        {Command::Find}, {Command::Bookmark},
+        {Command::Find}, {Command::Bookmark}, {Command::OpenTerminal},
     };
     static const std::vector<Entry> tabs = {
         {Command::NewTab}, {Command::CloseTab}, {Command::LockTab},
@@ -112,7 +113,7 @@ const std::vector<Entry>& contextEntries(Context context)
     // folder, so these act on it.
     static const std::vector<Entry> tree = {
         {Command::NewTab, "Open in a &new tab"}, {Command::Mkdir}, {Command::Find}, {Command::Bookmark},
-        {Command::Reload},
+        {Command::OpenTerminal}, {Command::Reload},
     };
     static const std::vector<Entry> treeMount = {
         {Command::Trash, "&Unmount or eject"},

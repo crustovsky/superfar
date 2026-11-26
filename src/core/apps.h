@@ -56,6 +56,12 @@ bool launchCommand(const QString& command, const std::vector<Location>& files, b
 // pressed, so output can be read.
 bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOpen, QString* error);
 
+// The same terminal with nothing to run: the user's shell, in dir. A
+// GVfs location opens at its FUSE path when it has one, an admin:// one
+// at the plain path; what has no path at all is an error. The terminal
+// is its own window and is not waited for.
+bool openTerminal(const Location& dir, QString* error);
+
 // A desktop entry's Exec line as a shell command for these files: %f and
 // %u are the first file, %F and %U all of them (paths, or URIs for what
 // has no path), shell-quoted; %% is a percent sign; the other codes go.

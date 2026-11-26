@@ -105,6 +105,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_Z), Command::Undo},
         {QKeySequence(Qt::SHIFT | Qt::Key_F10), Command::Redo},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), Command::Redo},
+        {QKeySequence(Qt::ALT | Qt::Key_F3), Command::OpenTerminal},
     };
     return t;
 }
@@ -208,6 +209,7 @@ QString label(Command command)
     case Command::Undo: return QStringLiteral("Undo");
     case Command::Redo: return QStringLiteral("Redo");
     case Command::ToggleHighlight: return QStringLiteral("Syntax");
+    case Command::OpenTerminal: return QStringLiteral("Terminal");
     case Command::None: return {};
     }
     return {};
@@ -239,6 +241,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
         {Command::PreviewPlay, "PreviewPlay"}, {Command::Columns, "Columns"},
         {Command::Undo, "Undo"}, {Command::Redo, "Redo"}, {Command::ToggleHighlight, "ToggleHighlight"},
+        {Command::OpenTerminal, "OpenTerminal"},
     };
     return n;
 }

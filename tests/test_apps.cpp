@@ -2,6 +2,7 @@
 // test's own: the desktop entries, the terminal and the defaults it
 // sees are the ones written here, and nothing of the user's is touched.
 // A program of its own because GLib reads those directories once.
+#include "core/admin.h"
 #include "core/apps.h"
 
 #include <QDir>
@@ -37,6 +38,7 @@ private Q_SLOTS:
     void terminalAppRunsInOurTerminal();
     void oneTerminalPerFile();
     void noTerminal();
+    void terminalInAFolder();
     void severalFilesAndTheDefault();
     void typedCommand();
 
@@ -172,6 +174,31 @@ void AppsTest::noTerminal()
     QVERIFY(!core::launchWith(QStringLiteral("stubedit.desktop"), {loc(files_ + "/b.txt")}, &error));
     QCOMPARE(error, QStringLiteral("No terminal found; set $TERMINAL"));
     qputenv("TERMINAL", "stubterm");
+}
+
+void AppsTest::terminalInAFolder()
+{
+    // The terminal alone, in the folder: nothing after its name, so it
+    // comes up with the user's shell (#84).
+    QString error;
+    QVERIFY2(core::openTerminal(loc(files_), &error), qPrintable(error));
+    QTRY_VERIFY(!terminalCall().isEmpty());
+    QCOMPARE(terminalCall(), QStringList({files_}));
+    QFile::remove(out_);
+    // An administrator tab's folder is the same folder; the shell is
+    // not root's.
+    QVERIFY2(core::openTerminal(core::admin::of(loc(files_)), &error), qPrintable(error));
+    QTRY_COMPARE(terminalCall(), QStringList({files_}));
+    QFile::remove(out_);
+    // Nowhere on disk to stand: said, and nothing is started.
+    QVERIFY(!core::openTerminal(core::Location::fromUri(QStringLiteral("trash:///")), &error));
+    QCOMPARE(error, QStringLiteral("trash:/// has no local path to open a terminal in"));
+    qputenv("TERMINAL", "");
+    QVERIFY(!core::openTerminal(loc(files_), &error));
+    QCOMPARE(error, QStringLiteral("No terminal found; set $TERMINAL"));
+    qputenv("TERMINAL", "stubterm");
+    QTest::qWait(200);
+    QVERIFY(terminalCall().isEmpty());
 }
 
 void AppsTest::severalFilesAndTheDefault()

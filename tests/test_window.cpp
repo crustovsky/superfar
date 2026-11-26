@@ -131,6 +131,7 @@ private Q_SLOTS:
     void queueBehindARunningJob();
     void syntaxColoursFromBat();
     void viewerFonts();
+    void terminalInTheTabsFolder();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -477,7 +478,8 @@ void WindowTest::functionBarLayers()
     QCOMPARE(row().value(0), QStringLiteral("F1 Go to"));
     QCOMPARE(row().value(1), QStringLiteral("F2 Properties"));
     QCOMPARE(row().value(5), QStringLiteral("F6 Bookmark"));
-    QVERIFY(!buttons[2]->isEnabled());  // Alt+F3 is free
+    QCOMPARE(row().value(2), QStringLiteral("F3 Terminal"));
+    QVERIFY(!buttons[3]->isEnabled());  // Alt+F4 is the window manager's
     QTest::keyRelease(focus, Qt::Key_Alt);
 
     QTest::keyPress(focus, Qt::Key_Control);
@@ -999,6 +1001,34 @@ void WindowTest::viewerFonts()
     QTest::keyClick(text, Qt::Key_Escape);
 }
 
+void WindowTest::terminalInTheTabsFolder()
+{
+    // Alt+F3 starts the terminal in the active tab's folder with
+    // nothing to run (#84). The one on PATH is the test's own.
+    auto call = [] {
+        QFile f(g_env + "/terminal-call");
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts)
+                                           : QStringList();
+    };
+    QFile::remove(g_env + "/terminal-call");
+    QTest::keyClick(left()->activeTab()->view(), Qt::Key_F3, Qt::AltModifier);
+    QTRY_COMPARE(call(), QStringList({a_, "END"}));
+    QFile::remove(g_env + "/terminal-call");
+    // From the other pane it is that pane's folder.
+    QTest::keyClick(left()->activeTab()->view(), Qt::Key_Tab);
+    QTRY_VERIFY(right()->activeTab()->view()->hasFocus());
+    window_->execute(Command::OpenTerminal);
+    QTRY_COMPARE(call(), QStringList({b_, "END"}));
+    QFile::remove(g_env + "/terminal-call");
+    // It is on the menus that act on a folder.
+    for (menu::Context context : {menu::Context::Folder, menu::Context::Tree}) {
+        bool listed = false;
+        for (const menu::Entry& entry : menu::contextEntries(context))
+            listed = listed || entry.command == Command::OpenTerminal;
+        QVERIFY(listed);
+    }
+}
+
 void WindowTest::permissionDeniedOffersAdministrator()
 {
     if (::geteuid() == 0)
@@ -1078,6 +1108,14 @@ int main(int argc, char** argv)
         script.write("#!/bin/sh\n{ printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/viewer-call'\n");
         script.close();
         script.setPermissions(script.permissions() | QFile::ExeOwner);
+        // A stand-in for the terminal, ahead of any real one on PATH: a
+        // test must never open a window on the developer's desktop.
+        QFile term(g_env + "/bin/xdg-terminal-exec");
+        if (!term.open(QIODevice::WriteOnly))
+            return 1;
+        term.write("#!/bin/sh\n{ pwd; printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/terminal-call'\n");
+        term.close();
+        term.setPermissions(term.permissions() | QFile::ExeOwner);
         // A stand-in for bat: its arguments written down, its input
         // back in one colour; with bat-warns there, a warning as well.
         QFile bat(g_env + "/bin/bat");

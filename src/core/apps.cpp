@@ -1,5 +1,6 @@
 #include "core/apps.h"
 
+#include "core/admin.h"
 #include "core/gobject.h"
 
 #include <QFile>
@@ -59,29 +60,38 @@ void queryContentType(const Location& file,
                             nullptr, &TypeRequest::onInfo, req);
 }
 
-// The terminal's command line up to where the program to run goes;
-// empty when there is none.
-QList<QByteArray> terminalArgv()
+// The terminal's command line: up to where the program to run goes
+// when there is one to run, else what opens it with the user's shell.
+// Empty when there is no terminal.
+QList<QByteArray> terminalArgv(bool forCommand)
 {
     if (GStr found(g_find_program_in_path("xdg-terminal-exec")); found)
         return {QByteArray(found.get())};
-    if (const QByteArray term = qgetenv("TERMINAL"); !term.isEmpty())
-        return {term, "-e"};
-    for (const char* t : {"kitty", "foot", "alacritty", "wezterm", "ghostty", "konsole", "xterm"})
+    QByteArray term = qgetenv("TERMINAL");
+    for (const char* t : {"kitty", "foot", "alacritty", "wezterm", "ghostty", "konsole", "xterm"}) {
+        if (!term.isEmpty())
+            break;
         if (GStr found(g_find_program_in_path(t)); found)
-            return {QByteArray(found.get()), "-e"};
-    return {};
+            term = found.get();
+    }
+    if (term.isEmpty())
+        return {};
+    return forCommand ? QList<QByteArray>{term, "-e"} : QList<QByteArray>{term};
 }
 
-bool shellInTerminal(const QByteArray& cwd, const QByteArray& command, QString* error)
+// Starts the terminal in cwd: with sh running command, or, when
+// command is null, with nothing to run, which is the user's shell. It
+// is not our child to wait for: it outlives the window.
+bool spawnTerminal(const QByteArray& cwd, const QByteArray* command, QString* error)
 {
-    QList<QByteArray> argv = terminalArgv();
+    QList<QByteArray> argv = terminalArgv(command != nullptr);
     if (argv.isEmpty()) {
         if (error)
             *error = QStringLiteral("No terminal found; set $TERMINAL");
         return false;
     }
-    argv << "sh" << "-c" << command;
+    if (command)
+        argv << "sh" << "-c" << *command;
     std::vector<char*> cargv;
     for (QByteArray& a : argv)
         cargv.push_back(a.data());
@@ -93,6 +103,11 @@ bool shellInTerminal(const QByteArray& cwd, const QByteArray& command, QString* 
     if (!ok && error)
         *error = errorMessage(err.get());
     return ok;
+}
+
+bool shellInTerminal(const QByteArray& cwd, const QByteArray& command, QString* error)
+{
+    return spawnTerminal(cwd, &command, error);
 }
 
 bool launchInTerminal(GAppInfo* app, const std::vector<Location>& files, QString* error)
@@ -261,6 +276,19 @@ bool runInTerminal(const Location& dir, const QString& shellCommand, bool holdOp
     if (holdOpen)
         command += QStringLiteral("; __s=$?; printf '\\n[exit %s] Enter to close' \"$__s\"; read __r");
     return shellInTerminal(dir.path(), command.toUtf8(), error);
+}
+
+bool openTerminal(const Location& dir, QString* error)
+{
+    // An administrator tab is the local folder under another name; the
+    // shell that opens there is the user's, not root's.
+    const QByteArray path = (admin::isAdmin(dir) ? admin::plain(dir) : dir).path();
+    if (path.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("%1 has no local path to open a terminal in").arg(dir.displayPath());
+        return false;
+    }
+    return spawnTerminal(path, nullptr, error);
 }
 
 QByteArray expandExec(const QByteArray& exec, const std::vector<Location>& files)

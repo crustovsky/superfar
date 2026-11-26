@@ -78,6 +78,7 @@ private:
     void togglePreview();
     void placePreview();
     void runCommand(const QString& command);
+    void openTerminal();  // Alt+F3: the terminal, in the active tab's folder
     void copyToClipboard(bool cut);
     void paste();
     void transfer(const std::vector<core::Location>& sources, const core::Location& target, bool move);

@@ -134,8 +134,8 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Tree roots: filesystem, trash, GTK bookmarks, mounts and volumes.
   Choosing a volume mounts it; F8 on a mount in the tree unmounts it
 - Ctrl+Space focuses the command line, which runs in the active tab's
-  directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
-  the window until Enter; Ctrl+Enter inserts the cursor's name
+  directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds the
+  window until Enter; Ctrl+Enter inserts the name; Alt+F3 that terminal there
 - Ctrl+F4 (Ctrl+Q) preview (Ctrl+Home / PgUp / PgDown / End page a PDF or
   seek a video, Ctrl+P plays); Ctrl+C / Ctrl+X / Ctrl+V work across apps
 

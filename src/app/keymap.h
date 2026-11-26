@@ -77,6 +77,7 @@ enum class Command {
     Undo,              // Ctrl+Z: take the last file operation back
     Redo,              // Ctrl+Shift+Z: do it again
     ToggleHighlight,   // Ctrl+F9: syntax colours in the viewer and the preview
+    OpenTerminal,      // Alt+F3: the default terminal in the tab's folder
 };
 
 Command lookup(const QKeySequence& key);

@@ -85,7 +85,7 @@ void AppTest::functionKeyLayers()
         {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "Undo", "Redo"}},
         {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleTree", "Preview", "ToggleSizes", "ToggleThumbnails",
                                "ToggleHidden", "Columns", "ToggleHighlight", "LockTab"}},
-        {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
+        {Qt::AltModifier, {"GoTo", "Properties", "OpenTerminal", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
     };
     for (const auto& layer : layers) {
         QStringList row;

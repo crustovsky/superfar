@@ -54,7 +54,7 @@ thumbnail; nothing else changes.
 | ffmpeg and ffprobe | video in the preview |
 | bat (0.25 or newer) | syntax colours in the viewer and the preview |
 | gvfs | the trash, mounts and network shares; going on as administrator (with a polkit agent running) |
-| xdg-terminal-exec or `$TERMINAL` | F4 and the command line |
+| xdg-terminal-exec or `$TERMINAL` | F4, the command line and Alt+F3 |
 
 ## Features
 
@@ -96,7 +96,7 @@ thumbnail; nothing else changes.
 
 | | What you get | Where |
 |---|---|---|
-| **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space |
+| **Plays well with others** | Clipboard and drag and drop speak the formats other file managers do; the command line runs in the tab's folder in your terminal, and Alt+F3 opens that terminal there. | Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Space, Alt+F3 |
 | **Nothing pops up** | Progress, questions, passwords, the open-with list and errors are bars inside the one window. | |
 | **Your theme** | No colour of its own: what the platform theme says (qt6ct, Kvantum, Fusion) is what it looks like. | |
 | **Light** | One process, no indexer, no daemon. About 5 MB of its own memory with an empty window, under 50 MB with a 100,000-entry folder open. | |
@@ -142,7 +142,7 @@ bottom shows the one whose modifier you hold:
 |-----|-------|-------|------|-----|
 | F1 | Help | About | Left pane | Go to |
 | F2 | Rename | Multi-rename | Right pane | Properties |
-| F3 | View | Open with | Tree | |
+| F3 | View | Open with | Tree | Terminal |
 | F4 | Edit | New file | Preview | |
 | F5 | Copy | Sync | Sizes | Pack |
 | F6 | Move | | Thumbnails | Bookmark |
@@ -239,6 +239,7 @@ playhead.
 | F9 | the menu bar until a choice or Esc |
 | F10 | quit, keeping the session |
 | Ctrl+Space | the command line: runs in the tab's folder in a terminal |
+| Alt+F3 | your terminal in the tab's folder, with your shell (xdg-terminal-exec, else `$TERMINAL`) |
 
 ## Mouse
 
