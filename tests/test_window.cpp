@@ -1274,13 +1274,19 @@ void WindowTest::jobStripFitsANarrowWindow()
     QVERIFY(top(details) < top(progress) + progress->height());
     const int roomy = strip->height();
 
-    // As narrow as the window may be: the buttons go under the bar.
+    // As narrow as the window may be: the buttons go under the bar
+    // where the row does not fit one line.
     QVERIFY2(window_->minimumSizeHint().width() <= bound, qPrintable(QString::number(window_->minimumSizeHint().width())));
     window_->resize(window_->minimumSizeHint().width(), window_->height());
     QTest::qWait(150);
     QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
-    QVERIFY(top(details) >= top(progress) + progress->height());
-    QVERIFY(strip->height() > roomy);
+    // Whether the row needs its second line there is the font's to
+    // say: a small one fits it in the least the panes allow.
+    const QWidget* line = details->parentWidget()->parentWidget();
+    const bool wraps = line->sizeHint().width() > line->width();
+    QCOMPARE(top(details) >= top(progress) + progress->height(), wraps);
+    if (wraps)
+        QVERIFY(strip->height() > roomy);
 
     // The job's panel open as well.
     details->click();
