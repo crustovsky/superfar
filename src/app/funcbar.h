@@ -17,6 +17,9 @@ public:
     explicit FuncBar(QWidget* parent = nullptr);
 
     bool eventFilter(QObject* watched, QEvent* event) override;
+    // What button index (0 for F1) paints: its label, cut at the end
+    // where the bar is too narrow for it.
+    QString shownLabel(int index) const;
 
 Q_SIGNALS:
     void commandRequested(keymap::Command command);
