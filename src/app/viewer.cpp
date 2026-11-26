@@ -4,6 +4,7 @@
 #include "highlight.h"
 #include "jobs/format.h"
 
+#include <QFontDatabase>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QPlainTextEdit>
@@ -22,6 +23,7 @@ Viewer::Viewer(Config* config, QWidget* parent)
     , text_(new QPlainTextEdit(this))
     , status_(new QLabel(this))
     , colours_(new Highlight(config, text_->document()))
+    , textFont_(text_->font())
 {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -61,6 +63,8 @@ void Viewer::showText(const QString& title, const QString& text)
 {
     clear();
     title_->setText(title);
+    // The help is a table made with spaces.
+    text_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     text_->setPlainText(text);
     status_->setText(tr("Esc closes"));
 }
@@ -72,6 +76,7 @@ void Viewer::clear()
     whole_.clear();
     name_.clear();
     text_->clear();
+    text_->setFont(textFont_);
     size_ = loaded_ = 0;
     hex_ = loading_ = false;
     status_->clear();
@@ -90,8 +95,11 @@ void Viewer::onData(quint64 offset, const QByteArray& bytes)
     loading_ = false;
     if (offset != loaded_)
         return;
-    if (loaded_ == 0)
+    if (loaded_ == 0) {
         hex_ = bytes.contains('\0');
+        if (hex_)  // columns made with spaces
+            text_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    }
     loaded_ += static_cast<quint64>(bytes.size());
     const QString chunk = hex_ ? hexDump(offset, bytes) : QString::fromUtf8(bytes);
     QTextCursor cursor(text_->document());

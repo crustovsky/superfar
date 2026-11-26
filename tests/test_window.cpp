@@ -26,6 +26,7 @@
 #include <QContextMenuEvent>
 #include <QDir>
 #include <QFile>
+#include <QFontDatabase>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -126,6 +127,7 @@ private Q_SLOTS:
     void warningsSayWhatCannotBeUndone();
     void queueBehindARunningJob();
     void syntaxColoursFromBat();
+    void viewerFonts();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -931,6 +933,40 @@ void WindowTest::syntaxColoursFromBat()
     QTest::qWait(300);
     QVERIFY(!firstColour(text).isValid());
     qputenv("PATH", path);
+}
+
+void WindowTest::viewerFonts()
+{
+    // What the viewer lines up with spaces is set in the fixed font: the
+    // help and the hex view (#86). A file shown as text keeps the
+    // application's, also right after one of the others.
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    const QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    QTest::keyClick(view, Qt::Key_F1);
+    QTRY_VERIFY(left()->findChild<Viewer*>());
+    auto* text = left()->findChild<Viewer*>()->findChild<QPlainTextEdit*>();
+    QVERIFY(text->toPlainText().contains(QStringLiteral("this help")));
+    QCOMPARE(text->font(), fixed);
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    write(a_ + "/blob.bin", QByteArray("\x7f" "ELF\0\1\2\3", 8));
+    QTRY_VERIFY(tab->entryNames().contains(QStringLiteral("blob.bin")));
+    auto open = [&](const QString& name) {
+        view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(name), 0));
+        QTest::keyClick(view, Qt::Key_F3);
+    };
+    open(QStringLiteral("blob.bin"));
+    QTRY_VERIFY(text->toPlainText().startsWith(QStringLiteral("00000000  7f 45 4c 46")));
+    QCOMPARE(text->font(), fixed);
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    open(QStringLiteral("one.txt"));
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("1"));
+    QCOMPARE(text->font(), QApplication::font(text));
+    QTest::keyClick(text, Qt::Key_Escape);
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()
