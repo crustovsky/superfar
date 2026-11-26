@@ -37,6 +37,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextBlock>
@@ -132,6 +133,7 @@ private Q_SLOTS:
     void syntaxColoursFromBat();
     void viewerFonts();
     void terminalInTheTabsFolder();
+    void growingFileUpdatesItsRow();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -1040,6 +1042,57 @@ void WindowTest::terminalInTheTabsFolder()
             listed = listed || entry.command == Command::OpenTerminal;
         QVERIFY(listed);
     }
+}
+
+void WindowTest::growingFileUpdatesItsRow()
+{
+    // A file being written in the open folder changes its Size cell and
+    // nothing else: no reset of the list, so cursor, marks and scroll
+    // stay (#83). The other pane shows the same folder in a tab that is
+    // not sorted by name: the row keeps its place until the writer is done.
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    auto* model = view->model();
+    auto rowOf = [&](const QString& name) { return static_cast<int>(tab->entryNames().indexOf(name)); };
+    auto sizeOf = [&](const QString& name) { return model->index(rowOf(name), columns::SizeColumn).data().toString(); };
+    view->setCurrentIndex(model->index(rowOf(QStringLiteral("two.txt")), 0));
+    QTest::keyClick(view, Qt::Key_Insert);  // marks two.txt; the cursor moves on
+    const QByteArray cursor = tab->currentName();
+    QCOMPARE(tab->markedCount(), 1);
+    QCOMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("1 bytes"));
+    QTest::qWait(600);  // the monitor's word on what the test set up has passed
+
+    QSignalSpy reset(model, &QAbstractItemModel::modelReset);
+    QSignalSpy listed(tab, &Tab::folderChanged);
+    QFile one(a_ + "/one.txt");
+    QVERIFY(one.open(QIODevice::Append));
+    one.write(QByteArray(4095, 'x'));
+    one.flush();
+    QTRY_COMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("4.0 KiB"));
+    one.write(QByteArray(4096, 'x'));
+    one.close();
+    QTRY_COMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("8.0 KiB"));
+    QTest::qWait(600);
+    QCOMPARE(reset.size(), 0);
+    QCOMPARE(listed.size(), 0);
+    QCOMPARE(tab->currentName(), cursor);
+    QCOMPARE(tab->markedCount(), 1);
+
+    // Sorted by size, the row moves once the file is closed, and the
+    // cursor and the mark go with their items.
+    tab->setSort(core::SortBy::Size, true);
+    QTRY_COMPARE(tab->entryNames().last(), QStringLiteral("one.txt"));
+    QFile two(a_ + "/two.txt");
+    QVERIFY(two.open(QIODevice::Append));
+    two.write(QByteArray(20000, 'x'));
+    two.flush();
+    QTRY_COMPARE(sizeOf(QStringLiteral("two.txt")), QStringLiteral("19.5 KiB"));
+    QCOMPARE(tab->entryNames().last(), QStringLiteral("one.txt"));  // still being written
+    two.close();
+    QTRY_COMPARE(tab->entryNames().last(), QStringLiteral("two.txt"));
+    QCOMPARE(tab->currentName(), cursor);
+    QCOMPARE(tab->markedCount(), 1);
+    QCOMPARE(listed.size(), 0);
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()

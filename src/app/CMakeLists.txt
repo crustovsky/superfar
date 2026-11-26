@@ -41,6 +41,7 @@ qt_add_library(superfar_app STATIC
   pane/tab_archive.cpp
   pane/tab_marks.cpp
   pane/tab_commands.cpp
+  pane/tab_monitor.cpp
   pane/tab_attributes.cpp
   pane/listview.cpp
   pane/listmodel.cpp

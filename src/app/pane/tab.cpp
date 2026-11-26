@@ -58,6 +58,7 @@ Tab::Tab(const Services& services, QWidget* parent)
     });
     connect(space_, &core::SpaceQuery::result, this, &Tab::onSpace);
     connect(monitor_, &core::Monitor::changed, this, &Tab::onMonitor);
+    connect(monitor_, &core::Monitor::entryChanged, this, &Tab::onEntryChanged);
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
     connect(view_, &QAbstractItemView::activated, this, &Tab::activate);
     connect(view_, &ListView::commandRequested, this, &Tab::commandRequested);
@@ -222,16 +223,6 @@ void Tab::setCurrent(bool current)
         dirty_ = false;
         reload();
     }
-}
-
-void Tab::onMonitor()
-{
-    if (!current_ || view_->isEditing()) {
-        dirty_ = true;
-        return;
-    }
-    Q_EMIT folderChanged();
-    reload();
 }
 
 void Tab::load(const core::Location& dir)

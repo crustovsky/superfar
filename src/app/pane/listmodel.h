@@ -99,6 +99,12 @@ public:
     // shows it without a reload.
     void updateAttributes(const QByteArray& name, std::optional<quint32> permissions, const core::OwnerChange& owner);
 
+    // An entry that changed on disk where it is (a file being written,
+    // a chmod from elsewhere): size, date, mode and owner are taken from
+    // fresh and its row repaints, with no reset; a hidden or filtered
+    // one is updated too. The row keeps its place until the next sort.
+    void updateEntry(const core::Entry& fresh);
+
     // A rename that already happened on disk: the entry changes in place
     // and keeps its row until the next reload re-sorts, so an editor on
     // a neighbouring row survives.
