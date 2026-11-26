@@ -97,8 +97,14 @@ public:
     GoToBar* goTo();
     OpenWithBar* openWith(const QString& title, std::vector<core::AppChoice> apps);
 
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
+
 Q_SIGNALS:
     void jobFinished(core::Job* job);
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void showBar(QWidget* bar, QWidget* under = nullptr);

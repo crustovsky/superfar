@@ -35,6 +35,7 @@
 #include <QMenu>
 #include <QMimeData>
 #include <QPlainTextEdit>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSettings>
 #include <QSignalSpy>
@@ -135,6 +136,7 @@ private Q_SLOTS:
     void terminalInTheTabsFolder();
     void growingFileUpdatesItsRow();
     void longPathsDoNotWidenTheWindow();
+    void jobStripFitsANarrowWindow();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -500,26 +502,59 @@ void WindowTest::functionBarLayers()
     QTest::keyRelease(focus, Qt::Key_Control);
     QTest::keyPress(focus, Qt::Key_Control);
     QCOMPARE(window_->width(), narrow);
-    // What does not fit is cut at the end: the key and the start of
-    // the word stay (#104). The window is given three quarters of what
-    // the Ctrl layer's labels alone would take, whatever the font.
-    const int tight = std::max(window_->minimumSizeHint().width(), labels * 3 / 4);
+    // Where the widest layer does not fit one row the bar takes two,
+    // F1 to F5 over F6 to F10, and every label is whole (#108). The
+    // window is given three quarters of what one row asks for.
+    const int oneRow = bar->sizeHint().width();
+    const int rowHeight = buttons[0]->sizeHint().height();
+    const int tight = oneRow * 3 / 4;
+    QVERIFY(window_->minimumSizeHint().width() <= tight);
     window_->resize(tight, before.height());
-    QTRY_COMPARE(window_->width(), tight);
-    bool cut = false;
-    for (int i = 0; i < buttons.size(); ++i) {
-        const QString shown = bar->shownLabel(i);
-        QVERIFY2(shown.startsWith(QStringLiteral("F%1").arg(i + 1)), qPrintable(shown));
-        QString head = shown;
-        if (head.endsWith(QChar(0x2026))) {
-            head.chop(1);
-            cut = true;
-        }
-        QVERIFY2(buttons[i]->text().startsWith(head), qPrintable(shown));
+    QTRY_COMPARE(bar->height(), 2 * rowHeight);
+    auto whole = [&] {
+        for (int i = 0; i < buttons.size(); ++i)
+            if (bar->shownLabel(i) != buttons[i]->text())
+                return false;
+        return true;
+    };
+    QVERIFY(whole());  // the Ctrl layer
+    for (int i = 0; i < 5; ++i) {
+        QCOMPARE(buttons[i]->y(), 0);
+        QCOMPARE(buttons[i + 5]->y(), rowHeight);
+        QCOMPARE(buttons[i + 5]->x(), buttons[i]->x());  // the keys in columns
     }
-    QVERIFY(cut);
+    // The height is the widest layer's, not the held one's: letting go
+    // of the modifier does not move what is above the bar.
+    QTest::keyRelease(focus, Qt::Key_Control);
+    QTest::qWait(50);
+    QCOMPARE(bar->height(), 2 * rowHeight);
+    QVERIFY(whole());
+    QTest::keyPress(focus, Qt::Key_Control);
+    window_->resize(oneRow + 20, before.height());
+    QTRY_COMPARE(bar->height(), rowHeight);
+    QVERIFY(whole());
     window_->resize(before);
-    QTRY_COMPARE(bar->shownLabel(9), buttons[9]->text());  // with room, whole
+    QTRY_COMPARE(window_->size(), before);
+    // Too narrow even for two rows, what does not fit is cut at the
+    // end: the key and the start of the word stay (#104).
+    {
+        FuncBar narrow;
+        narrow.resize(oneRow * 2 / 5, 2 * rowHeight);
+        narrow.show();
+        const auto own = narrow.findChildren<QToolButton*>();
+        bool cut = false;
+        for (int i = 0; i < own.size(); ++i) {
+            const QString shown = narrow.shownLabel(i);
+            QVERIFY2(shown.startsWith(QStringLiteral("F%1").arg(i + 1)), qPrintable(shown));
+            QString head = shown;
+            if (head.endsWith(QChar(0x2026))) {
+                head.chop(1);
+                cut = true;
+            }
+            QVERIFY2(own[i]->text().startsWith(head), qPrintable(shown));
+        }
+        QVERIFY(cut);
+    }
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);
@@ -1177,19 +1212,103 @@ void WindowTest::longPathsDoNotWidenTheWindow()
         if (deep[i].second > plain[i].second)
             wider << QStringLiteral("%1: %2, was %3").arg(deep[i].first).arg(deep[i].second).arg(plain[i].second);
     QVERIFY2(wider.isEmpty(), qPrintable(wider.join(QStringLiteral("; "))));
-    // Nor do a panel's own rows of controls: they wrap (#96). None of
-    // the panels that take a pane's place makes the window ask for
-    // more than this many average characters; the sync and
-    // multi-rename panels asked for about 110. (The job strip's row
-    // and the bars under it do not wrap yet: #109.)
+    // Nor do a panel's own rows of controls: they wrap (#96), and so
+    // do the job's row and the answers under it (#109). No panel or
+    // bar makes the window ask for more than this many average
+    // characters; the sync and multi-rename panels asked for about 110.
     const int bound = 75 * window_->fontMetrics().averageCharWidth();
-    const QStringList panels = {QStringLiteral("pack"), QStringLiteral("sync"), QStringLiteral("multi-rename"),
-                                QStringLiteral("properties")};
     QStringList wide;
     for (const auto& [what, width] : plain)
-        if (panels.contains(what) && width > bound)
+        if (width > bound)
             wide << QStringLiteral("%1: %2").arg(what).arg(width);
     QVERIFY2(wide.isEmpty(), qPrintable(QStringLiteral("over %1: ").arg(bound) + wide.join(QStringLiteral("; "))));
+}
+
+void WindowTest::jobStripFitsANarrowWindow()
+{
+    // The job's row, the question under it and the job's panel wrap
+    // (#109). The strip sits in a splitter that only reads size hints,
+    // so what is tested is what is on screen: in a window as narrow as
+    // it may be, nothing in the strip lies over anything else or
+    // outside it.
+    write(b_ + "/one.txt", "22");  // a conflict holds the job where it is
+    Tab* tab = left()->activeTab();
+    tab->view()->setCurrentIndex(tab->view()->model()->index(static_cast<int>(tab->entryNames().indexOf("one.txt")), 0));
+    window_->execute(Command::Copy);
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+    QTRY_VERIFY(window_->findChild<ConflictBar*>());
+    auto* strip = window_->findChild<JobStrip*>();
+    QVERIFY(strip);
+    auto placed = [&] {
+        QList<QPair<QString, QRect>> out;
+        for (const QWidget* w : strip->findChildren<QWidget*>()) {
+            const bool leaf = qobject_cast<const QAbstractButton*>(w) || qobject_cast<const QLabel*>(w)
+                              || qobject_cast<const QProgressBar*>(w) || qobject_cast<const ThroughputGraph*>(w);
+            if (leaf && w->isVisible() && !w->size().isEmpty())
+                out.append({QLatin1String(w->metaObject()->className()) + QLatin1Char(' ') + w->property("text").toString(),
+                            QRect(w->mapTo(strip, QPoint(0, 0)), w->size())});
+        }
+        return out;
+    };
+    auto misplaced = [&] {
+        QStringList out;
+        const auto all = placed();
+        for (qsizetype i = 0; i < all.size(); ++i) {
+            if (!strip->rect().contains(all[i].second))
+                out << QStringLiteral("%1 is outside the strip").arg(all[i].first);
+            for (qsizetype j = i + 1; j < all.size(); ++j)
+                if (all[i].second.intersects(all[j].second))
+                    out << QStringLiteral("%1 over %2").arg(all[i].first, all[j].first);
+        }
+        return out.join(QStringLiteral("; "));
+    };
+    auto top = [&](const QWidget* w) { return w->mapTo(strip, QPoint(0, 0)).y(); };
+    // The row's own line: its bar, not the ones of the job's panel.
+    auto* details = buttonOf<QToolButton>(strip, QStringLiteral("Details"));
+    QVERIFY(details);
+    const QWidget* line = details->parentWidget()->parentWidget();
+    auto* progress = line->findChild<QProgressBar*>();
+    QVERIFY(progress && progress->isVisible());
+    const int bound = 75 * window_->fontMetrics().averageCharWidth();
+
+    // With room: one line for the row, one for the answers.
+    QTest::qWait(100);
+    QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
+    QVERIFY(top(details) < top(progress) + progress->height());
+    const int roomy = strip->height();
+
+    // As narrow as the window may be: the buttons go under the bar
+    // where the row does not fit one line.
+    QVERIFY2(window_->minimumSizeHint().width() <= bound, qPrintable(QString::number(window_->minimumSizeHint().width())));
+    window_->resize(window_->minimumSizeHint().width(), window_->height());
+    QTest::qWait(150);
+    QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
+    // Whether the row needs its second line there is the font's to
+    // say: a small one fits it in the least the panes allow.
+    const bool wraps = line->sizeHint().width() > line->width();
+    QCOMPARE(top(details) >= top(progress) + progress->height(), wraps);
+    if (wraps)
+        QVERIFY(strip->height() > roomy);
+
+    // The job's panel open as well.
+    details->click();
+    QTest::qWait(150);
+    QVERIFY(strip->findChild<ThroughputGraph*>()->isVisible());
+    QVERIFY2(window_->minimumSizeHint().width() <= bound, qPrintable(QString::number(window_->minimumSizeHint().width())));
+    window_->resize(window_->minimumSizeHint().width(), window_->height());
+    QTest::qWait(150);
+    QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
+    details->click();
+
+    // Wide again, the strip gives the second line back.
+    window_->resize(1200, 800);
+    QTRY_COMPARE(strip->height(), roomy);
+    QVERIFY2(misplaced().isEmpty(), qPrintable(misplaced()));
+
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);  // skip
+    QTRY_VERIFY(window_->findChild<LogBar*>());                      // which the job's log tells of
+    QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+    settle();
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()

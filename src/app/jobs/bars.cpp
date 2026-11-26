@@ -1,6 +1,7 @@
 #include "jobs/bars.h"
 
 #include "elidedlabel.h"
+#include "flowlayout.h"
 
 #include "jobs/format.h"
 
@@ -24,11 +25,13 @@ QPushButton* button(const QString& text, QWidget* parent)
     return b;
 }
 
+// Minimum where a bar does not grow, not Fixed: a layout caps a Fixed
+// widget at its hint, and a bar whose answers wrap is higher than that.
 void frame(QFrame* f, bool grows = false)
 {
     f->setFrameShape(QFrame::StyledPanel);
     f->setFocusPolicy(Qt::StrongFocus);
-    f->setSizePolicy(QSizePolicy::Preferred, grows ? QSizePolicy::Expanding : QSizePolicy::Fixed);
+    f->setSizePolicy(QSizePolicy::Preferred, grows ? QSizePolicy::Expanding : QSizePolicy::Minimum);
 }
 
 QString when(qint64 secs)
@@ -373,7 +376,7 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     if (c.cannotUndo)
         layout->addWidget(new FittedLabel(tr("There is no trash here to keep what is replaced: overwriting cannot be undone."), this));
 
-    auto* row = new QHBoxLayout;
+    auto* row = new FlowLayout;  // the answers wrap where the window is narrow
     auto* all = new QCheckBox(tr("Apply to &all"), this);
     auto add = [&](const QString& text, core::ConflictAction action) {
         auto* b = button(text, this);
@@ -385,7 +388,6 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     add(tr("Overwrite if &newer"), core::ConflictAction::OverwriteIfNewer);
     add(tr("&Rename"), core::ConflictAction::Rename);
     add(tr("&Skip"), core::ConflictAction::Skip);
-    row->addStretch(1);
     row->addWidget(all);
     layout->addLayout(row);
     setFocusProxy(first);
@@ -410,7 +412,7 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     // Cut in the middle: what failed and why both stay, whatever the path.
     layout->addWidget(new FittedLabel(tr("Could not %1 %2: %3").arg(verb, f.path, f.message), this));
 
-    auto* row = new QHBoxLayout;
+    auto* row = new FlowLayout;
     auto* all = new QCheckBox(tr("Apply to &all"), this);
     auto add = [&](const QString& label, core::ErrorAction action) {
         auto* b = button(label, this);
@@ -425,7 +427,6 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     if (f.offerAdmin)
         add(tr("As a&dministrator"), core::ErrorAction::AsAdmin);
     add(tr("A&bort"), core::ErrorAction::Abort);
-    row->addStretch(1);
     row->addWidget(all);
     layout->addLayout(row);
     setFocusProxy(first);
