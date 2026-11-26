@@ -8,11 +8,16 @@
 #include "core/location.h"
 
 #include <QObject>
+#include <functional>
 #include <vector>
 
 namespace core {
 
 enum class ListFailure { Other, NotMounted, NotDirectory, NotSupported, Denied };
+
+// One entry as a listing of its folder would give it now, for a row
+// that changed in place. ok is false when it is gone or cannot be read.
+void queryEntry(const Location& file, std::function<void(bool ok, const Entry& entry)> done);
 
 class Listing : public QObject {
     Q_OBJECT

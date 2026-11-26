@@ -4,7 +4,52 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QStyleOptionToolButton>
+#include <QStylePainter>
 #include <QToolButton>
+
+namespace {
+
+// A button of the bar. Where its label does not fit it is cut at the
+// end, so the key and the start of the word stay ("F1 Abo…"); left to
+// itself the style cuts the middle ("F1...ut"). The size hint is the
+// whole label's.
+class BarButton : public QToolButton {
+public:
+    using QToolButton::QToolButton;
+
+    QString shownText() const
+    {
+        // A cramped button gives its label all it has but the frame.
+        QStyleOptionToolButton opt;
+        initStyleOption(&opt);
+        const int frame = style()->pixelMetric(QStyle::PM_DefaultFrameWidth, &opt, this);
+        const int room = width() - 2 * frame - 2;
+        const QString shown = fontMetrics().elidedText(text(), Qt::ElideRight, room);
+        // Never dots alone: the key at least, or nothing (a free key).
+        const QString key = text().section(QLatin1Char(' '), 0, 0);
+        if (shown.startsWith(key))
+            return shown;
+        return fontMetrics().horizontalAdvance(key) <= room ? key : QString();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QStylePainter p(this);
+        QStyleOptionToolButton opt;
+        initStyleOption(&opt);
+        opt.text = shownText();
+        p.drawComplexControl(QStyle::CC_ToolButton, opt);
+    }
+};
+
+} // namespace
+
+QString FuncBar::shownLabel(int index) const
+{
+    return static_cast<const BarButton*>(buttons_.value(index))->shownText();
+}
 
 FuncBar::FuncBar(QWidget* parent)
     : QWidget(parent)
@@ -21,7 +66,7 @@ FuncBar::FuncBar(QWidget* parent)
     held_->setFixedWidth(held_->fontMetrics().horizontalAdvance(QStringLiteral("Ctrl+Shift")) + 12);
     layout->addWidget(held_);
     for (int i = 1; i <= 10; ++i) {
-        auto* b = new QToolButton(this);
+        auto* b = new BarButton(this);
         b->setAutoRaise(true);
         b->setFocusPolicy(Qt::NoFocus);
         b->setToolButtonStyle(Qt::ToolButtonTextOnly);

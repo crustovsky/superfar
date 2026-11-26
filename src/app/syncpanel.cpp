@@ -1,5 +1,8 @@
 #include "syncpanel.h"
 
+#include "elidedlabel.h"
+#include "flowlayout.h"
+
 #include "counted.h"
 #include "core/jobs/remove.h"
 #include "core/jobs/transfer.h"
@@ -32,7 +35,7 @@ QString sideText(bool exists, bool isDir, quint64 size, qint64 modified)
 SyncPanel::SyncPanel(QWidget* parent)
     : QWidget(parent)
     , comparer_(new core::Comparer(this))
-    , title_(new QLabel(this))
+    , title_(new ElidedLabel(this, Qt::ElideMiddle))
     , bySize_(new QCheckBox(tr("&Size"), this))
     , byTime_(new QCheckBox(tr("&Time"), this))
     , byHash_(new QCheckBox(tr("Content (SHA-256, slo&w)"), this))
@@ -47,14 +50,11 @@ SyncPanel::SyncPanel(QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(6, 4, 6, 4);
     layout->setSpacing(4);
-    title_->setWordWrap(true);
     layout->addWidget(title_);
-    auto* options = new QHBoxLayout;
-    options->addWidget(new QLabel(tr("Compare by"), this));
-    options->addWidget(bySize_);
-    options->addWidget(byTime_);
+    // Both rows of controls wrap: the panel is as narrow as its pane.
+    auto* options = new FlowLayout;
+    options->addWidget(FlowLayout::cell({new QLabel(tr("Compare by"), this), bySize_, byTime_}, this));
     options->addWidget(byHash_);
-    options->addStretch(1);
     options->addWidget(onlyDifferent_);
     auto* compareBtn = new QPushButton(tr("&Compare"), this);
     options->addWidget(compareBtn);
@@ -69,8 +69,9 @@ SyncPanel::SyncPanel(QWidget* parent)
     table_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     layout->addWidget(table_, 1);
 
-    auto* actions = new QHBoxLayout;
-    actions->addWidget(summary_, 1);
+    summary_->setMinimumWidth(1);
+    layout->addWidget(summary_);
+    auto* actions = new FlowLayout;
     auto* closeBtn = new QPushButton(tr("Clos&e"), this);
     for (QPushButton* b : {toRight_, toLeft_, deleteRight_, deleteLeft_, closeBtn})
         actions->addWidget(b);

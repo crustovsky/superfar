@@ -194,7 +194,7 @@ src/core/             no widgets, GIO only, tested headless with QtTest
                       Extract and pack run bsdtar; attributes is chmod -R with
                       X. Each records what it did (undo.h); undo inverts it,
                       records the inverse (redo), trashes, asks before deleting
-  monitor.cpp         directory change events, coalesced by timer
+  monitor.cpp         coalesced: entries came or went, or one changed in place
   apps.cpp            GAppInfo: default app, open-with list, terminal apps
   mounts.cpp          volumes, mount, unmount; admin.cpp: admin:// past denials
   compare.cpp         folder sync engine: name, size, mtime, hash

@@ -96,6 +96,7 @@ private Q_SLOTS:
     void removePermanent();
     void trashOrDelete();
     void monitor();
+    void monitorTellsWritingFromListing();
     void mkdir();
     void undoStack();
     void undoCopy();
@@ -307,6 +308,58 @@ void JobsTest::monitor()
     QVERIFY(changed.wait(2000));
     QTest::qWait(600);
     QCOMPARE(changed.size(), 2);
+}
+
+void JobsTest::monitorTellsWritingFromListing()
+{
+    // A file that is only written to is reported by name, at a calm
+    // pace, and never as a change of the folder (#83): a download must
+    // not cost a listing for every block.
+    QTemporaryDir tmp;
+    write(tmp.path() + "/grow", "x");
+    write(tmp.path() + "/other", "x");
+    core::Monitor mon;
+    QSignalSpy listed(&mon, &core::Monitor::changed);
+    QSignalSpy entry(&mon, &core::Monitor::entryChanged);
+    mon.watch(loc(tmp.path()));
+    QFile grow(tmp.path() + "/grow");
+    QVERIFY(grow.open(QIODevice::Append));
+    for (int i = 0; i < 30; ++i) {  // a second and a half of steady writing
+        grow.write(QByteArray(4096, 'y'));
+        grow.flush();
+        QTest::qWait(50);
+    }
+    QVERIFY(!entry.isEmpty());
+    QVERIFY2(entry.size() <= 3, qPrintable(QString::number(entry.size())));
+    for (const auto& call : entry) {
+        QCOMPARE(call.at(0).toByteArray(), QByteArray("grow"));
+        QVERIFY(!call.at(1).toBool());  // still open
+    }
+    // Closed: settled, said once the pace allows.
+    grow.close();
+    QTRY_VERIFY(!entry.isEmpty() && entry.last().at(1).toBool());
+    // A writer that never closes is taken as settled after a quiet while.
+    entry.clear();
+    QVERIFY(grow.open(QIODevice::Append));
+    grow.write("z");
+    grow.flush();
+    QTRY_COMPARE(entry.size(), 1);
+    QVERIFY(!entry.last().at(1).toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(entry.size(), 2, 6000);
+    QVERIFY(entry.last().at(1).toBool());
+    grow.close();
+    // A chmod is the entry's own change too.
+    entry.clear();
+    QVERIFY(QFile::setPermissions(tmp.path() + "/other", QFile::ReadOwner));
+    QTRY_VERIFY(!entry.isEmpty());
+    QCOMPARE(entry.last().at(0).toByteArray(), QByteArray("other"));
+    QTest::qWait(600);
+    QCOMPARE(listed.size(), 0);
+    // Entries that go or come still list the folder again.
+    QVERIFY(QFile::remove(tmp.path() + "/other"));
+    QVERIFY(listed.wait(2000));
+    QVERIFY(QFile::rename(tmp.path() + "/grow", tmp.path() + "/grown"));
+    QVERIFY(listed.wait(2000));
 }
 
 void JobsTest::mkdir()

@@ -1,5 +1,7 @@
 #include "pane/tab.h"
 
+#include "jobs/format.h"
+
 #include "counted.h"
 #include "bench.h"
 #include "core/admin.h"
@@ -58,6 +60,7 @@ Tab::Tab(const Services& services, QWidget* parent)
     });
     connect(space_, &core::SpaceQuery::result, this, &Tab::onSpace);
     connect(monitor_, &core::Monitor::changed, this, &Tab::onMonitor);
+    connect(monitor_, &core::Monitor::entryChanged, this, &Tab::onEntryChanged);
     connect(model_, &ListModel::marksChanged, this, &Tab::updateStatus);
     connect(view_, &QAbstractItemView::activated, this, &Tab::activate);
     connect(view_, &ListView::commandRequested, this, &Tab::commandRequested);
@@ -222,16 +225,6 @@ void Tab::setCurrent(bool current)
         dirty_ = false;
         reload();
     }
-}
-
-void Tab::onMonitor()
-{
-    if (!current_ || view_->isEditing()) {
-        dirty_ = true;
-        return;
-    }
-    Q_EMIT folderChanged();
-    reload();
 }
 
 void Tab::load(const core::Location& dir)
@@ -466,13 +459,11 @@ void Tab::fallBack(const QString& why)
         load(target);
 }
 
-
 void Tab::onSpace(quint64 generation, bool ok, quint64 freeBytes)
 {
     if (generation != generation_)
         return;
-    spaceText_ = ok ? tr("%1 free").arg(QLocale().formattedDataSize(
-                          static_cast<qint64>(freeBytes), 1, QLocale::DataSizeIecFormat))
+    spaceText_ = ok ? tr("%1 free").arg(jobfmt::bytes(freeBytes))
                     : QString();
     updateStatus();
 }

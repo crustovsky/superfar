@@ -83,3 +83,29 @@ void ListModel::updateAttributes(const QByteArray& name, std::optional<quint32> 
         e.gid = *owner.gid;
     Q_EMIT dataChanged(index(row, 0), index(row, ColumnCount - 1));
 }
+
+void ListModel::updateEntry(const core::Entry& fresh)
+{
+    const int row = rowOf(fresh.name);
+    core::Entry* e = nullptr;
+    if (row >= 0) {
+        e = &entries_[rows_[static_cast<size_t>(row)]];
+    } else {
+        for (core::Entry& candidate : entries_)  // not shown: no index knows it
+            if (candidate.name == fresh.name)
+                e = &candidate;
+    }
+    if (!e || e->type != fresh.type)
+        return;  // gone, new, or another kind of thing now: the reload that follows has it
+    e->size = fresh.size;
+    e->modified = fresh.modified;
+    e->mode = fresh.mode;
+    e->uid = fresh.uid;
+    e->gid = fresh.gid;
+    // A folder's own change is the only word of what happened inside:
+    // its count is asked again when the row is painted.
+    if (e->isDir() && !dirPending_.contains(e->name))
+        dirCache_.remove(e->name);
+    if (row >= 0)
+        Q_EMIT dataChanged(index(row, 0), index(row, ColumnCount - 1));
+}

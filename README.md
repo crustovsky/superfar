@@ -77,6 +77,7 @@ thumbnail; nothing else changes.
 | **Permissions and owner** | `rwxr-xr-x` and `user:group` in the list as `ls -l` has them, sortable, edited in the row. For many items at once, and down their folders, in the properties panel. | F2 then Tab, Alt+F2 |
 | **As administrator** | Where permission is denied on a local folder or item, a bar offers to go on as administrator: opening the folder, the job's item (for all that follow, if you say so), a rename, a new folder or file. It goes through GVfs's `admin://` and polkit, so the password dialog is the system's own and nothing of superfar runs as root. Unattended jobs never escalate. | the bar, or `admin:///path` in Ctrl+L |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
+| **Open with and edit** | Open the marked items with another app: type to narrow the list, Enter opens, Ctrl+Enter also makes it the default; text that names no app runs as a command. F4 edits in a terminal with `$VISUAL`, `$EDITOR`, else nvim, vim, nano or vi. | Shift+F3, F4 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |
 | **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it, and an item changed since is left alone. Nothing is deleted, except where there is no trash (a network share): there undo asks before it deletes. | Ctrl+Z, Ctrl+Shift+Z, Shift+F9, Shift+F10 |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
@@ -150,96 +151,34 @@ Each layer has one rule:
 - **Alt** is tools and panels, then the marks on F8 to F10. Alt+F4 is
   left to the window manager.
 
-F1 shows the same grid and the full list inside the window, with
-whatever you have remapped. A config written by 0.9 or older follows
-the keys that moved in 0.9.5 (the Ctrl layer); a line you changed
-yourself is left alone.
+F1 shows the same grid and every key inside the window, with whatever
+you have remapped. A config written by 0.9 or older follows the keys
+that moved in 0.9.5 (the Ctrl layer); a line you changed yourself is
+left alone.
 
-The defaults by subject, with the keys other file managers use kept as
-second keys:
-
-### Files
+The rest is not on the bar:
 
 | Key | Action |
 |-----|--------|
-| Enter | open with the default app; on a folder or an archive, enter it |
-| Shift+F3, Shift+Enter | open the marked items (or the cursor item, a folder too) with another app: type to narrow the list, Enter opens, Ctrl+Enter also makes it the default; text that names no app runs as a command (Ctrl+Enter: in a terminal) |
-| F2 | rename inline; Tab moves on to the row's permissions and owner when those columns are shown |
-| Shift+F2 | multi-rename panel |
-| F3 | view; on a folder, compute its size |
-| F4 | edit in a terminal ($VISUAL, $EDITOR, else nvim, vim, nano or vi) |
-| F5, F6 | copy, move to the other pane (F5 inside an archive extracts) |
-| Shift+F5 | folder sync panel |
-| Alt+F5 | pack the marked items into a new archive (zip, tar.gz, tar.xz, tar.zst, 7z) in the other pane |
-| F7, Shift+F4 | new folder, new file |
-| F8, Shift+F8 | trash, delete permanently (which cannot be undone, and says so) |
-| Ctrl+Z, Shift+F9 | undo the last file operation of this window |
-| Ctrl+Shift+Z, Shift+F10 | redo it |
-| Alt+F2, Alt+Enter | properties, with permissions and owner for every marked item |
-| Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
-
-### Marks and filter
-
-| Key | Action |
-|-----|--------|
-| Insert, Shift+Down | mark and move down |
-| Shift+Up | mark and move up |
-| Space, Ctrl+A | mark, mark all |
-| Alt+F8, * | invert the marks (mark what stays, invert, F8) |
-| Alt+F9, Ctrl+= | mark by pattern |
-| Alt+F10, Ctrl+- | unmark by pattern |
-| Ctrl+Shift+A | clear the marks (a folder's marks come back when you return to it) |
-| any text | filters the current tab; Backspace edits the filter while one is set, Space appends to it |
-| Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
-
-### Moving around
-
-| Key | Action |
-|-----|--------|
-| Backspace, Left | go up |
-| Right | enter the folder |
-| Ctrl+L | type a path or URI |
-| Alt+F1, Ctrl+G | go to a folder from history |
-| Alt+F7 | find in tree |
-| Alt+F6, Ctrl+D | bookmark this folder, or remove the bookmark |
-| Ctrl+R | reload the folder |
 | Tab, Shift+Tab | switch panes, focus the tree |
-| F8 in the tree | on a mount: unmount it, or eject it when it is removable |
+| Enter, Right | open with the default app; enter a folder or an archive |
+| Backspace, Left | go up |
+| any text | filters the current tab; Backspace edits the filter while one is set |
+| Insert, Shift+Down, Shift+Up | mark and move down, or up |
+| Space, Ctrl+A, Ctrl+Shift+A | mark (while no filter is set), mark all, clear the marks |
+| Esc | clear the filter, close the viewer or panel, close the preview, then clear the marks |
+| Ctrl+T, Ctrl+W, Ctrl+Tab, Ctrl+Shift+Tab | new tab, close tab, next tab, previous tab |
+| Ctrl+L, Ctrl+R | type a path or URI, reload the folder |
+| Ctrl+C, Ctrl+X, Ctrl+V | clipboard, shared with other file managers |
+| Ctrl+Z, Ctrl+Shift+Z | undo and redo, as on Shift+F9 and Shift+F10 |
+| Ctrl+Space | the command line: runs one command in the tab's folder in a terminal |
+| Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End, Ctrl+P | page a previewed PDF or seek a video; play or pause |
 
-### Panes, tabs and what they show
-
-| Key | Action |
-|-----|--------|
-| Ctrl+T, Ctrl+W | new tab, close tab |
-| Ctrl+Tab, Ctrl+Shift+Tab | next tab, previous tab |
-| Ctrl+F1, Ctrl+F2 | hide the left or right pane |
-| Ctrl+F3 | hide or show the folder tree |
-| Ctrl+F5, Ctrl+F6 | recursive sizes and counts, thumbnails for this tab |
-| Ctrl+F7, Ctrl+H | show hidden files |
-| Ctrl+F8 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
-| Ctrl+F10, Ctrl+Shift+L | lock the tab: navigation opens a new tab |
-
-### Preview
-
-| Key | Action |
-|-----|--------|
-| Ctrl+F4, Ctrl+Q | preview the cursor item |
-| Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End | previewed PDF: first, previous, next, last page; video: start, back 10 s, forward 10 s, end |
-| Ctrl+P | previewed video: play or pause |
-
-The strip under the preview's details has the same buttons and a
-playhead.
-
-### Help, menu, terminal and command line
-
-| Key | Action |
-|-----|--------|
-| F1, Shift+F1 | help; about: name, version and build date |
-| F9 | the menu bar until a choice or Esc |
-| F10 | quit, keeping the session |
-| Ctrl+F9 | syntax colours in the viewer and the preview, on or off |
-| Ctrl+Space | the command line: runs one command in the tab's folder in a terminal, which stays until Enter |
-| Alt+F3 | your terminal in the tab's folder, with your shell (xdg-terminal-exec, else `$TERMINAL`) |
+Several keys of the bar also answer to the chord other file managers
+use: Ctrl+Q preview, Ctrl+H hidden files, Ctrl+G go to, Ctrl+D
+bookmark, Alt+Enter properties, Shift+Enter open with, `*` invert the
+marks, Ctrl+= and Ctrl+- mark and unmark by pattern, Ctrl+Shift+L lock
+the tab.
 
 ## Mouse
 

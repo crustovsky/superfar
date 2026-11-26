@@ -37,6 +37,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextBlock>
@@ -132,6 +133,8 @@ private Q_SLOTS:
     void syntaxColoursFromBat();
     void viewerFonts();
     void terminalInTheTabsFolder();
+    void growingFileUpdatesItsRow();
+    void longPathsDoNotWidenTheWindow();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -497,7 +500,26 @@ void WindowTest::functionBarLayers()
     QTest::keyRelease(focus, Qt::Key_Control);
     QTest::keyPress(focus, Qt::Key_Control);
     QCOMPARE(window_->width(), narrow);
+    // What does not fit is cut at the end: the key and the start of
+    // the word stay (#104). The window is given three quarters of what
+    // the Ctrl layer's labels alone would take, whatever the font.
+    const int tight = std::max(window_->minimumSizeHint().width(), labels * 3 / 4);
+    window_->resize(tight, before.height());
+    QTRY_COMPARE(window_->width(), tight);
+    bool cut = false;
+    for (int i = 0; i < buttons.size(); ++i) {
+        const QString shown = bar->shownLabel(i);
+        QVERIFY2(shown.startsWith(QStringLiteral("F%1").arg(i + 1)), qPrintable(shown));
+        QString head = shown;
+        if (head.endsWith(QChar(0x2026))) {
+            head.chop(1);
+            cut = true;
+        }
+        QVERIFY2(buttons[i]->text().startsWith(head), qPrintable(shown));
+    }
+    QVERIFY(cut);
     window_->resize(before);
+    QTRY_COMPARE(bar->shownLabel(9), buttons[9]->text());  // with room, whole
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);
@@ -1040,6 +1062,134 @@ void WindowTest::terminalInTheTabsFolder()
             listed = listed || entry.command == Command::OpenTerminal;
         QVERIFY(listed);
     }
+}
+
+void WindowTest::growingFileUpdatesItsRow()
+{
+    // A file being written in the open folder changes its Size cell and
+    // nothing else: no reset of the list, so cursor, marks and scroll
+    // stay (#83). The other pane shows the same folder in a tab that is
+    // not sorted by name: the row keeps its place until the writer is done.
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    auto* model = view->model();
+    auto rowOf = [&](const QString& name) { return static_cast<int>(tab->entryNames().indexOf(name)); };
+    auto sizeOf = [&](const QString& name) { return model->index(rowOf(name), columns::SizeColumn).data().toString(); };
+    view->setCurrentIndex(model->index(rowOf(QStringLiteral("two.txt")), 0));
+    QTest::keyClick(view, Qt::Key_Insert);  // marks two.txt; the cursor moves on
+    const QByteArray cursor = tab->currentName();
+    QCOMPARE(tab->markedCount(), 1);
+    QCOMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("1 byte"));
+    QTest::qWait(600);  // the monitor's word on what the test set up has passed
+
+    QSignalSpy reset(model, &QAbstractItemModel::modelReset);
+    QSignalSpy listed(tab, &Tab::folderChanged);
+    QFile one(a_ + "/one.txt");
+    QVERIFY(one.open(QIODevice::Append));
+    one.write(QByteArray(4095, 'x'));
+    one.flush();
+    QTRY_COMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("4.0 KiB"));
+    one.write(QByteArray(4096, 'x'));
+    one.close();
+    QTRY_COMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("8.0 KiB"));
+    QTest::qWait(600);
+    QCOMPARE(reset.size(), 0);
+    QCOMPARE(listed.size(), 0);
+    QCOMPARE(tab->currentName(), cursor);
+    QCOMPARE(tab->markedCount(), 1);
+
+    // Sorted by size, the row moves once the file is closed, and the
+    // cursor and the mark go with their items.
+    tab->setSort(core::SortBy::Size, true);
+    QTRY_COMPARE(tab->entryNames().last(), QStringLiteral("one.txt"));
+    QFile two(a_ + "/two.txt");
+    QVERIFY(two.open(QIODevice::Append));
+    two.write(QByteArray(20000, 'x'));
+    two.flush();
+    QTRY_COMPARE(sizeOf(QStringLiteral("two.txt")), QStringLiteral("19.5 KiB"));
+    QCOMPARE(tab->entryNames().last(), QStringLiteral("one.txt"));  // still being written
+    two.close();
+    QTRY_COMPARE(tab->entryNames().last(), QStringLiteral("two.txt"));
+    QCOMPARE(tab->currentName(), cursor);
+    QCOMPARE(tab->markedCount(), 1);
+    QCOMPARE(listed.size(), 0);
+}
+
+void WindowTest::longPathsDoNotWidenTheWindow()
+{
+    // Whatever names a folder or an item on screen elides; it never
+    // sets the least the window may be (#93). Every panel and bar is
+    // opened twice, in two short folders and in two some 230
+    // characters deep around a file with a 120 character name: the
+    // window asks for the same width both times.
+    using Widths = QList<QPair<QString, int>>;
+    auto measure = [&](const QString& l, const QString& r, const QString& name) {
+        write(l + QLatin1Char('/') + name, "1");
+        write(r + QLatin1Char('/') + name, "22");  // a conflict, and a difference to sync
+        left()->activeTab()->navigate(loc(l));
+        right()->activeTab()->navigate(loc(r));
+        [&] { QTRY_VERIFY(left()->activeTab()->entryNames().contains(name)); }();
+        [&] { QTRY_VERIFY(right()->activeTab()->entryNames().contains(name)); }();
+        ListView* view = left()->activeTab()->view();
+        view->setCurrentIndex(view->model()->index(static_cast<int>(left()->activeTab()->entryNames().indexOf(name)), 0));
+        Widths out;
+        auto note = [&](const char* what) {
+            QTest::qWait(120);
+            out.append({QLatin1String(what), window_->minimumSizeHint().width()});
+        };
+        auto escape = [&] {
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_Escape);
+            QTest::qWait(40);
+        };
+        note("the panes");
+        for (const auto& [command, what] : std::initializer_list<std::pair<Command, const char*>>{
+                 {Command::Pack, "pack"}, {Command::Sync, "sync"}, {Command::MultiRename, "multi-rename"},
+                 {Command::Properties, "properties"}, {Command::Mkdir, "new folder"}, {Command::NewFile, "new file"},
+                 {Command::DeletePermanent, "delete"}, {Command::Trash, "trash"}, {Command::Move, "move"},
+                 {Command::Find, "find"}, {Command::GoTo, "go to"}, {Command::OpenWith, "open with"},
+                 {Command::MarkGlob, "mark by pattern"}, {Command::Columns, "columns"}, {Command::Preview, "preview"},
+                 {Command::View, "viewer"}, {Command::EditPath, "path"}}) {
+            window_->execute(command);
+            note(what);
+            escape();
+        }
+        // A copy onto the same name: the prompt, then the conflict bar.
+        window_->execute(Command::Copy);
+        note("copy");
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Return);
+        [&] { QTRY_VERIFY(window_->findChild<ConflictBar*>()); }();
+        note("conflict");
+        escape();
+        [&] { QTRY_VERIFY(window_->findChildren<core::Job*>().isEmpty()); }();
+        return out;
+    };
+    QString deepA = a_, deepB = b_;
+    for (int i = 0; i < 4; ++i) {
+        deepA += QStringLiteral("/a-folder-with-quite-a-long-name-to-fill-the-path-%1").arg(i);
+        deepB += QStringLiteral("/b-folder-with-quite-a-long-name-to-fill-the-path-%1").arg(i);
+    }
+    QVERIFY(QDir().mkpath(deepA) && QDir().mkpath(deepB));
+    const Widths plain = measure(a_, b_, QStringLiteral("n.txt"));
+    const Widths deep = measure(deepA, deepB, QString(120, QLatin1Char('n')) + QStringLiteral(".txt"));
+    QCOMPARE(deep.size(), plain.size());
+    QStringList wider;
+    for (qsizetype i = 0; i < deep.size(); ++i)
+        if (deep[i].second > plain[i].second)
+            wider << QStringLiteral("%1: %2, was %3").arg(deep[i].first).arg(deep[i].second).arg(plain[i].second);
+    QVERIFY2(wider.isEmpty(), qPrintable(wider.join(QStringLiteral("; "))));
+    // Nor do a panel's own rows of controls: they wrap (#96). None of
+    // the panels that take a pane's place makes the window ask for
+    // more than this many average characters; the sync and
+    // multi-rename panels asked for about 110. (The job strip's row
+    // and the bars under it do not wrap yet: #109.)
+    const int bound = 75 * window_->fontMetrics().averageCharWidth();
+    const QStringList panels = {QStringLiteral("pack"), QStringLiteral("sync"), QStringLiteral("multi-rename"),
+                                QStringLiteral("properties")};
+    QStringList wide;
+    for (const auto& [what, width] : plain)
+        if (panels.contains(what) && width > bound)
+            wide << QStringLiteral("%1: %2").arg(what).arg(width);
+    QVERIFY2(wide.isEmpty(), qPrintable(QStringLiteral("over %1: ").arg(bound) + wide.join(QStringLiteral("; "))));
 }
 
 void WindowTest::permissionDeniedOffersAdministrator()

@@ -1,4 +1,5 @@
-// Text helpers shared by the job strip and panel.
+// Text helpers for sizes, rates and durations, shared by the list, the
+// job strip and the panels.
 #pragma once
 
 #include <QLocale>
@@ -6,8 +7,11 @@
 
 namespace jobfmt {
 
+// The one place a size is put into words. Qt has no singular.
 inline QString bytes(quint64 n)
 {
+    if (n == 1)
+        return QStringLiteral("1 byte");
     return QLocale().formattedDataSize(static_cast<qint64>(n), 1, QLocale::DataSizeIecFormat);
 }
 

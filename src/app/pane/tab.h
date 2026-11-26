@@ -121,6 +121,7 @@ private:
     void showArchiveDir(const QByteArray& dir);
     void onSpace(quint64 generation, bool ok, quint64 freeBytes);
     void onMonitor();
+    void onEntryChanged(const QByteArray& name, bool settled);
     void activate(const QModelIndex& index);
     void typed(const QString& text);
     void setFilter(const QString& text);

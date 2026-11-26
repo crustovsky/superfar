@@ -54,7 +54,30 @@ Entry toEntry(GFileInfo* info)
     return e;
 }
 
+struct EntryRequest {
+    std::function<void(bool, const Entry&)> done;
+
+    static void onInfo(GObject* source, GAsyncResult* result, gpointer data)
+    {
+        std::unique_ptr<EntryRequest> req(static_cast<EntryRequest*>(data));
+        GPtr<GFileInfo> info(g_file_query_info_finish(G_FILE(source), result, nullptr));
+        req->done(info != nullptr, info ? toEntry(info.get()) : Entry{});
+    }
+};
+
 } // namespace
+
+void queryEntry(const Location& file, std::function<void(bool ok, const Entry& entry)> done)
+{
+    if (!file.isValid()) {
+        done(false, Entry{});
+        return;
+    }
+    // The same attributes and the same flags as the listing, so the row
+    // reads as a reload would have it (a link shows its target's size).
+    g_file_query_info_async(file.gfile(), kAttributes, G_FILE_QUERY_INFO_NONE, G_PRIORITY_DEFAULT, nullptr,
+                            &EntryRequest::onInfo, new EntryRequest{std::move(done)});
+}
 
 // One load. Owned by its own callback chain: it deletes itself when the
 // chain ends, whether by completion, error or cancellation. owner is

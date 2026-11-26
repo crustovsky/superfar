@@ -1,5 +1,7 @@
 #include "jobs/panel.h"
 
+#include "elidedlabel.h"
+
 #include "jobs/format.h"
 
 #include <QGridLayout>
@@ -63,7 +65,7 @@ JobPanel::JobPanel(core::Job* job, QWidget* parent)
     , job_(job)
     , from_(new QLabel(this))
     , to_(new QLabel(this))
-    , currentName_(new QLabel(this))
+    , currentName_(new FittedLabel(QString(), this))
     , current_(new QProgressBar(this))
     , overall_(new QProgressBar(this))
     , overallText_(new QLabel(this))
@@ -108,6 +110,10 @@ JobPanel::JobPanel(core::Job* job, QWidget* parent)
 
     for (QLabel* l : {from_, to_, currentName_})
         l->setTextFormat(Qt::PlainText);
+    // The two paths can be selected, so they stay plain labels: a long
+    // one is cut at the edge and does not ask for its width.
+    from_->setMinimumWidth(1);
+    to_->setMinimumWidth(1);
     from_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     to_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     current_->setTextVisible(false);
