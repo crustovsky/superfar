@@ -9,6 +9,7 @@
 #include "core/reader.h"
 #include "keymap.h"
 
+#include <QFont>
 #include <QWidget>
 
 class Config;
@@ -47,6 +48,7 @@ private:
     QPlainTextEdit* text_;
     QLabel* status_;
     Highlight* colours_;
+    QFont textFont_;    // the application's, for a file shown as text
     QByteArray whole_;  // the file, when it fits the first window as text
     QByteArray name_;
     quint64 size_ = 0;

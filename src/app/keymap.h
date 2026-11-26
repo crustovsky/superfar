@@ -66,17 +66,18 @@ enum class Command {
     MultiRename,       // Shift+F2: the multi-rename panel
     Sync,              // Shift+F5: folder sync between the two active tabs
     About,             // Shift+F1, the Help menu, and once per new version
-    ToggleTree,        // Ctrl+F5: hide or show the folder tree
+    ToggleTree,        // Ctrl+F3: hide or show the folder tree
     Pack,              // Alt+F5: the marked items into a new archive
     PreviewFirst,      // paged preview content: first page
     PreviewPrev,
     PreviewNext,
     PreviewLast,
     PreviewPlay,       // a previewed video: play or pause
-    Columns,           // Ctrl+F6: the pane's column list
+    Columns,           // Ctrl+F8: the pane's column list
     Undo,              // Ctrl+Z: take the last file operation back
     Redo,              // Ctrl+Shift+Z: do it again
     ToggleHighlight,   // Ctrl+F9: syntax colours in the viewer and the preview
+    OpenTerminal,      // Alt+F3: the default terminal in the tab's folder
 };
 
 Command lookup(const QKeySequence& key);

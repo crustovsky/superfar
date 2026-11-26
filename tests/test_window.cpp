@@ -9,6 +9,7 @@
 #include "highlight.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
+#include "keymap.h"
 #include "mainwindow.h"
 #include "menu.h"
 #include "openwith.h"
@@ -26,6 +27,7 @@
 #include <QContextMenuEvent>
 #include <QDir>
 #include <QFile>
+#include <QFontDatabase>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -34,6 +36,7 @@
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextBlock>
@@ -118,6 +121,7 @@ private Q_SLOTS:
     void rightClickInTheOtherPane();
     void columnListFromTheKeyboard();
     void functionBarLayers();
+    void keysOfAnOlderConfig();
     void propertiesGoDownAFolder();
     void promptOutlivesItsTab();
     void cursorStaysWhereItsItemWas();
@@ -126,6 +130,8 @@ private Q_SLOTS:
     void warningsSayWhatCannotBeUndone();
     void queueBehindARunningJob();
     void syntaxColoursFromBat();
+    void viewerFonts();
+    void terminalInTheTabsFolder();
     void permissionDeniedOffersAdministrator();
 
 private:
@@ -426,6 +432,32 @@ void WindowTest::columnListFromTheKeyboard()
     QTRY_VERIFY(left()->activeTab()->view()->hasFocus());  // focus comes back to the list
 }
 
+void WindowTest::keysOfAnOlderConfig()
+{
+    // A config a 0.9 first run wrote follows the keys that moved within
+    // the Ctrl layer (#85); a line the user changed is theirs and stays.
+    QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("superfar.ini"));
+    {
+        QSettings old(path, QSettings::IniFormat);
+        old.setValue(QStringLiteral("keys/ToggleTree"), QStringLiteral("Ctrl+F5"));
+        old.setValue(QStringLiteral("keys/Preview"), QStringLiteral("Ctrl+F8;Ctrl+Q"));
+        old.setValue(QStringLiteral("keys/ToggleSizes"), QStringLiteral("Ctrl+F3"));
+        old.setValue(QStringLiteral("keys/Columns"), QStringLiteral("Ctrl+F6"));
+        old.setValue(QStringLiteral("keys/LockTab"), QStringLiteral("Ctrl+Shift+L"));
+        old.setValue(QStringLiteral("keys/ToggleThumbnails"), QStringLiteral("Ctrl+T;Ctrl+F4"));  // edited
+    }
+    Config config(path);
+    config.writeDefaultKeys(keymap::defaults(), keymap::retiredDefaults());
+    const auto keys = config.keyBindings();
+    QCOMPARE(keys.value(QStringLiteral("ToggleTree")), QStringList({"Ctrl+F3"}));
+    QCOMPARE(keys.value(QStringLiteral("Preview")), QStringList({"Ctrl+F4", "Ctrl+Q"}));
+    QCOMPARE(keys.value(QStringLiteral("ToggleSizes")), QStringList({"Ctrl+F5"}));
+    QCOMPARE(keys.value(QStringLiteral("Columns")), QStringList({"Ctrl+F8"}));
+    QCOMPARE(keys.value(QStringLiteral("LockTab")), QStringList({"Ctrl+F10", "Ctrl+Shift+L"}));
+    QCOMPARE(keys.value(QStringLiteral("ToggleThumbnails")), QStringList({"Ctrl+T", "Ctrl+F4"}));
+}
+
 void WindowTest::functionBarLayers()
 {
     // What the bar reads with a modifier held is what the keys do.
@@ -446,11 +478,26 @@ void WindowTest::functionBarLayers()
     QCOMPARE(row().value(0), QStringLiteral("F1 Go to"));
     QCOMPARE(row().value(1), QStringLiteral("F2 Properties"));
     QCOMPARE(row().value(5), QStringLiteral("F6 Bookmark"));
-    QVERIFY(!buttons[2]->isEnabled());  // Alt+F3 is free
+    QCOMPARE(row().value(2), QStringLiteral("F3 Terminal"));
+    QVERIFY(!buttons[3]->isEnabled());  // Alt+F4 is the window manager's
     QTest::keyRelease(focus, Qt::Key_Alt);
 
     QTest::keyPress(focus, Qt::Key_Control);
-    QCOMPARE(row().mid(5, 3), QStringList({"F6 Columns", "F7 Hidden", "F8 Preview"}));
+    QCOMPARE(row().mid(0, 4), QStringList({"F1 Left", "F2 Right", "F3 Tree", "F4 Preview"}));  // the window
+    QCOMPARE(row().mid(4, 6), QStringList({"F5 Sizes", "F6 Thumbs", "F7 Hidden", "F8 Columns", "F9 Syntax", "F10 Lock"}));  // the tab
+    // The bar shares the room there is and never asks for more (#91):
+    // its widest layer does not set the least the window may be.
+    int labels = 0;
+    for (const QToolButton* b : buttons)
+        labels += b->fontMetrics().horizontalAdvance(b->text());
+    QVERIFY(bar->minimumSizeHint().width() < labels);
+    const QSize before = window_->size();
+    window_->resize(window_->minimumSizeHint().width(), before.height());
+    const int narrow = window_->width();
+    QTest::keyRelease(focus, Qt::Key_Control);
+    QTest::keyPress(focus, Qt::Key_Control);
+    QCOMPARE(window_->width(), narrow);
+    window_->resize(before);
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);
@@ -933,6 +980,68 @@ void WindowTest::syntaxColoursFromBat()
     qputenv("PATH", path);
 }
 
+void WindowTest::viewerFonts()
+{
+    // What the viewer lines up with spaces is set in the fixed font: the
+    // help and the hex view (#86). A file shown as text keeps the
+    // application's, also right after one of the others.
+    Tab* tab = left()->activeTab();
+    ListView* view = tab->view();
+    const QFont fixed = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    QTest::keyClick(view, Qt::Key_F1);
+    QTRY_VERIFY(left()->findChild<Viewer*>());
+    auto* text = left()->findChild<Viewer*>()->findChild<QPlainTextEdit*>();
+    QVERIFY(text->toPlainText().contains(QStringLiteral("this help")));
+    QCOMPARE(text->font(), fixed);
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    write(a_ + "/blob.bin", QByteArray("\x7f" "ELF\0\1\2\3", 8));
+    QTRY_VERIFY(tab->entryNames().contains(QStringLiteral("blob.bin")));
+    auto open = [&](const QString& name) {
+        view->setCurrentIndex(view->model()->index(tab->entryNames().indexOf(name), 0));
+        QTest::keyClick(view, Qt::Key_F3);
+    };
+    open(QStringLiteral("blob.bin"));
+    QTRY_VERIFY(text->toPlainText().startsWith(QStringLiteral("00000000  7f 45 4c 46")));
+    QCOMPARE(text->font(), fixed);
+    QTest::keyClick(text, Qt::Key_Escape);
+    QTRY_VERIFY(view->hasFocus());
+
+    open(QStringLiteral("one.txt"));
+    QTRY_COMPARE(text->toPlainText(), QStringLiteral("1"));
+    QCOMPARE(text->font(), QApplication::font(text));
+    QTest::keyClick(text, Qt::Key_Escape);
+}
+
+void WindowTest::terminalInTheTabsFolder()
+{
+    // Alt+F3 starts the terminal in the active tab's folder with
+    // nothing to run (#84). The one on PATH is the test's own.
+    auto call = [] {
+        QFile f(g_env + "/terminal-call");
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts)
+                                           : QStringList();
+    };
+    QFile::remove(g_env + "/terminal-call");
+    QTest::keyClick(left()->activeTab()->view(), Qt::Key_F3, Qt::AltModifier);
+    QTRY_COMPARE(call(), QStringList({a_, "END"}));
+    QFile::remove(g_env + "/terminal-call");
+    // From the other pane it is that pane's folder.
+    QTest::keyClick(left()->activeTab()->view(), Qt::Key_Tab);
+    QTRY_VERIFY(right()->activeTab()->view()->hasFocus());
+    window_->execute(Command::OpenTerminal);
+    QTRY_COMPARE(call(), QStringList({b_, "END"}));
+    QFile::remove(g_env + "/terminal-call");
+    // It is on the menus that act on a folder.
+    for (menu::Context context : {menu::Context::Folder, menu::Context::Tree}) {
+        bool listed = false;
+        for (const menu::Entry& entry : menu::contextEntries(context))
+            listed = listed || entry.command == Command::OpenTerminal;
+        QVERIFY(listed);
+    }
+}
+
 void WindowTest::permissionDeniedOffersAdministrator()
 {
     if (::geteuid() == 0)
@@ -1012,6 +1121,14 @@ int main(int argc, char** argv)
         script.write("#!/bin/sh\n{ printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/viewer-call'\n");
         script.close();
         script.setPermissions(script.permissions() | QFile::ExeOwner);
+        // A stand-in for the terminal, ahead of any real one on PATH: a
+        // test must never open a window on the developer's desktop.
+        QFile term(g_env + "/bin/xdg-terminal-exec");
+        if (!term.open(QIODevice::WriteOnly))
+            return 1;
+        term.write("#!/bin/sh\n{ pwd; printf '%s\\n' \"$@\"; echo END; } >> '" + QFile::encodeName(g_env) + "/terminal-call'\n");
+        term.close();
+        term.setPermissions(term.permissions() | QFile::ExeOwner);
         // A stand-in for bat: its arguments written down, its input
         // back in one colour; with bat-warns there, a warning as well.
         QFile bat(g_env + "/bin/bat");

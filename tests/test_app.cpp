@@ -9,6 +9,7 @@
 #include "pane/markstore.h"
 #include "sgr.h"
 
+#include <QRegularExpression>
 #include <QTest>
 
 class AppTest : public QObject {
@@ -82,9 +83,9 @@ void AppTest::functionKeyLayers()
     const struct { Qt::KeyboardModifier mod; QStringList row; } layers[] = {
         {Qt::NoModifier, {"Help", "Rename", "View", "Edit", "Copy", "Move", "Mkdir", "Trash", "Menu", "Quit"}},
         {Qt::ShiftModifier, {"About", "MultiRename", "OpenWith", "NewFile", "Sync", "-", "-", "DeletePermanent", "Undo", "Redo"}},
-        {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleSizes", "ToggleThumbnails", "ToggleTree", "Columns",
-                               "ToggleHidden", "Preview", "ToggleHighlight", "-"}},
-        {Qt::AltModifier, {"GoTo", "Properties", "-", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
+        {Qt::ControlModifier, {"HideLeft", "HideRight", "ToggleTree", "Preview", "ToggleSizes", "ToggleThumbnails",
+                               "ToggleHidden", "Columns", "ToggleHighlight", "LockTab"}},
+        {Qt::AltModifier, {"GoTo", "Properties", "OpenTerminal", "-", "Pack", "Bookmark", "Find", "InvertMarks", "MarkGlob", "UnmarkGlob"}},
     };
     for (const auto& layer : layers) {
         QStringList row;
@@ -109,6 +110,30 @@ void AppTest::functionKeyLayers()
             retired = retired || (name == keymap::name(command) && was == old);
         QVERIFY2(retired, qPrintable(keymap::name(command)));
     }
+    // 0.9.5 moved keys within the Ctrl layer (#85): a config still at the
+    // 0.9 line of a moved command is retired, so it follows, and the
+    // letter chords stayed where they were.
+    const QList<QPair<Command, QString>> regrouped = {
+        {Command::ToggleTree, "Ctrl+F5"}, {Command::Preview, "Ctrl+F8;Ctrl+Q"}, {Command::ToggleSizes, "Ctrl+F3"},
+        {Command::ToggleThumbnails, "Ctrl+F4"}, {Command::Columns, "Ctrl+F6"}, {Command::LockTab, "Ctrl+Shift+L"}};
+    for (const auto& [command, old] : regrouped) {
+        bool retired = false;
+        for (const auto& [name, was] : keymap::retiredDefaults())
+            retired = retired || (name == keymap::name(command) && was == old);
+        QVERIFY2(retired, qPrintable(keymap::name(command)));
+        for (const auto& [name, keys] : keymap::defaults())
+            if (name == keymap::name(command))
+                QVERIFY2(keys.join(QLatin1Char(';')) != old, qPrintable(name));
+    }
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::CTRL | Qt::Key_Q)), Command::Preview);
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L)), Command::LockTab);
+    // Alt+F4 is the window manager's, for good.
+    QCOMPARE(keymap::lookup(QKeySequence(Qt::ALT | Qt::Key_F4)), Command::None);
+    // The help carries the same grid, a row per key.
+    const QString text = help::text();
+    QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\n {5}plain +Shift +Ctrl +Alt\\n"))));
+    QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\nF3 +View +Open with +Tree"))));
+    QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\nF10 +Quit +Redo +Lock +Deselect\\n"))));
 }
 
 void AppTest::keyShownInMenus()

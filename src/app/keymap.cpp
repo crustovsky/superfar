@@ -9,8 +9,16 @@ namespace keymap {
 namespace {
 
 // Every command has a key on a function key layer where one fits, so
-// the bar shows it while the modifier is held: Shift is a variant of
-// the plain key, Ctrl is what the pane shows, Alt is panels and tools.
+// the bar shows it while the modifier is held. One rule per layer:
+//   plain  FAR's row.
+//   Shift  the same verb as the plain key, another form. F9 and F10 are
+//          the stated exception: the menu and quit have no other form,
+//          so their slots hold undo and redo.
+//   Ctrl   what is shown, toggles only: F1 to F4 the parts of the
+//          window, F5 to F10 the settings of the tab.
+//   Alt    tools and panels that open something or go somewhere, then
+//          the marks as one block (F8 to F10). Alt+F4 stays empty:
+//          window managers take it.
 // Letter chords and the keys other file managers use come second.
 std::vector<std::pair<QKeySequence, Command>>& table()
 {
@@ -31,7 +39,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::ALT | Qt::Key_F7), Command::Find},
         {QKeySequence(Qt::CTRL | Qt::Key_F1), Command::HideLeft},
         {QKeySequence(Qt::CTRL | Qt::Key_F2), Command::HideRight},
-        {QKeySequence(Qt::CTRL | Qt::Key_F3), Command::ToggleSizes},
+        {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleSizes},
         {QKeySequence(Qt::Key_Tab), Command::SwitchPane},
         {QKeySequence(Qt::SHIFT | Qt::Key_Tab), Command::FocusTree},
         {QKeySequence(Qt::CTRL | Qt::Key_T), Command::NewTab},
@@ -52,7 +60,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::Key_Backspace), Command::GoUp},
         {QKeySequence(Qt::Key_Left), Command::GoUp},
         {QKeySequence(Qt::Key_Right), Command::Activate},
-        {QKeySequence(Qt::CTRL | Qt::Key_F8), Command::Preview},
+        {QKeySequence(Qt::CTRL | Qt::Key_F4), Command::Preview},
         {QKeySequence(Qt::CTRL | Qt::Key_Q), Command::Preview},
         {QKeySequence(Qt::Key_Return), Command::Activate},
         {QKeySequence(Qt::Key_Enter), Command::Activate},
@@ -74,17 +82,18 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_L), Command::EditPath},
         {QKeySequence(Qt::ALT | Qt::Key_F1), Command::GoTo},
         {QKeySequence(Qt::CTRL | Qt::Key_G), Command::GoTo},
+        {QKeySequence(Qt::CTRL | Qt::Key_F10), Command::LockTab},  // a locked tab shows as [name]
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_L), Command::LockTab},
         {QKeySequence(Qt::ALT | Qt::Key_F2), Command::Properties},  // on the bar with the other panels
         {QKeySequence(Qt::ALT | Qt::Key_Return), Command::Properties},  // what other file managers use
         {QKeySequence(Qt::ALT | Qt::Key_Enter), Command::Properties},
         {QKeySequence(Qt::ALT | Qt::Key_F6), Command::Bookmark},
         {QKeySequence(Qt::CTRL | Qt::Key_D), Command::Bookmark},
-        {QKeySequence(Qt::CTRL | Qt::Key_F4), Command::ToggleThumbnails},
+        {QKeySequence(Qt::CTRL | Qt::Key_F6), Command::ToggleThumbnails},
         {QKeySequence(Qt::SHIFT | Qt::Key_F2), Command::MultiRename},
         {QKeySequence(Qt::SHIFT | Qt::Key_F5), Command::Sync},
-        {QKeySequence(Qt::CTRL | Qt::Key_F5), Command::ToggleTree},
-        {QKeySequence(Qt::CTRL | Qt::Key_F6), Command::Columns},
+        {QKeySequence(Qt::CTRL | Qt::Key_F3), Command::ToggleTree},
+        {QKeySequence(Qt::CTRL | Qt::Key_F8), Command::Columns},
         {QKeySequence(Qt::ALT | Qt::Key_F5), Command::Pack},
         {QKeySequence(Qt::CTRL | Qt::Key_Home), Command::PreviewFirst},
         {QKeySequence(Qt::CTRL | Qt::Key_PageUp), Command::PreviewPrev},
@@ -96,6 +105,7 @@ std::vector<std::pair<QKeySequence, Command>>& table()
         {QKeySequence(Qt::CTRL | Qt::Key_Z), Command::Undo},
         {QKeySequence(Qt::SHIFT | Qt::Key_F10), Command::Redo},
         {QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), Command::Redo},
+        {QKeySequence(Qt::ALT | Qt::Key_F3), Command::OpenTerminal},
     };
     return t;
 }
@@ -181,7 +191,7 @@ QString label(Command command)
     case Command::Paste: return QStringLiteral("Paste");
     case Command::EditPath: return QStringLiteral("Path");
     case Command::GoTo: return QStringLiteral("Go to");
-    case Command::LockTab: return QStringLiteral("Lock tab");
+    case Command::LockTab: return QStringLiteral("Lock");
     case Command::Properties: return QStringLiteral("Properties");
     case Command::Bookmark: return QStringLiteral("Bookmark");
     case Command::ToggleThumbnails: return QStringLiteral("Thumbs");
@@ -199,6 +209,7 @@ QString label(Command command)
     case Command::Undo: return QStringLiteral("Undo");
     case Command::Redo: return QStringLiteral("Redo");
     case Command::ToggleHighlight: return QStringLiteral("Syntax");
+    case Command::OpenTerminal: return QStringLiteral("Terminal");
     case Command::None: return {};
     }
     return {};
@@ -230,6 +241,7 @@ const std::vector<std::pair<Command, const char*>>& names()
         {Command::PreviewNext, "PreviewNext"}, {Command::PreviewLast, "PreviewLast"},
         {Command::PreviewPlay, "PreviewPlay"}, {Command::Columns, "Columns"},
         {Command::Undo, "Undo"}, {Command::Redo, "Redo"}, {Command::ToggleHighlight, "ToggleHighlight"},
+        {Command::OpenTerminal, "OpenTerminal"},
     };
     return n;
 }
@@ -279,7 +291,15 @@ QList<QPair<QString, QString>> retiredDefaults()
             // 0.8.5: the marks got Alt+F8 to Alt+F10
             {QStringLiteral("InvertMarks"), QStringLiteral("*")},
             {QStringLiteral("MarkGlob"), QStringLiteral("Ctrl+=;Ctrl++;Num++")},
-            {QStringLiteral("UnmarkGlob"), QStringLiteral("Ctrl+-;Num+-")}};
+            {QStringLiteral("UnmarkGlob"), QStringLiteral("Ctrl+-;Num+-")},
+            // 0.9.5: the Ctrl layer in two blocks, the parts of the window
+            // (F1 to F4) and the settings of the tab (F5 to F10)
+            {QStringLiteral("ToggleTree"), QStringLiteral("Ctrl+F5")},
+            {QStringLiteral("Preview"), QStringLiteral("Ctrl+F8;Ctrl+Q")},
+            {QStringLiteral("ToggleSizes"), QStringLiteral("Ctrl+F3")},
+            {QStringLiteral("ToggleThumbnails"), QStringLiteral("Ctrl+F4")},
+            {QStringLiteral("Columns"), QStringLiteral("Ctrl+F6")},
+            {QStringLiteral("LockTab"), QStringLiteral("Ctrl+Shift+L")}};
 }
 
 QList<QKeySequence> keysOf(Command command)

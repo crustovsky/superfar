@@ -445,6 +445,9 @@ void MainWindow::execute(keymap::Command command)
     case Command::FocusCommandLine:
         cmdline_->setFocus();
         return;
+    case Command::OpenTerminal:
+        openTerminal();
+        return;
     case Command::CopyClip:
         copyToClipboard(false);
         return;
@@ -543,6 +546,20 @@ void MainWindow::runCommand(const QString& command)
 {
     QString error;
     if (!core::runInTerminal(active_->activeTab()->location(), command, true, &error))
+        active_->showMessage(error);
+}
+
+void MainWindow::openTerminal()
+{
+    // Inside an archive the tab's location is the archive file: there
+    // is no folder on disk for a shell to stand in.
+    const Tab* tab = active_->activeTab();
+    QString error;
+    if (tab->isArchive())
+        error = tr("No terminal inside an archive: there is no folder on disk");
+    else
+        core::openTerminal(tab->location(), &error);
+    if (!error.isEmpty())
         active_->showMessage(error);
 }
 
