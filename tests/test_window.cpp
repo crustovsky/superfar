@@ -1060,7 +1060,7 @@ void WindowTest::growingFileUpdatesItsRow()
     QTest::keyClick(view, Qt::Key_Insert);  // marks two.txt; the cursor moves on
     const QByteArray cursor = tab->currentName();
     QCOMPARE(tab->markedCount(), 1);
-    QCOMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("1 bytes"));
+    QCOMPARE(sizeOf(QStringLiteral("one.txt")), QStringLiteral("1 byte"));
     QTest::qWait(600);  // the monitor's word on what the test set up has passed
 
     QSignalSpy reset(model, &QAbstractItemModel::modelReset);

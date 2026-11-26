@@ -1,5 +1,7 @@
 #include "pane/listmodel.h"
 
+#include "jobs/format.h"
+
 #include "core/admin.h"
 #include "core/match.h"
 #include "core/sort.h"
@@ -369,10 +371,9 @@ QVariant ListModel::data(const QModelIndex& index, int role) const
                 const core::DirSize* d = dirSize(e);
                 if (!d || !d->ok || !d->recursive)
                     return {};
-                return QLocale().formattedDataSize(static_cast<qint64>(d->bytes), 1,
-                                                   QLocale::DataSizeIecFormat);
+                return jobfmt::bytes(d->bytes);
             }
-            return QLocale().formattedDataSize(static_cast<qint64>(e.size), 1, QLocale::DataSizeIecFormat);
+            return jobfmt::bytes(e.size);
         }
         case ItemsColumn: {
             if (!e.isDir())

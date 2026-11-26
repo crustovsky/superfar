@@ -1,5 +1,7 @@
 #include "pane/tab.h"
 
+#include "jobs/format.h"
+
 #include "counted.h"
 #include "bench.h"
 #include "core/admin.h"
@@ -457,13 +459,11 @@ void Tab::fallBack(const QString& why)
         load(target);
 }
 
-
 void Tab::onSpace(quint64 generation, bool ok, quint64 freeBytes)
 {
     if (generation != generation_)
         return;
-    spaceText_ = ok ? tr("%1 free").arg(QLocale().formattedDataSize(
-                          static_cast<qint64>(freeBytes), 1, QLocale::DataSizeIecFormat))
+    spaceText_ = ok ? tr("%1 free").arg(jobfmt::bytes(freeBytes))
                     : QString();
     updateStatus();
 }

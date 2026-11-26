@@ -4,6 +4,7 @@
 #include "counted.h"
 #include "archivetext.h"
 #include "help.h"
+#include "jobs/format.h"
 #include "keymap.h"
 #include "pane/columns.h"
 #include "pane/markstore.h"
@@ -69,6 +70,11 @@ void AppTest::propertiesKeys()
 
 void AppTest::countsOfOne()
 {
+    // And "1 bytes" wherever a size was shown (#103).
+    QCOMPARE(jobfmt::bytes(0), QStringLiteral("0 bytes"));
+    QCOMPARE(jobfmt::bytes(1), QStringLiteral("1 byte"));
+    QCOMPARE(jobfmt::bytes(2), QStringLiteral("2 bytes"));
+    QCOMPARE(jobfmt::bytes(1024), QStringLiteral("1.0 KiB"));
     // "1 items" was everywhere (#64).
     QCOMPARE(counted(0, "item", "items"), QStringLiteral("0 items"));
     QCOMPARE(counted(1, "item", "items"), QStringLiteral("1 item"));
