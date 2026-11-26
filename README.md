@@ -78,7 +78,7 @@ thumbnail; nothing else changes.
 | **As administrator** | Where permission is denied on a local folder or item, a bar offers to go on as administrator: opening the folder, the job's item (for all that follow, if you say so), a rename, a new folder or file. It goes through GVfs's `admin://` and polkit, so the password dialog is the system's own and nothing of superfar runs as root. Unattended jobs never escalate. | the bar, or `admin:///path` in Ctrl+L |
 | **Archives** | Open as read-only folders, extract with F5, pack the marked items into zip, tar.gz, tar.xz, tar.zst or 7z. | Enter, F5, Alt+F5 |
 | **Multi-rename** | Wildcards, regex, find and replace, numbering, case and presets, with a live preview that calls out clashes. | Shift+F2 |
-| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it, and an item changed since is left alone. Nothing is deleted, except where there is no trash (a network share): there undo asks before it deletes. | Ctrl+Z, Ctrl+Shift+Z |
+| **Undo and redo** | Copy, move, trash, rename, new folder or file, extract, pack and attribute changes can be taken back. What an operation created goes to the trash, what it replaced comes back from it, and an item changed since is left alone. Nothing is deleted, except where there is no trash (a network share): there undo asks before it deletes. | Ctrl+Z, Ctrl+Shift+Z, Shift+F9, Shift+F10 |
 | **Folder sync** | Compares the two panes by size, time and, if asked, SHA-256; copies or trashes what you check. | Shift+F5 |
 
 ### Looking and finding
@@ -113,7 +113,7 @@ Click one for its full size.
 | | |
 |---|---|
 | ![Permissions](docs/screenshots/permissions.png)<br>Permissions and owner as columns; F2 opens the name, Tab moves to the row's mode | ![Properties](docs/screenshots/properties.png)<br>Properties on Alt+F2 over several marked items: bits they differ in are half checked and stay |
-| ![Columns](docs/screenshots/columns.png)<br>The column list on Ctrl+F8: Space shows or hides, Shift+Up and Shift+Down move | ![Folder sizes](docs/screenshots/folder-sizes.png)<br>Recursive folder sizes on Ctrl+F5, computed in the background |
+| ![Columns](docs/screenshots/columns.png)<br>The column list on Ctrl+F8: Space shows or hides, Shift+Up and Shift+Down move | ![Folder sizes](docs/screenshots/folder-sizes.png)<br>Recursive folder sizes on Ctrl+F5, computed in the background; with Ctrl held the bar shows that layer |
 | ![Preview](docs/screenshots/preview.png)<br>The preview on Ctrl+F4, following the cursor | ![PDF pages](docs/screenshots/pdf-pages.png)<br>A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the buttons |
 | ![Video](docs/screenshots/video.png)<br>A video in the preview, playing after Ctrl+P, without sound; the same keys seek | ![Viewer](docs/screenshots/viewer.png)<br>The F3 viewer on a binary file |
 | ![Multi-rename](docs/screenshots/multi-rename.png)<br>Multi-rename on Shift+F2, the clashes called out before anything is renamed | ![Folder sync](docs/screenshots/folder-sync.png)<br>Folder sync on Shift+F5, comparing the two panes |
@@ -124,37 +124,36 @@ Click one for its full size.
 
 Almost everything is on a function key, in four layers, and the bar at
 the bottom shows the layer of whatever modifier you hold, naming the
-modifier at its left end. Shift is a variant of the plain key, Ctrl is
-what the pane shows, Alt is panels and tools:
+modifier at its left end:
 
-| | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| plain | help | rename | view | edit | copy | move | new folder | trash | menu | quit |
-| Shift | about | multi-rename | open with | new file | sync | | | delete | | |
-| Ctrl | left pane | right pane | sizes | thumbnails | tree | columns | hidden files | preview | | |
-| Alt | go to | properties | | | pack | bookmark | find | invert marks | mark by pattern | unmark by pattern |
+| | plain | Shift | Ctrl | Alt |
+|---|---|---|---|---|
+| **F1** | help | about | left pane | go to |
+| **F2** | rename | multi-rename | right pane | properties |
+| **F3** | view | open with | tree | terminal |
+| **F4** | edit | new file | preview | |
+| **F5** | copy | sync | sizes | pack |
+| **F6** | move | | thumbnails | bookmark |
+| **F7** | new folder | | hidden files | find |
+| **F8** | trash | delete | columns | invert marks |
+| **F9** | menu | undo | syntax colours | mark by pattern |
+| **F10** | quit | redo | lock tab | unmark by pattern |
 
-F1 shows the full table inside the window, with whatever you have
-remapped. The function keys come in four layers, and the bar at the
-bottom shows the one whose modifier you hold:
+Each layer has one rule:
 
-| Key | plain | Shift | Ctrl | Alt |
-|-----|-------|-------|------|-----|
-| F1 | Help | About | Left pane | Go to |
-| F2 | Rename | Multi-rename | Right pane | Properties |
-| F3 | View | Open with | Tree | Terminal |
-| F4 | Edit | New file | Preview | |
-| F5 | Copy | Sync | Sizes | Pack |
-| F6 | Move | | Thumbnails | Bookmark |
-| F7 | Mkdir | | Hidden | Find |
-| F8 | Trash | Delete | Columns | Invert marks |
-| F9 | Menu | Undo | Syntax colours | Mark by pattern |
-| F10 | Quit | Redo | Lock tab | Unmark by pattern |
+- **plain** is FAR's row.
+- **Shift** is the plain key in another form: rename and multi-rename,
+  trash and delete. The menu and quit have no other form, so Shift+F9
+  and Shift+F10 hold undo and redo.
+- **Ctrl** is what is shown, each key a switch: F1 to F4 the parts of
+  the window, F5 to F10 the settings of the tab.
+- **Alt** is tools and panels, then the marks on F8 to F10. Alt+F4 is
+  left to the window manager.
 
-One rule per layer. Shift is another form of the plain key (undo and
-redo on F9 and F10 are the one exception). Ctrl is what is shown: F1 to
-F4 the parts of the window, F5 to F10 the settings of the tab. Alt is
-tools and panels, then the marks. Alt+F4 is left to the window manager.
+F1 shows the same grid and the full list inside the window, with
+whatever you have remapped. A config written by 0.9 or older follows
+the keys that moved in 0.9.5 (the Ctrl layer); a line you changed
+yourself is left alone.
 
 The defaults by subject, with the keys other file managers use kept as
 second keys:
@@ -231,14 +230,15 @@ second keys:
 The strip under the preview's details has the same buttons and a
 playhead.
 
-### Help, menu and command line
+### Help, menu, terminal and command line
 
 | Key | Action |
 |-----|--------|
 | F1, Shift+F1 | help; about: name, version and build date |
 | F9 | the menu bar until a choice or Esc |
 | F10 | quit, keeping the session |
-| Ctrl+Space | the command line: runs in the tab's folder in a terminal |
+| Ctrl+F9 | syntax colours in the viewer and the preview, on or off |
+| Ctrl+Space | the command line: runs one command in the tab's folder in a terminal, which stays until Enter |
 | Alt+F3 | your terminal in the tab's folder, with your shell (xdg-terminal-exec, else `$TERMINAL`) |
 
 ## Mouse

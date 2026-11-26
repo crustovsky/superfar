@@ -2,8 +2,9 @@
 # README screenshots. Run as: unshare -Urm tools/screenshots.sh
 # A user and mount namespace with a fresh tmpfs on /tmp, so the tree shows
 # only the demo folder below. Needs build/shotcfg: a copy of your qt6ct
-# config next to a superfar.ini whose [window] size is 1400x900, kept
-# pristine at build/shots/pristine.ini. Output lands in docs/screenshots.
+# config, and build/shots/pristine.ini: a superfar.ini that ends with
+# the state every shot starts from, [layout], [session] and [window]
+# (size 1400x900), in that order. Output lands in docs/screenshots.
 # ONLY=name renders that one shot.
 set -e
 cd "$(dirname "$0")/.."
@@ -41,9 +42,8 @@ chmod 2775 $D/Projects/shared; chmod 1777 $D/Projects/scratch
 chmod 755 $D/Projects/deploy.sh; chmod 600 $D/Projects/secrets.env
 touch -d '2026-10-12 09:30' $D/Projects/* $D/Documents/* $D/Pictures/* $D/Music/* $D/Downloads/* $D/Projects/site/* $D/Videos/* $D/README.txt
 export XDG_CONFIG_HOME=$PWD/build/shotcfg XDG_STATE_HOME=$PWD/build/shotstate QT_QPA_PLATFORM=offscreen
-# A state that knows the version, so the about note stays out of the shots.
 mkdir -p build/shotstate/superfar
-printf '[about]\nlastVersion=%s\n' "$(build/src/app/superfar --version | cut -d' ' -f2)" > build/shotstate/superfar/state.ini
+VERSION=$(build/src/app/superfar --version | cut -d' ' -f2)
 # The Owner column names accounts, and the shots should not name
 # yours. This namespace is root (your id mapped to 0); a second one
 # inside maps that to 1000, which a stand-in passwd calls sam. Shots
@@ -58,6 +58,12 @@ shot() {
     name=$1; keys=$2; ms=$3; shift 3
     [ -z "${ONLY:-}" ] || [ "$ONLY" = "$name" ] || return 0
     cp build/shots/pristine.ini build/shotcfg/superfar/superfar.ini
+    # The state afresh for every shot, or one shot's tabs and sizes are
+    # the start of the next: it knows the version, so the about note
+    # stays out, and takes the rest from the pristine file. The app only
+    # moves those sections over by itself when the state is empty.
+    { printf '[about]\nlastVersion=%s\n\n' "$VERSION"; sed -n '/^\[layout\]/,$p' build/shots/pristine.ini; } \
+        > build/shotstate/superfar/state.ini
     [ -z "${CFG:-}" ] || printf '%b' "$CFG" >> build/shotcfg/superfar/superfar.ini
     SUPERFAR_GRAB=docs/screenshots/$name.png SUPERFAR_GRAB_MS=$ms SUPERFAR_DEV_KEYS="$keys" \
         ${AS:-} build/src/app/superfar "$@" > build/shots/$name.log 2>&1 || echo "$name failed"
