@@ -8,7 +8,17 @@
 # ONLY=name renders that one shot.
 set -e
 cd "$(dirname "$0")/.."
-mount -t tmpfs none /tmp
+# A D-Bus session and a runtime directory of the run's own. The tree's
+# roots come from GVfs, and the desktop's would put whatever network
+# share is mounted there into every shot, with its user and host (#112).
+# The services a shot needs (GVfs, tumbler) start on the new bus by
+# themselves, knowing of no mounts.
+if [ -z "${SHOTS_BUS:-}" ]; then
+    mount -t tmpfs none /tmp
+    mkdir -m 700 /tmp/.run  # hidden: the tree shows /tmp
+    export SHOTS_BUS=1 XDG_RUNTIME_DIR=/tmp/.run
+    exec dbus-run-session -- tools/screenshots.sh "$@"
+fi
 D=/tmp/demo
 mkdir -p $D/Documents $D/Pictures $D/Music $D/Downloads $D/Projects/site $D/Backup/site
 printf '# Notes\n\n- call the plumber\n- renew passport\n- book the ferry\n' > $D/Documents/notes.md
