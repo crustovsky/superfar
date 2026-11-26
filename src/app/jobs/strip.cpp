@@ -1,15 +1,16 @@
 #include "jobs/strip.h"
 
 #include "elidedlabel.h"
+#include "flowlayout.h"
 
 #include "jobs/bars.h"
 #include "jobs/format.h"
 #include "openwith.h"
 
 #include <QApplication>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QProgressBar>
+#include <QResizeEvent>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -32,29 +33,28 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(0);
 
+    // What the job is and how far, then the numbers and the buttons:
+    // one line where the window has room for both, two where it does
+    // not, so the row never sets how wide the window must be (#109).
     auto* line = new QWidget(this);
-    auto* row = new QHBoxLayout(line);
+    auto* row = new FlowLayout;
+    line->setLayout(row);
     row->setContentsMargins(6, 2, 6, 2);
-    row->setSpacing(6);
     // An undo says what it takes back.
     const bool back = job->kind() == core::JobKind::Undo || job->kind() == core::JobKind::Redo;
     auto* title = new FittedLabel(back ? tr("%1: %2").arg(job->title(), job->subject()) : job->title(), this);
     title->setMinimumWidth(title->fontMetrics().horizontalAdvance(QStringLiteral("Delete")) + 4);
-    row->addWidget(title);
     name_->setTextFormat(Qt::PlainText);
     name_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    row->addWidget(name_, 2);
     bar_->setTextVisible(true);
     bar_->setMinimumWidth(160);
-    row->addWidget(bar_, 1);
-    row->addWidget(info_);
+    row->addWidget(FlowLayout::cell({title, name_, bar_}, line));
 
     auto add = [&](const QString& text) {
         auto* b = new QToolButton(this);
         b->setText(text);
         b->setAutoRaise(true);
         b->setFocusPolicy(Qt::NoFocus);
-        row->addWidget(b);
         return b;
     };
     start_ = add(tr("Start now"));
@@ -65,6 +65,7 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     auto* abort = abort_ = add(tr("Abort"));
     details_ = add(tr("Details"));
     details_->setCheckable(true);
+    row->addWidget(FlowLayout::cell({info_, start_, unattended_, pause_, abort_, details_}, line));
 
     layout_->addWidget(line);
     layout_->addWidget(panel_);
@@ -78,9 +79,11 @@ JobRow::JobRow(core::Job* job, QWidget* parent)
     connect(details_, &QToolButton::toggled, this, [this](bool on) {
         panel_->setVisible(on);
         // Only an open panel takes extra height from the bar area.
-        setSizePolicy(QSizePolicy::Preferred, on ? QSizePolicy::Expanding : QSizePolicy::Fixed);
+        setSizePolicy(QSizePolicy::Preferred, on ? QSizePolicy::Expanding : QSizePolicy::Minimum);
     });
-    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    // Minimum, not Fixed: a layout caps a Fixed widget at its hint,
+    // which is the height of the row on one line.
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
     connect(job_, &core::Job::progress, this, &JobRow::onProgress);
 
     auto* timer = new QTimer(this);
@@ -196,6 +199,28 @@ JobStrip::JobStrip(QWidget* parent)
     layout_->setContentsMargins(0, 0, 0, 0);
     layout_->setSpacing(1);
     hide();
+}
+
+// The strip sits in a vertical splitter, which asks for size hints and
+// nothing else: a row that wraps is only given its second line if the
+// hints say what the width at hand needs.
+QSize JobStrip::sizeHint() const
+{
+    const QSize hint = QWidget::sizeHint();
+    return {hint.width(), layout_->hasHeightForWidth() ? layout_->totalHeightForWidth(width()) : hint.height()};
+}
+
+QSize JobStrip::minimumSizeHint() const
+{
+    const QSize hint = QWidget::minimumSizeHint();
+    return {hint.width(), layout_->hasHeightForWidth() ? layout_->totalMinimumHeightForWidth(width()) : hint.height()};
+}
+
+void JobStrip::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    if (event->size().width() != event->oldSize().width())
+        updateGeometry();
 }
 
 void JobStrip::addJob(core::Job* job, bool queued)
