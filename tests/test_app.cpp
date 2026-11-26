@@ -110,7 +110,7 @@ void AppTest::functionKeyLayers()
             retired = retired || (name == keymap::name(command) && was == old);
         QVERIFY2(retired, qPrintable(keymap::name(command)));
     }
-    // 0.10 moved keys within the Ctrl layer (#85): a config still at the
+    // 0.9.5 moved keys within the Ctrl layer (#85): a config still at the
     // 0.9 line of a moved command is retired, so it follows, and the
     // letter chords stayed where they were.
     const QList<QPair<Command, QString>> regrouped = {
@@ -133,7 +133,7 @@ void AppTest::functionKeyLayers()
     const QString text = help::text();
     QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\n {5}plain +Shift +Ctrl +Alt\\n"))));
     QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\nF3 +View +Open with +Tree"))));
-    QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\nF10 +Quit +Redo +Lock tab +Deselect\\n"))));
+    QVERIFY(text.contains(QRegularExpression(QStringLiteral("\\nF10 +Quit +Redo +Lock +Deselect\\n"))));
 }
 
 void AppTest::keyShownInMenus()

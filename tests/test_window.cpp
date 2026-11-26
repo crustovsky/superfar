@@ -484,7 +484,20 @@ void WindowTest::functionBarLayers()
 
     QTest::keyPress(focus, Qt::Key_Control);
     QCOMPARE(row().mid(0, 4), QStringList({"F1 Left", "F2 Right", "F3 Tree", "F4 Preview"}));  // the window
-    QCOMPARE(row().mid(4, 6), QStringList({"F5 Sizes", "F6 Thumbs", "F7 Hidden", "F8 Columns", "F9 Syntax", "F10 Lock tab"}));  // the tab
+    QCOMPARE(row().mid(4, 6), QStringList({"F5 Sizes", "F6 Thumbs", "F7 Hidden", "F8 Columns", "F9 Syntax", "F10 Lock"}));  // the tab
+    // The bar shares the room there is and never asks for more (#91):
+    // its widest layer does not set the least the window may be.
+    int labels = 0;
+    for (const QToolButton* b : buttons)
+        labels += b->fontMetrics().horizontalAdvance(b->text());
+    QVERIFY(bar->minimumSizeHint().width() < labels);
+    const QSize before = window_->size();
+    window_->resize(window_->minimumSizeHint().width(), before.height());
+    const int narrow = window_->width();
+    QTest::keyRelease(focus, Qt::Key_Control);
+    QTest::keyPress(focus, Qt::Key_Control);
+    QCOMPARE(window_->width(), narrow);
+    window_->resize(before);
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);

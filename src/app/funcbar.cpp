@@ -26,6 +26,9 @@ FuncBar::FuncBar(QWidget* parent)
         b->setFocusPolicy(Qt::NoFocus);
         b->setToolButtonStyle(Qt::ToolButtonTextOnly);
         b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        // The labels share the room there is and never ask for more: a
+        // layer wider than the window is cut, the window is not widened.
+        b->setMinimumWidth(1);
         connect(b, &QToolButton::clicked, this, [this, i] {
             const Qt::KeyboardModifiers mods = QApplication::keyboardModifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
             const auto key = Qt::Key(Qt::Key_F1 + i - 1);

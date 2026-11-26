@@ -191,7 +191,7 @@ QString label(Command command)
     case Command::Paste: return QStringLiteral("Paste");
     case Command::EditPath: return QStringLiteral("Path");
     case Command::GoTo: return QStringLiteral("Go to");
-    case Command::LockTab: return QStringLiteral("Lock tab");
+    case Command::LockTab: return QStringLiteral("Lock");
     case Command::Properties: return QStringLiteral("Properties");
     case Command::Bookmark: return QStringLiteral("Bookmark");
     case Command::ToggleThumbnails: return QStringLiteral("Thumbs");
@@ -292,7 +292,7 @@ QList<QPair<QString, QString>> retiredDefaults()
             {QStringLiteral("InvertMarks"), QStringLiteral("*")},
             {QStringLiteral("MarkGlob"), QStringLiteral("Ctrl+=;Ctrl++;Num++")},
             {QStringLiteral("UnmarkGlob"), QStringLiteral("Ctrl+-;Num+-")},
-            // 0.10: the Ctrl layer in two blocks, the parts of the window
+            // 0.9.5: the Ctrl layer in two blocks, the parts of the window
             // (F1 to F4) and the settings of the tab (F5 to F10)
             {QStringLiteral("ToggleTree"), QStringLiteral("Ctrl+F5")},
             {QStringLiteral("Preview"), QStringLiteral("Ctrl+F8;Ctrl+Q")},
