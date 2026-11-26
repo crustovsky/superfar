@@ -1,6 +1,7 @@
 #include "jobs/bars.h"
 
 #include "elidedlabel.h"
+#include "flowlayout.h"
 
 #include "jobs/format.h"
 
@@ -364,16 +365,16 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     const QString what = c.targetIsDir ? tr("Folder %1 already exists in %2")
                                        : tr("%1 already exists in %2");
     layout->addWidget(new FittedLabel(what.arg(c.name, c.targetPath.left(c.targetPath.size() - c.name.size())), this));
-    auto* details = new QLabel(tr("Source: %1, %2    Target: %3, %4")
-                                   .arg(jobfmt::bytes(c.sourceSize), when(c.sourceModified),
-                                        jobfmt::bytes(c.targetSize), when(c.targetModified)),
-                               this);
+    auto* details = new FittedLabel(tr("Source: %1, %2    Target: %3, %4")
+                                        .arg(jobfmt::bytes(c.sourceSize), when(c.sourceModified),
+                                             jobfmt::bytes(c.targetSize), when(c.targetModified)),
+                                    this);
     details->setEnabled(false);
     layout->addWidget(details);
     if (c.cannotUndo)
-        layout->addWidget(new QLabel(tr("There is no trash here to keep what is replaced: overwriting cannot be undone."), this));
+        layout->addWidget(new FittedLabel(tr("There is no trash here to keep what is replaced: overwriting cannot be undone."), this));
 
-    auto* row = new QHBoxLayout;
+    auto* row = new FlowLayout;  // the answers wrap where the window is narrow
     auto* all = new QCheckBox(tr("Apply to &all"), this);
     auto add = [&](const QString& text, core::ConflictAction action) {
         auto* b = button(text, this);
@@ -385,7 +386,6 @@ ConflictBar::ConflictBar(const core::Conflict& c, QWidget* parent)
     add(tr("Overwrite if &newer"), core::ConflictAction::OverwriteIfNewer);
     add(tr("&Rename"), core::ConflictAction::Rename);
     add(tr("&Skip"), core::ConflictAction::Skip);
-    row->addStretch(1);
     row->addWidget(all);
     layout->addLayout(row);
     setFocusProxy(first);
@@ -410,7 +410,7 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     // Cut in the middle: what failed and why both stay, whatever the path.
     layout->addWidget(new FittedLabel(tr("Could not %1 %2: %3").arg(verb, f.path, f.message), this));
 
-    auto* row = new QHBoxLayout;
+    auto* row = new FlowLayout;
     auto* all = new QCheckBox(tr("Apply to &all"), this);
     auto add = [&](const QString& label, core::ErrorAction action) {
         auto* b = button(label, this);
@@ -425,7 +425,6 @@ ErrorBar::ErrorBar(const QString& verb, const core::Failure& f, QWidget* parent)
     if (f.offerAdmin)
         add(tr("As a&dministrator"), core::ErrorAction::AsAdmin);
     add(tr("A&bort"), core::ErrorAction::Abort);
-    row->addStretch(1);
     row->addWidget(all);
     layout->addLayout(row);
     setFocusProxy(first);

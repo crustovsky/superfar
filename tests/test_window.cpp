@@ -501,10 +501,11 @@ void WindowTest::functionBarLayers()
     QTest::keyPress(focus, Qt::Key_Control);
     QCOMPARE(window_->width(), narrow);
     // What does not fit is cut at the end: the key and the start of
-    // the word stay (#104). At a width a column of a scrolling layout
-    // has, the Ctrl layer does not fit.
-    window_->resize(760, before.height());
-    QTRY_COMPARE(window_->width(), 760);
+    // the word stay (#104). The window is given three quarters of what
+    // the Ctrl layer's labels alone would take, whatever the font.
+    const int tight = std::max(window_->minimumSizeHint().width(), labels * 3 / 4);
+    window_->resize(tight, before.height());
+    QTRY_COMPARE(window_->width(), tight);
     bool cut = false;
     for (int i = 0; i < buttons.size(); ++i) {
         const QString shown = bar->shownLabel(i);
