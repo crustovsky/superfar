@@ -9,6 +9,7 @@
 #include "highlight.h"
 #include "jobs/bars.h"
 #include "jobs/strip.h"
+#include "keymap.h"
 #include "mainwindow.h"
 #include "menu.h"
 #include "openwith.h"
@@ -35,6 +36,7 @@
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTextBlock>
@@ -119,6 +121,7 @@ private Q_SLOTS:
     void rightClickInTheOtherPane();
     void columnListFromTheKeyboard();
     void functionBarLayers();
+    void keysOfAnOlderConfig();
     void propertiesGoDownAFolder();
     void promptOutlivesItsTab();
     void cursorStaysWhereItsItemWas();
@@ -428,6 +431,32 @@ void WindowTest::columnListFromTheKeyboard()
     QTRY_VERIFY(left()->activeTab()->view()->hasFocus());  // focus comes back to the list
 }
 
+void WindowTest::keysOfAnOlderConfig()
+{
+    // A config a 0.9 first run wrote follows the keys that moved within
+    // the Ctrl layer (#85); a line the user changed is theirs and stays.
+    QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("superfar.ini"));
+    {
+        QSettings old(path, QSettings::IniFormat);
+        old.setValue(QStringLiteral("keys/ToggleTree"), QStringLiteral("Ctrl+F5"));
+        old.setValue(QStringLiteral("keys/Preview"), QStringLiteral("Ctrl+F8;Ctrl+Q"));
+        old.setValue(QStringLiteral("keys/ToggleSizes"), QStringLiteral("Ctrl+F3"));
+        old.setValue(QStringLiteral("keys/Columns"), QStringLiteral("Ctrl+F6"));
+        old.setValue(QStringLiteral("keys/LockTab"), QStringLiteral("Ctrl+Shift+L"));
+        old.setValue(QStringLiteral("keys/ToggleThumbnails"), QStringLiteral("Ctrl+T;Ctrl+F4"));  // edited
+    }
+    Config config(path);
+    config.writeDefaultKeys(keymap::defaults(), keymap::retiredDefaults());
+    const auto keys = config.keyBindings();
+    QCOMPARE(keys.value(QStringLiteral("ToggleTree")), QStringList({"Ctrl+F3"}));
+    QCOMPARE(keys.value(QStringLiteral("Preview")), QStringList({"Ctrl+F4", "Ctrl+Q"}));
+    QCOMPARE(keys.value(QStringLiteral("ToggleSizes")), QStringList({"Ctrl+F5"}));
+    QCOMPARE(keys.value(QStringLiteral("Columns")), QStringList({"Ctrl+F8"}));
+    QCOMPARE(keys.value(QStringLiteral("LockTab")), QStringList({"Ctrl+F10", "Ctrl+Shift+L"}));
+    QCOMPARE(keys.value(QStringLiteral("ToggleThumbnails")), QStringList({"Ctrl+T", "Ctrl+F4"}));
+}
+
 void WindowTest::functionBarLayers()
 {
     // What the bar reads with a modifier held is what the keys do.
@@ -452,7 +481,8 @@ void WindowTest::functionBarLayers()
     QTest::keyRelease(focus, Qt::Key_Alt);
 
     QTest::keyPress(focus, Qt::Key_Control);
-    QCOMPARE(row().mid(5, 3), QStringList({"F6 Columns", "F7 Hidden", "F8 Preview"}));
+    QCOMPARE(row().mid(0, 4), QStringList({"F1 Left", "F2 Right", "F3 Tree", "F4 Preview"}));  // the window
+    QCOMPARE(row().mid(4, 6), QStringList({"F5 Sizes", "F6 Thumbs", "F7 Hidden", "F8 Columns", "F9 Syntax", "F10 Lock tab"}));  // the tab
     QTest::keyRelease(focus, Qt::Key_Control);
 
     QTest::keyPress(focus, Qt::Key_Shift);

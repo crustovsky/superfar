@@ -3,7 +3,11 @@
 #include "keymap.h"
 
 #include <QCoreApplication>
+#include <QKeyCombination>
+#include <QKeySequence>
 #include <QStringList>
+
+#include <algorithm>
 
 namespace help {
 
@@ -79,6 +83,35 @@ QString describe(keymap::Command c)
     return {};
 }
 
+// The four layers of the function bar as one grid, read from the
+// keymap so it cannot drift from the bar or from a remapped config.
+QStringList layerGrid()
+{
+    const struct { Qt::KeyboardModifier mod; const char* title; } layers[] = {
+        {Qt::NoModifier, "plain"}, {Qt::ShiftModifier, "Shift"}, {Qt::ControlModifier, "Ctrl"}, {Qt::AltModifier, "Alt"}};
+    QList<QStringList> columns;
+    for (const auto& layer : layers) {
+        QStringList column{QString::fromLatin1(layer.title)};
+        for (int i = 0; i < 10; ++i)
+            column << keymap::label(keymap::lookup(QKeySequence(QKeyCombination(layer.mod, Qt::Key(Qt::Key_F1 + i)).toCombined())));
+        columns << column;
+    }
+    QStringList lines;
+    for (int row = 0; row <= 10; ++row) {
+        QString line = (row == 0 ? QString() : QStringLiteral("F%1").arg(row)).leftJustified(5);
+        for (const QStringList& column : columns) {
+            int width = 0;
+            for (const QString& cell : column)
+                width = std::max<int>(width, static_cast<int>(cell.size()));
+            line += column[row].leftJustified(width + 2);
+        }
+        lines << line;
+        while (lines.last().endsWith(QLatin1Char(' ')))
+            lines.last().chop(1);
+    }
+    return lines;
+}
+
 } // namespace
 
 QString about()
@@ -115,6 +148,16 @@ QString text()
     lines << QCoreApplication::translate("help", "Keys (change them in ~/.config/superfar/superfar.ini, section [keys];");
     lines << QCoreApplication::translate("help", "a line with several keys is quoted: GoUp=\"Backspace;Left\")");
     lines << QString();
+    lines << QCoreApplication::translate("help", "The function keys, as the bar shows them while a modifier is held:");
+    lines << QString();
+    lines << layerGrid();
+    lines << QString();
+    lines << QCoreApplication::translate("help", "Shift is another form of the plain key (F9 and F10: undo and redo).");
+    lines << QCoreApplication::translate("help", "Ctrl is what is shown: F1 to F4 the parts of the window, F5 to F10");
+    lines << QCoreApplication::translate("help", "the settings of the tab. Alt is tools and panels, then the marks.");
+    lines << QString();
+    lines << QCoreApplication::translate("help", "Every key:");
+    lines << QString();
     int width = 0;
     QList<QPair<QString, QString>> rows;
     for (keymap::Command c : keymap::allCommands()) {
@@ -130,7 +173,7 @@ QString text()
     lines << QString();
     lines << QCoreApplication::translate("help", "Type to filter the list; Backspace edits the filter, Esc clears it.");
     lines << QCoreApplication::translate("help", "Click a column header to sort by it; click again to reverse. Folders stay first.");
-    lines << QCoreApplication::translate("help", "Drag a header to move its column, its edge to resize it; a right click lists the columns (Ctrl+F6 from the keys).");
+    lines << QCoreApplication::translate("help", "Drag a header to move its column, its edge to resize it; a right click lists the columns (Ctrl+F8 from the keys).");
     lines << QCoreApplication::translate("help", "Drag files between panes, onto folders and to other apps; drops accept files from them.");
     lines << QCoreApplication::translate("help", "A right click on an item, the empty list, a tab or the tree lists what the keys do there.");
     return lines.join(QLatin1Char('\n'));

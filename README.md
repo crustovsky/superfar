@@ -63,10 +63,10 @@ thumbnail; nothing else changes.
 | | What you get | Where |
 |---|---|---|
 | **Two panes** | Always open, each with its own path bar, tabs and status line; the active one is unmistakable. | Tab, Ctrl+F1, Ctrl+F2 |
-| **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+Shift+L |
-| **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F5 |
+| **Tabs** | A tab owns its folder, history, sort, filter, marks and cursor. Tabs come back on start and can be locked. | Ctrl+T, Ctrl+W, Ctrl+F10 |
+| **Folder tree** | One tree that follows the active tab: the filesystem, the trash, your GTK bookmarks, mounts and the network. | Shift+Tab, Ctrl+F3 |
 | **Function key bar** | F1 to F10 with what they do, relabelled while Shift, Ctrl or Alt is held. The menu bar stays out of the way until F9, and a right click offers the same commands for what is under the pointer. | always on screen |
-| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F6, the header |
+| **Columns** | Size, Items, Modified, Permissions, Owner. Drag a header to reorder, right click it to choose; each pane keeps its own. Size, count and date are never cut short. | Ctrl+F8, the header |
 
 ### Working with files
 
@@ -85,10 +85,10 @@ thumbnail; nothing else changes.
 
 | | What you get | Where |
 |---|---|---|
-| **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F3, F3 on a folder |
-| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F8 |
+| **Folder counts and sizes** | Item counts by default; recursive sizes and counts per tab, with partial totals while the walk runs. | Ctrl+F5, F3 on a folder |
+| **Preview** | Follows the cursor in the other pane or a third slot: images, text, PDF pages, video, an archive's summary and tree, a folder's totals. | Ctrl+F4 |
 | **Viewer** | Any file of any size, read in windows; hex for binaries. Source and config files up to 1 MiB in syntax colours when `bat` is installed, in the theme bat is set to for dark or light. | F3, Ctrl+F9 |
-| **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F4 |
+| **Thumbnails** | From tumbler over D-Bus, in taller rows, per tab. | Ctrl+F6 |
 | **Find and go** | Find in tree with the results in a tab, folder history ranked by frecency, a path or a remote URI typed in. | Alt+F7, Alt+F1, Ctrl+L |
 | **Remote and removable** | sftp, smb and the rest through GVfs. Mounting asks for credentials inside the window; F8 on a mount unmounts or ejects it. | Ctrl+L, the tree |
 
@@ -113,12 +113,12 @@ Click one for its full size.
 | | |
 |---|---|
 | ![Permissions](docs/screenshots/permissions.png)<br>Permissions and owner as columns; F2 opens the name, Tab moves to the row's mode | ![Properties](docs/screenshots/properties.png)<br>Properties on Alt+F2 over several marked items: bits they differ in are half checked and stay |
-| ![Columns](docs/screenshots/columns.png)<br>The column list on Ctrl+F6: Space shows or hides, Shift+Up and Shift+Down move | ![Folder sizes](docs/screenshots/folder-sizes.png)<br>Recursive folder sizes on Ctrl+F3, computed in the background |
-| ![Preview](docs/screenshots/preview.png)<br>The preview on Ctrl+F8, following the cursor | ![PDF pages](docs/screenshots/pdf-pages.png)<br>A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the buttons |
+| ![Columns](docs/screenshots/columns.png)<br>The column list on Ctrl+F8: Space shows or hides, Shift+Up and Shift+Down move | ![Folder sizes](docs/screenshots/folder-sizes.png)<br>Recursive folder sizes on Ctrl+F5, computed in the background |
+| ![Preview](docs/screenshots/preview.png)<br>The preview on Ctrl+F4, following the cursor | ![PDF pages](docs/screenshots/pdf-pages.png)<br>A PDF in the preview, paged with Ctrl+PgUp and Ctrl+PgDown or the buttons |
 | ![Video](docs/screenshots/video.png)<br>A video in the preview, playing after Ctrl+P, without sound; the same keys seek | ![Viewer](docs/screenshots/viewer.png)<br>The F3 viewer on a binary file |
 | ![Multi-rename](docs/screenshots/multi-rename.png)<br>Multi-rename on Shift+F2, the clashes called out before anything is renamed | ![Folder sync](docs/screenshots/folder-sync.png)<br>Folder sync on Shift+F5, comparing the two panes |
 | ![Archive](docs/screenshots/archive.png)<br>An archive opened as a folder, its tab named after it | ![Find](docs/screenshots/find.png)<br>Find in tree on Alt+F7, results in a tab |
-| ![Go to](docs/screenshots/go-to.png)<br>Folder history on Alt+F1, ranked by frecency | ![Thumbnails](docs/screenshots/thumbnails.png)<br>Thumbnails on Ctrl+F4, from tumbler through the freedesktop cache |
+| ![Go to](docs/screenshots/go-to.png)<br>Folder history on Alt+F1, ranked by frecency | ![Thumbnails](docs/screenshots/thumbnails.png)<br>Thumbnails on Ctrl+F6, from tumbler through the freedesktop cache |
 
 ## Keys
 
@@ -135,8 +135,29 @@ what the pane shows, Alt is panels and tools:
 | Alt | go to | properties | | | pack | bookmark | find | invert marks | mark by pattern | unmark by pattern |
 
 F1 shows the full table inside the window, with whatever you have
-remapped. The defaults by subject, with the keys other file managers
-use kept as second keys:
+remapped. The function keys come in four layers, and the bar at the
+bottom shows the one whose modifier you hold:
+
+| Key | plain | Shift | Ctrl | Alt |
+|-----|-------|-------|------|-----|
+| F1 | Help | About | Left pane | Go to |
+| F2 | Rename | Multi-rename | Right pane | Properties |
+| F3 | View | Open with | Tree | |
+| F4 | Edit | New file | Preview | |
+| F5 | Copy | Sync | Sizes | Pack |
+| F6 | Move | | Thumbnails | Bookmark |
+| F7 | Mkdir | | Hidden | Find |
+| F8 | Trash | Delete | Columns | Invert marks |
+| F9 | Menu | Undo | Syntax colours | Mark by pattern |
+| F10 | Quit | Redo | Lock tab | Unmark by pattern |
+
+One rule per layer. Shift is another form of the plain key (undo and
+redo on F9 and F10 are the one exception). Ctrl is what is shown: F1 to
+F4 the parts of the window, F5 to F10 the settings of the tab. Alt is
+tools and panels, then the marks. Alt+F4 is left to the window manager.
+
+The defaults by subject, with the keys other file managers use kept as
+second keys:
 
 ### Files
 
@@ -192,18 +213,18 @@ use kept as second keys:
 |-----|--------|
 | Ctrl+T, Ctrl+W | new tab, close tab |
 | Ctrl+Tab, Ctrl+Shift+Tab | next tab, previous tab |
-| Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 | Ctrl+F1, Ctrl+F2 | hide the left or right pane |
-| Ctrl+F5 | hide or show the folder tree |
-| Ctrl+F3, Ctrl+F4 | recursive sizes and counts, thumbnails for this tab |
-| Ctrl+F6 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
+| Ctrl+F3 | hide or show the folder tree |
+| Ctrl+F5, Ctrl+F6 | recursive sizes and counts, thumbnails for this tab |
 | Ctrl+F7, Ctrl+H | show hidden files |
+| Ctrl+F8 | the pane's columns as a list: Space shows or hides one, Shift+Up and Shift+Down move it |
+| Ctrl+F10, Ctrl+Shift+L | lock the tab: navigation opens a new tab |
 
 ### Preview
 
 | Key | Action |
 |-----|--------|
-| Ctrl+F8, Ctrl+Q | preview the cursor item |
+| Ctrl+F4, Ctrl+Q | preview the cursor item |
 | Ctrl+Home, Ctrl+PgUp, Ctrl+PgDown, Ctrl+End | previewed PDF: first, previous, next, last page; video: start, back 10 s, forward 10 s, end |
 | Ctrl+P | previewed video: play or pause |
 
@@ -239,7 +260,7 @@ playhead.
 ## Columns
 
 Name, Size, Items, Modified, Permissions and Owner; the last two are
-off until you switch them on. Ctrl+F6 lists a pane's columns: Space
+off until you switch them on. Ctrl+F8 lists a pane's columns: Space
 shows or hides one, Shift+Up and Shift+Down move it, and Reset columns
 at the bottom goes back to the defaults. The header does the same with
 the mouse. Name stays first and stays shown; when a pane is too narrow

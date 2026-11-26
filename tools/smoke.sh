@@ -70,12 +70,12 @@ fi
 run overlays "F1;Escape;F9;Escape;Ctrl+Q;Escape;Alt+Return;Escape;Ctrl+A;Shift+F2;Escape;Shift+F5;Escape;Ctrl+G;Escape;Ctrl+L;Escape" 8000 "$T/a" "$T/b"
 # The session brings the cursor back to the Z file from the newfile run;
 # Home first, so Return enters a folder instead of opening Z.
-run navigation "Home;Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F3;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
+run navigation "Home;Return;Backspace;Tab;Ctrl+T;Ctrl+W;Ctrl+H;Ctrl+F5;Insert;Shift+Down;Shift+Up;Space;Asterisk;Ctrl+F1;Ctrl+F1" 7000 "$T/a" "$T/b"
 run filter "t;w;Escape;p;Backspace" 3000 "$T/a" "$T/b"
 # The keys of the function key layers that have no other session:
-# hidden files on Ctrl+F7 (kept in the session), preview on Ctrl+F8, go
+# hidden files on Ctrl+F7 (kept in the session), preview on Ctrl+F4, go
 # to on Alt+F1, open with on Shift+F3, bookmark on Alt+F6 (set, removed).
-run layers "Ctrl+F7;Ctrl+F8;Escape;Alt+F1;Escape;Shift+F3;Escape;Alt+F6;Alt+F6" 5500 "$T/a" "$T/b"
+run layers "Ctrl+F7;Ctrl+F4;Escape;Alt+F1;Escape;Shift+F3;Escape;Alt+F6;Alt+F6" 5500 "$T/a" "$T/b"
 check "Ctrl+F7 showed hidden files" grep -q '^left.1.hidden=true' "$XDG_STATE_HOME/superfar/state.ini"
 run layersback "Ctrl+H" 2000 "$T/a" "$T/b"
 check "and Ctrl+H still hides them" grep -q '^left.1.hidden=false' "$XDG_STATE_HOME/superfar/state.ini"
@@ -105,13 +105,13 @@ if command -v ffmpeg > /dev/null && [ -d /usr/share/mime ]; then
     XDG_DATA_DIRS=$T/data
 fi
 
-# The column list on Ctrl+F6: Space on the first row hides Size,
+# The column list on Ctrl+F8: Space on the first row hides Size,
 # Shift+Down moves it past Items, the last row resets.
 before=$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")
-run columns "Ctrl+F6;Space;Shift+Down;Escape" 3000 "$T/a" "$T/b"
+run columns "Ctrl+F8;Space;Shift+Down;Escape" 3000 "$T/a" "$T/b"
 check "the Columns bar hid Size, in the state" grep -q '^left.hidden=.*size' "$XDG_STATE_HOME/superfar/state.ini"
 check "and moved it after Items" grep -q '^left.order=.*items,size' "$XDG_STATE_HOME/superfar/state.ini"
-run columnsreset "Ctrl+F6;End;Return;Escape" 2500 "$T/a" "$T/b"
+run columnsreset "Ctrl+F8;End;Return;Escape" 2500 "$T/a" "$T/b"
 check "Reset columns forgot it" sh -c "! grep -q '^left.hidden' '$XDG_STATE_HOME/superfar/state.ini'"
 check "the column list left the config alone" test "$before" = "$(cat "$XDG_CONFIG_HOME/superfar/superfar.ini")"
 

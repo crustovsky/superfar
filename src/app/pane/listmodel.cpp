@@ -439,7 +439,7 @@ const core::Metadata* ListModel::metadata(const core::Entry& entry) const
 bool ListModel::walksHere() const
 {
     // An administrator tab is the local disk read as root: the sizes
-    // asked for with Ctrl+F3 are walked there too. The item counts
+    // asked for with Ctrl+F5 are walked there too. The item counts
     // that come unasked are not: each goes through the admin daemon,
     // and once its authorisation has lapsed a mere repaint would put
     // up the password dialog.

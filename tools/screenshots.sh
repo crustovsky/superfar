@@ -64,7 +64,7 @@ shot() {
     echo "$name: $(grep -v '^bench' build/shots/$name.log | head -1)"
 }
 shot dual-pane "Down;Down" 3500 /usr/share $D
-shot folder-sizes "Ctrl+F3" 7000 /usr/share $D
+shot folder-sizes "Ctrl+F5" 7000 /usr/share $D
 shot preview "Ctrl+Q" 5000 $D/Pictures $D
 shot viewer "F3" 3500 $D/Downloads $D
 shot pdf-pages "Down;Down;Ctrl+Q;Ctrl+PgDown" 5000 $D/Documents $D
@@ -75,7 +75,7 @@ shot multi-rename "Ctrl+A;Shift+F2;Ctrl+A;I;M;G;_;*;Tab;Ctrl+A;H;O;L;I;D;A;Y;_;{
 shot folder-sync "Shift+F5" 5000 $D/Projects/site $D/Backup/site
 shot archive "Down;Return;Return" 5000 $D/Downloads $D
 shot find "Alt+F7;G;T;K;Return" 7000 /usr/share/icons/hicolor $D
-shot thumbnails "Ctrl+F4" 6000 /usr/share/icons/hicolor/256x256/apps $D
+shot thumbnails "Ctrl+F6" 6000 /usr/share/icons/hicolor/256x256/apps $D
 CFG=$COLS AS=$AS_SAM shot permissions "Down;Down;Down;F2;Tab" 4500 $D/Projects $D
-CFG=$COLS AS=$AS_SAM shot columns "Ctrl+F6;Down;Down" 4500 $D/Projects $D
+CFG=$COLS AS=$AS_SAM shot columns "Ctrl+F8;Down;Down" 4500 $D/Projects $D
 CFG=$COLS AS=$AS_SAM shot properties "Ctrl+A;Alt+F2;Tab" 5000 $D/Projects $D

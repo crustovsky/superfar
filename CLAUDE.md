@@ -42,7 +42,7 @@ These are the product. When in doubt, they win.
    and failure, and shows the list when the job ends.
 8. **Columns fit their content.** Size, count and date never truncate; each
    pane keeps its own set, order and widths, changed from its header.
-9. **Previews are big.** Ctrl+F8 previews the cursor item. By default it
+9. **Previews are big.** Ctrl+F4 previews the cursor item. By default it
    borrows the opposite pane (the window is often one column wide in a
    scrolling layout); a config option gives it a dedicated third slot, Opus
    style. Same component, same key, different slot. Images fit the slot,
@@ -58,8 +58,7 @@ These are the product. When in doubt, they win.
 - C++23, CMake + Ninja, warnings as errors
 - Qt 6 Widgets only: Core, Gui, Widgets, DBus. No QML, no KDE Frameworks
 - GIO (GLib) for the filesystem: local and remote (GVfs), trash, mounts,
-  monitors, MIME, default apps, copy and move. GLib is not GTK; Thunar
-  uses the same split
+  monitors, MIME, default apps, copy and move. GLib is not GTK (Thunar too)
 
 Rationale: Qt Widgets fits a dense keyboard-driven app. Current index and
 selection are separate objects (an Opus or FAR cursor needs exactly that),
@@ -87,11 +86,13 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 
 ## Keys (FAR-style, remappable)
 
-- Each command has a function key where one fits (the bar shows it):
-  Shift a variant, Ctrl what the pane shows, Alt panels, tools; chords second
+- Each command has a function key where one fits (the bar shows it),
+  chords second. Shift: the plain key in another form (F9, F10: undo,
+  redo). Ctrl: toggles of what is shown, F1 to F4 the window, F5 to F10
+  the tab. Alt: tools and panels, then marks; Alt+F4 is never bound
 - Tab switches panes; Shift+Tab focuses the tree; Ctrl+T new tab (same
-  folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab cycle; Ctrl+Shift+L locks
-  a tab so navigation opens a new tab (shown as [name])
+  folder), Ctrl+W close, Ctrl+Tab / Ctrl+Shift+Tab cycle; Ctrl+F10 (Ctrl+Shift+L)
+  locks a tab so navigation opens a new tab (shown as [name])
 - F1 help (Shift+F1 about), F2 rename inline (Tab: the row's mode and
   owner cells, when shown), F3 view (folder: compute size), F4 edit, F5
   copy, F6 move, F7 mkdir, F8 trash, F9 menu, F10 quit
@@ -103,19 +104,19 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Alt+F5 pack panel: the marked items into a new zip, tar.gz, tar.xz,
   tar.zst or 7z (name, level, this folder or the other pane's) by
   bsdtar in a child, with progress, conflict and abort like a copy
-- Ctrl+F3 toggles recursive sizes and counts for the tab (Items shows the
-  direct count otherwise); Ctrl+F4 thumbnails (tumbler over D-Bus, taller
-  rows); Ctrl+F5 the tree; Ctrl+F6 the column list; Ctrl+F7 (Ctrl+H) hidden
-  files; Ctrl+F9 syntax colours (bat); a header click sorts, a drag moves it
+- Ctrl+F3 the tree; Ctrl+F5 recursive sizes and counts for the tab (Items
+  shows the direct count otherwise); Ctrl+F6 thumbnails (tumbler over D-Bus,
+  taller rows); Ctrl+F7 (Ctrl+H) hidden files; Ctrl+F8 the column list;
+  Ctrl+F9 syntax colours (bat); a header click sorts, a drag moves it
 - Shift+F4 new file, Shift+F8 delete permanently (confirm in window),
   Alt+F7 find in tree (fuzzy over names, results in a tab); Ctrl+Z
   (Shift+F9) undoes the window's last file operation, Ctrl+Shift+Z redoes
-- Insert or Shift+Down selects and moves down, Shift+Up selects and
-  moves up; Space selects when the filter is empty;
-  Alt+F9 (Ctrl+=) / Alt+F10 (Ctrl+-) select and deselect by glob;
-  Ctrl+A all; Alt+F8 (*) inverts; Ctrl+Shift+A clears. Selection is marks,
-  separate from the cursor; a folder's marks come back when the tab
-  returns to it after a trip into a subfolder or an archive
+- Insert or Shift+Down selects and moves down, Shift+Up selects and moves
+  up; Space selects when the filter is empty; Alt+F9 (Ctrl+=) / Alt+F10
+  (Ctrl+-) select and deselect by glob; Ctrl+A all; Alt+F8 (*) inverts;
+  Ctrl+Shift+A clears. Selection is marks, separate from the cursor; a
+  folder's marks come back when the tab returns to it after a trip into
+  a subfolder or an archive
 - Enter opens with the default app; Shift+F3 (Shift+Enter) the open-with
   bar (filter, Ctrl+Enter sets the default, no match runs as a command);
   Alt+F2 (Alt+Enter) properties (mode and owner, down folders if asked); Esc
@@ -135,7 +136,7 @@ GStreamer, Poppler, Boost, an auto-updater, a search indexer.
 - Ctrl+Space focuses the command line, which runs in the active tab's
   directory in a terminal (xdg-terminal-exec, else $TERMINAL) and holds
   the window until Enter; Ctrl+Enter inserts the cursor's name
-- Ctrl+F8 (Ctrl+Q) preview (Ctrl+Home / PgUp / PgDown / End page a PDF or
+- Ctrl+F4 (Ctrl+Q) preview (Ctrl+Home / PgUp / PgDown / End page a PDF or
   seek a video, Ctrl+P plays); Ctrl+C / Ctrl+X / Ctrl+V work across apps
 
 ## Config
@@ -222,8 +223,7 @@ src/app/
 1. **Per-file work stays in the viewport.** Icon, content type and folder
    counts are queried when a row is painted, with a small cache. Size, date,
    mode and owner come with the listing: GIO's local enumerator stats each
-   entry anyway, so a sort by them needs no extra pass. Measure before
-   adding an attribute.
+   entry anyway, so sorting by them is free. Measure before adding one.
 2. **The model is not a list of objects.** `listmodel.cpp` wraps a plain
    vector<Entry>. Sorting and filtering change the vector and emit one
    reset. No QObject, no QStandardItem per row.
